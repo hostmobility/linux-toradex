@@ -38,12 +38,16 @@ MODULE_LICENSE("GPL v2");
 
 static u8 sp_read_reg8(const struct sja1000_priv *priv, int reg)
 {
-	return ioread8(priv->reg_base + reg);
+	u8 value;
+	iowrite8(reg, priv->reg_base);
+	value = ioread8(priv->reg_base + 8);
+	return value;
 }
 
 static void sp_write_reg8(const struct sja1000_priv *priv, int reg, u8 val)
 {
-	iowrite8(val, priv->reg_base + reg);
+	iowrite8(reg, priv->reg_base);
+	iowrite8(val, priv->reg_base + 8);
 }
 
 static u8 sp_read_reg16(const struct sja1000_priv *priv, int reg)

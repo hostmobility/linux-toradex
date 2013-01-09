@@ -18,6 +18,8 @@
 #include <asm/mach-types.h>
 #include <asm/setup.h>
 
+#include <linux/can/platform/mcp251x.h>
+#include <linux/can/platform/sja1000.h>
 #include <linux/clk.h>
 #include <linux/colibri_usb.h>
 #include <linux/delay.h>
@@ -37,6 +39,9 @@
 #include <linux/serial_8250.h>
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
+#if defined(CONFIG_SPI_GPIO) || defined(CONFIG_SPI_GPIO_MODULE)
+#include <linux/spi/spi_gpio.h>
+#endif
 #include <linux/suspend.h>
 #include <linux/tegra_uart.h>
 #include <linux/wm97xx.h>
@@ -57,9 +62,25 @@
 #include "clock.h"
 #include "devices.h"
 #include "gpio-names.h"
+//#include "../../../drivers/mtd/maps/tegra_nor.h"
+#include <linux/platform_data/tegra_nor.h>
 //move to board-colibri_t20-power.c?
 #include "pm.h"
 #include "wakeups-t2.h"
+
+/* Legacy defines from previous tegra_nor.h (changed) */
+#define __BITMASK0(len)				((1 << (len)) - 1)
+#define __BITMASK(start, len)		(__BITMASK0(len) << (start))
+#define REG_BIT(bit)				(1 << (bit))
+#define REG_FIELD(val, start, len)	(((val) & __BITMASK0(len)) << (start))
+#define REG_FIELD_MASK(start, len)	(~(__BITMASK((start), (len))))
+#define REG_GET_FIELD(val, start, len)	(((val) >> (start)) & __BITMASK0(len))
+#define TEGRA_GMI_PHYS				0x70009000
+#define TEGRA_GMI_BASE				IO_TO_VIRT(TEGRA_GMI_PHYS)
+#define CONFIG_REG					(TEGRA_GMI_BASE + 0x00)
+#define STATUS_REG					(TEGRA_GMI_BASE + 0x04)
+#define CONFIG_SNOR_CS(val) 		REG_FIELD((val), 4, 3)
+#define CONFIG_GO					REG_BIT(31)
 
 /* ADC */
 
@@ -98,6 +119,118 @@ static struct platform_device tegra_camera = {
 	.id	= -1,
 };
 #endif /* COLIBRI_T20_VI */
+
+/* CAN */
+#if ((defined(CONFIG_CAN_MCP251X) || defined(CONFIG_CAN_MCP251X_MODULE)) && \
+     (defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)))
+	#error either enable SJA1000 or MCP251X but not both
+#endif
+
+#if defined(CONFIG_CAN_MCP251X) || defined(CONFIG_CAN_MCP251X_MODULE)
+/* MECS Tellurium xPOD CAN module featuring MCP2515 SPI CAN controller */
+
+#ifdef MECS_TELLURIUM_XPOD2
+#define CAN_CS_GPIO		TEGRA_GPIO_PB7	/* SSPFRM2 */
+#define CAN_INTERRUPT_GPIO	TEGRA_GPIO_PK3	/* active low interrupt (MCP2515 nINT) */
+#define CAN_RESET_GPIO		TEGRA_GPIO_PK2	/* active high reset (not MCP2515 nRESET) */
+#else
+#define CAN_INTERRUPT_GPIO	TEGRA_GPIO_PA0	/* active low interrupt (MCP2515 nINT) */
+#define CAN_RESET_GPIO		TEGRA_GPIO_PK4	/* active high reset (not MCP2515 nRESET) */
+#endif
+
+static int __init colibri_t20_mcp2515_setup(struct spi_device *spi)
+{
+	int gpio_status;
+
+	printk("MECS Tellurium xPOD CAN Initialisation\n");
+
+	/* configure xPOD reset line as output and pull high into reset */
+	gpio_status = gpio_request(CAN_RESET_GPIO, "USB_HUB_RESET");
+	if (gpio_status < 0)
+		pr_warning("CAN_RESET_GPIO request GPIO FAILED\n");
+	tegra_gpio_enable(CAN_RESET_GPIO);
+	gpio_status = gpio_direction_output(CAN_RESET_GPIO, 1);
+	if (gpio_status < 0)
+		pr_warning("CAN_RESET_GPIO request GPIO DIRECTION FAILED\n");
+
+	udelay(2);
+
+	/* pull out of reset */
+	gpio_set_value(CAN_RESET_GPIO, 0);
+
+	return 0;
+}
+
+static struct mcp251x_platform_data mcp251x_pdata = {
+	.board_specific_setup	= colibri_t20_mcp2515_setup,
+	.model			= CAN_MCP251X_MCP2515,
+	.oscillator_frequency	= 16000000,
+	.power_enable		= NULL,
+	.transceiver_enable	= NULL
+};
+
+static struct spi_board_info mcp251x_board_info[] = {
+	{
+#ifndef MECS_TELLURIUM_XPOD2
+		.bus_num		= 3,
+#else
+		.bus_num		= 4,
+#endif
+		.chip_select		= 0,
+#ifdef MECS_TELLURIUM_XPOD2
+		.controller_data	= (void *) CAN_CS_GPIO,
+#endif
+		.max_speed_hz		= 10000000,
+		.modalias		= "mcp2515",
+		.platform_data		= &mcp251x_pdata,
+	},
+};
+
+static void __init colibri_t20_mcp2515_can_init(void)
+{
+#ifdef MECS_TELLURIUM_XPOD2
+	tegra_gpio_enable(CAN_CS_GPIO);
+#endif
+	tegra_gpio_enable(CAN_INTERRUPT_GPIO);
+	mcp251x_board_info[0].irq = gpio_to_irq(CAN_INTERRUPT_GPIO);
+	spi_register_board_info(mcp251x_board_info, ARRAY_SIZE(mcp251x_board_info));
+}
+#else /* CONFIG_CAN_MCP251X || CONFIG_CAN_MCP251X_MODULE */
+#define colibri_t20_mcp2515_can_init() do {} while (0)
+#endif /* CONFIG_CAN_MCP251X || CONFIG_CAN_MCP251X_MODULE */
+
+#if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
+#define CAN_BASE_TEG 0xd0000000 /* GMI_CS4_N */
+static struct resource colibri_can_resource[] = {
+	[0] =   {
+		.start	= CAN_BASE_TEG,		/* address */
+		.end	= CAN_BASE_TEG + 0xff,	/* data */
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] =   {
+		/* interrupt assigned during initialisation */
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+	}
+};
+
+static struct sja1000_platform_data colibri_can_platdata = {
+	.osc_freq	= 24000000,
+	.ocr		= (OCR_MODE_NORMAL | OCR_TX0_PUSHPULL),
+	.cdr		= CDR_CLK_OFF | /* Clock off (CLKOUT pin) */
+			  CDR_CBP, /* CAN input comparator bypass */
+};
+
+static struct platform_device colibri_can_device = {
+	.name		= "sja1000_platform",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(colibri_can_resource),
+	.resource	= colibri_can_resource,
+	.dev            = {
+		.platform_data = &colibri_can_platdata,
+	}
+};
+#endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
+
 
 /* Clock */
 static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
@@ -164,9 +297,12 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 #define USBH_PEN	TEGRA_GPIO_PW2	/* SODIMM 129 */
 
 static struct gpio colibri_t20_gpios[] = {
+//conflicts with MCP251X & SJA1000 CAN interfaces in MX4
 //conflicts with CAN interrupt on Colibri Evaluation Board and MECS Tellurium xPOD1 CAN
 //conflicts with DAC_PSAVE# on Iris
-#ifndef IRIS
+#if !defined(CONFIG_CAN_MCP251X) && !defined(CONFIG_CAN_MCP251X_MODULE) && \
+	!defined(CONFIG_CAN_SJA1000) && !defined(CONFIG_CAN_SJA1000_MODULE) && \
+	!defined(IRIS)
 	{TEGRA_GPIO_PA0,	GPIOF_IN,	"SODIMM pin 73"},
 #endif
 	{TEGRA_GPIO_PA2,	GPIOF_IN,	"SODIMM pin 186"},
@@ -176,10 +312,14 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PB2,	GPIOF_IN,	"SODIMM pin 154"},
 //multiplexed VI_D7
 	{TEGRA_GPIO_PB4,	GPIOF_IN,	"SODIMM pin 59"},
+#if !defined(CONFIG_SPI_GPIO) && !defined(CONFIG_SPI_GPIO_MODULE)
 //conflicts with MECS Tellurium xPOD2 SSPCLK2
 	{TEGRA_GPIO_PB6,	GPIOF_IN,	"SODIMM pin 55"},
+#endif
+#ifndef MECS_TELLURIUM_XPOD2
 //conflicts with MECS Tellurium xPOD2 SSPFRM2
 	{TEGRA_GPIO_PB7,	GPIOF_IN,	"SODIMM pin 63"},
+#endif
 #ifndef COLIBRI_T20_VI
 	{TEGRA_GPIO_PD5,	GPIOF_IN,	"SODI-98, Iris X16-13"},
 	{TEGRA_GPIO_PD6,	GPIOF_IN,	"SODIMM pin 81"},
@@ -190,8 +330,10 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PK0,	GPIOF_IN,	"SODIMM pin 150"},
 //multiplexed OWR
 	{TEGRA_GPIO_PK1,	GPIOF_IN,	"SODIMM pin 152"},
+#if !defined(CONFIG_CAN_MCP251X) && !defined(CONFIG_CAN_MCP251X_MODULE)
 //conflicts with CAN reset on MECS Tellurium xPOD1 CAN
 	{TEGRA_GPIO_PK4,	GPIOF_IN,	"SODIMM pin 106"},
+#endif
 //	{TEGRA_GPIO_PK5,	GPIOF_IN,	"USBC_DET"},
 #ifndef CONFIG_KEYBOARD_GPIO
 	{TEGRA_GPIO_PK6,	GPIOF_IN,	"SODIMM pin 135"},
@@ -652,11 +794,32 @@ static struct platform_device tegra_rtc_device = {
 
 /* SPI */
 
+#if defined(CONFIG_SPI_GPIO) || defined(CONFIG_SPI_GPIO_MODULE)
+#ifdef MECS_TELLURIUM_XPOD2
+struct spi_gpio_platform_data xpod2_spi_platform_data = {
+	.sck		= TEGRA_GPIO_PB6,	/* SSPCLK2 */
+	.mosi		= TEGRA_GPIO_PW2,	/* SSPTXD2 */
+	.miso		= TEGRA_GPIO_PW3,	/* SSPRXD2 */
+	.num_chipselect	= 1,
+};
+
+static struct platform_device xpod2_spi_device = {
+	.name	= "spi_gpio",
+	.id	= 4,
+	.dev 	= {
+		.platform_data	= &xpod2_spi_platform_data,
+	}
+};
+#endif /* MECS_TELLURIUM_XPOD2 */
+#endif /* CONFIG_SPI_GPIO || CONFIG_SPI_GPIO_MODULE */
+
 #if defined(CONFIG_SPI_TEGRA) && defined(CONFIG_SPI_SPIDEV)
 static struct spi_board_info tegra_spi_devices[] __initdata = {
 	{
 		.bus_num	= 3,
-		.chip_select	= 0,
+//working with spidev_test
+//		.chip_select	= 0,
+		.chip_select	= 1,
 		.irq		= 0,
 		.max_speed_hz	= 50000000,
 		.modalias	= "spidev",
@@ -1091,6 +1254,17 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 
 static void __init tegra_colibri_t20_init(void)
 {
+
+//we might have to move the location of can - legacy import
+#if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
+	writel(CONFIG_SNOR_CS(4), CONFIG_REG);
+	writel(CONFIG_GO | CONFIG_SNOR_CS(4), CONFIG_REG);
+	tegra_gpio_enable(TEGRA_GPIO_PA0);
+	colibri_can_resource[1].start	= gpio_to_irq(TEGRA_GPIO_PA0);
+	colibri_can_resource[1].end	= gpio_to_irq(TEGRA_GPIO_PA0);
+	platform_device_register(&colibri_can_device);
+#endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
+
 	tegra_clk_init_from_table(colibri_t20_clk_init_table);
 	colibri_t20_pinmux_init();
 	colibri_t20_i2c_init();
@@ -1112,6 +1286,12 @@ static void __init tegra_colibri_t20_init(void)
 //	tegra_spdif_input_device.name = "spdif";
 //	tegra_spdif_input_device.dev.platform_data = &tegra_spdif_audio_pdata;
 
+#ifdef MECS_TELLURIUM_XPOD2
+	tegra_gpio_enable(TEGRA_GPIO_PB6);
+	tegra_gpio_enable(TEGRA_GPIO_PW2);
+	tegra_gpio_enable(TEGRA_GPIO_PW3);
+#endif
+
 	colibri_t20_usb_init();
 	colibri_t20_panel_init();
 //sensors
@@ -1122,6 +1302,8 @@ static void __init tegra_colibri_t20_init(void)
 
 	colibri_t20_gpio_init();
 	colibri_t20_register_spidev();
+
+	colibri_t20_mcp2515_can_init();
 
 	tegra_release_bootloader_fb();
 }
