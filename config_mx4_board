@@ -869,7 +869,33 @@ CONFIG_XPS=y
 # CONFIG_NET_PKTGEN is not set
 # CONFIG_NET_DROP_MONITOR is not set
 # CONFIG_HAMRADIO is not set
-# CONFIG_CAN is not set
+CONFIG_CAN=y
+CONFIG_CAN_RAW=y
+CONFIG_CAN_BCM=y
+
+#
+# CAN Device Drivers
+#
+# CONFIG_CAN_VCAN is not set
+# CONFIG_CAN_SLCAN is not set
+CONFIG_CAN_DEV=y
+CONFIG_CAN_CALC_BITTIMING=y
+# CONFIG_CAN_MCP251X is not set
+# CONFIG_PCH_CAN is not set
+CONFIG_CAN_SJA1000=y
+CONFIG_CAN_SJA1000_PLATFORM=y
+# CONFIG_CAN_EMS_PCI is not set
+# CONFIG_CAN_KVASER_PCI is not set
+# CONFIG_CAN_PLX_PCI is not set
+# CONFIG_CAN_C_CAN is not set
+
+#
+# CAN USB interfaces
+#
+# CONFIG_CAN_EMS_USB is not set
+# CONFIG_CAN_ESD_USB2 is not set
+# CONFIG_CAN_SOFTING is not set
+# CONFIG_CAN_DEBUG_DEVICES is not set
 # CONFIG_IRDA is not set
 CONFIG_BT=y
 CONFIG_BT_L2CAP=y
@@ -1597,8 +1623,8 @@ CONFIG_SPI_MASTER=y
 # SPI Master Controller Drivers
 #
 # CONFIG_SPI_ALTERA is not set
-# CONFIG_SPI_BITBANG is not set
-# CONFIG_SPI_GPIO is not set
+CONFIG_SPI_BITBANG=y
+CONFIG_SPI_GPIO=y
 # CONFIG_SPI_OC_TINY is not set
 # CONFIG_SPI_PXA2XX_PCI is not set
 CONFIG_SPI_TEGRA=y
