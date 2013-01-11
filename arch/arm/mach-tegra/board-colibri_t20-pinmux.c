@@ -371,11 +371,11 @@ int __init colibri_t20_pinmux_init(void)
 
 	/* tri-stating GMI_WR_N on SODIMM pin 99 nPWE */
 	gpio_request(TEGRA_GPIO_PT6, "no GMI_WR_N on 99");
-	gpio_direction_output(TEGRA_GPIO_PT6, 1);
+	gpio_direction_output(TEGRA_GPIO_PT6, 0);
 
 	/* not tri-stating GMI_WR_N on SODIMM pin 93 RDnWR */
 	gpio_request(TEGRA_GPIO_PT5, "GMI_WR_N on 93 RDnWR");
-	gpio_direction_output(TEGRA_GPIO_PT5, 0);
+	gpio_direction_output(TEGRA_GPIO_PT5, 1);
 
 	return 0;
 }
