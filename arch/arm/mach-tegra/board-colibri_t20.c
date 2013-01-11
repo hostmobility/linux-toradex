@@ -50,6 +50,7 @@
 #include <mach/clk.h>
 #include <mach/gpio.h>
 #include <mach/iomap.h>
+#include <mach/mx4_iomap.h>
 #include <mach/irqs.h>
 #include <mach/nand.h>
 #include <mach/sdhci.h>
@@ -82,7 +83,9 @@
 #define CONFIG_SNOR_CS(val) 		REG_FIELD((val), 4, 3)
 #define CONFIG_GO					REG_BIT(31)
 
-/* ADC */
+/* We define a no export flag. We dont want to export the gpio 
+for a NC pin By: Mirza */
+#define GPIOF_NO_EXPORT		(1 << 2)
 
 static struct wm97xx_batt_pdata colibri_t20_adc_pdata = {
 	.batt_aux	= WM97XX_AUX_ID1,	/* AD0 - ANALOG_IN0 */
@@ -200,16 +203,15 @@ static void __init colibri_t20_mcp2515_can_init(void)
 #endif /* CONFIG_CAN_MCP251X || CONFIG_CAN_MCP251X_MODULE */
 
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
-#define CAN_BASE_TEG 0xd0000000 /* GMI_CS4_N */
 static struct resource colibri_can_resource[] = {
 	[0] =   {
-		.start	= CAN_BASE_TEG,		/* address */
-		.end	= CAN_BASE_TEG + 0xff,	/* data */
+		.start	= TEGRA_CAN_BASE,		/* address */
+		.end	= TEGRA_CAN_BASE + TEGRA_CAN_SIZE,/* data */
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
 	}
 };
 
@@ -229,6 +231,39 @@ static struct platform_device colibri_can_device = {
 		.platform_data = &colibri_can_platdata,
 	}
 };
+
+/* ********************************CAN DEVICE 2*******************************/
+static struct resource colibri_can_resource2[] = {
+	[0] =   {
+		.start	= TEGRA_CAN2_BASE, 	/* address */
+		.end	= TEGRA_CAN2_BASE + TEGRA_CAN2_SIZE, /* data */
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] =   {
+		/* interrupt assigned during initialisation */
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+	}
+};
+
+static struct sja1000_platform_data colibri_can_platdata2 = {
+	.osc_freq	= 24000000,
+	.ocr		= (OCR_MODE_NORMAL | OCR_TX0_PUSHPULL),
+	.cdr		= CDR_CLK_OFF | /* Clock off (CLKOUT pin) */
+			  CDR_CBP, /* CAN input comparator bypass */
+};
+
+static struct platform_device colibri_can_device2 = {
+	.name		= "sja1000_platform",
+	.id		= 1,
+	.num_resources	= ARRAY_SIZE(colibri_can_resource2),
+	.resource	= colibri_can_resource2,
+	.dev            = {
+		.platform_data = &colibri_can_platdata2,
+	}
+};
+
+
+
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
 
@@ -1255,14 +1290,22 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 static void __init tegra_colibri_t20_init(void)
 {
 
-//we might have to move the location of can - legacy import
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
-	writel(CONFIG_SNOR_CS(4), CONFIG_REG);
-	writel(CONFIG_GO | CONFIG_SNOR_CS(4), CONFIG_REG);
-	tegra_gpio_enable(TEGRA_GPIO_PA0);
-	colibri_can_resource[1].start	= gpio_to_irq(TEGRA_GPIO_PA0);
-	colibri_can_resource[1].end	= gpio_to_irq(TEGRA_GPIO_PA0);
+	writel(CONFIG_SNOR_CS(CS_PIN), CONFIG_REG);
+	writel(CONFIG_GO | CONFIG_SNOR_CS(CS_PIN), CONFIG_REG);
+	tegra_gpio_enable(TEGRA_CAN_INT);
+	tegra_gpio_enable(TEGRA_CAN2_INT);
+	gpio_request_one(TEGRA_CAN_INT, GPIOF_DIR_IN, "CAN1-INT");
+	gpio_request_one(TEGRA_CAN2_INT, GPIOF_DIR_IN, "CAN2-INT");
+
+	colibri_can_resource[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+	colibri_can_resource[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+
+	colibri_can_resource2[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+	colibri_can_resource2[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+
 	platform_device_register(&colibri_can_device);
+	platform_device_register(&colibri_can_device2);
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
 	tegra_clk_init_from_table(colibri_t20_clk_init_table);

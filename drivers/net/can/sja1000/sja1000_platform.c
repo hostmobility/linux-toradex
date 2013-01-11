@@ -40,14 +40,14 @@ static u8 sp_read_reg8(const struct sja1000_priv *priv, int reg)
 {
 	u8 value;
 	iowrite8(reg, priv->reg_base);
-	value = ioread8(priv->reg_base + 8);
+	value = ioread8(priv->reg_base + 0x20);
 	return value;
 }
 
 static void sp_write_reg8(const struct sja1000_priv *priv, int reg, u8 val)
 {
 	iowrite8(reg, priv->reg_base);
-	iowrite8(val, priv->reg_base + 8);
+	iowrite8(val, (priv->reg_base + 0x20));
 }
 
 static u8 sp_read_reg16(const struct sja1000_priv *priv, int reg)
