@@ -1359,6 +1359,11 @@ config SENSORS_INA230
 	  Support for the TI INA230 power monitor sensor.
 	  (also works for TI INA226)
 
+config MXC_MMA845X
+    tristate "Freescale  MMA845X  Accelerometer sensor"
+    depends on I2C && SYSFS
+    default n
+
 
 if ACPI
 

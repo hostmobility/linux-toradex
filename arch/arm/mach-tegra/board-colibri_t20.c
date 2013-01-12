@@ -45,6 +45,7 @@
 #include <linux/suspend.h>
 #include <linux/tegra_uart.h>
 #include <linux/wm97xx.h>
+#include <linux/mma845x.h>
 
 #include <mach/audio.h>
 #include <mach/clk.h>
@@ -465,14 +466,30 @@ static void colibri_t20_gpio_init(void)
 }
 
 /* I2C */
+#ifdef CONFIG_MXC_MMA845X
+static struct mxc_mma845x_platform_data mma845x_data = {
+	.gpio_pin_get = NULL,
+	.gpio_pin_put = NULL,
+	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), 
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PW3),
+};
+#endif
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] = {
-	{
+#ifdef IRIS
+	{		
 		/* M41T0M6 real time clock on Iris carrier board */
 		I2C_BOARD_INFO("rtc-ds1307", 0x68),
 			.type = "m41t00",
 	},
+#endif
+#ifdef CONFIG_MXC_MMA845X	
+	{
+		I2C_BOARD_INFO("mma845x", 0x1C),
+			.platform_data = (void *)&mma845x_data,
+	},
+#endif
 #if defined(COLIBRI_T20_VI) && !defined(CONFIG_ANDROID)
 	{
 		I2C_BOARD_INFO("adv7180", 0x21),
