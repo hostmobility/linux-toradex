@@ -852,13 +852,22 @@ static struct platform_device xpod2_spi_device = {
 static struct spi_board_info tegra_spi_devices[] __initdata = {
 	{
 		.bus_num	= 3,
+		.chip_select	= 0,
+		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PY6),
+		.max_speed_hz	= 5000000,
+		.modalias	= "mx4_io_spi",
+		.mode		= SPI_MODE_1,
+		.platform_data	= NULL,
+	},
+	{
+		.bus_num	= 3,
 //working with spidev_test
 //		.chip_select	= 0,
 		.chip_select	= 1,
 		.irq		= 0,
 		.max_speed_hz	= 50000000,
 		.modalias	= "spidev",
-		.mode		= SPI_MODE_0,
+		.mode		= SPI_MODE_1,
 		.platform_data	= NULL,
 	},
 };
