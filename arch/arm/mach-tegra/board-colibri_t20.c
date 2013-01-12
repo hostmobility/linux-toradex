@@ -1091,7 +1091,7 @@ static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= false,
 		.vbus_gpio			= USBH_PEN,
-		.vbus_gpio_inverted		= 1,
+		.vbus_gpio_inverted		= 0,
 		.vbus_reg			= NULL,
 	},
 };
