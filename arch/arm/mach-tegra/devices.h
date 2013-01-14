@@ -126,10 +126,10 @@ extern struct platform_device debug_uarta_device;
 extern struct platform_device debug_uartb_device;
 extern struct platform_device debug_uartc_device;
 extern struct platform_device debug_uartd_device;
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+//#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 extern struct platform_device tegra_se_device;
 extern struct platform_device debug_uarte_device;
-#endif
+//#endif
 
 extern struct nvhost_device tegra_disp1_device;
 extern struct nvhost_device tegra_disp2_device;

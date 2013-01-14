@@ -277,8 +277,9 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 	{"pwm",		"clk_m",	0,		false},
 	{"spdif_out",	"pll_a_out0",	0,		false},
 
-//required otherwise getting disabled by "Disabling clocks left on by bootloader" stage
-	{"uarta",	"pll_p",	216000000,	true},
+	/* uarta disabled by "Disabling clocks left on by bootloader" stage, 
+	   uarte will be used for debug console */ 
+	{"uarte",	"pll_p",	216000000,	true},
 
 //required otherwise uses pll_p_out4 as parent and changing its rate to 72 MHz
 	{"sclk",	"pll_p_out3",	108000000,	true},
@@ -901,15 +902,17 @@ static void __init colibri_t20_register_spidev(void)
 /* UART */
 
 static struct platform_device *colibri_t20_uart_devices[] __initdata = {
+	&tegra_uarte_device,	
 	&tegra_uarta_device,
-	&tegra_uartb_device,
+	&tegra_uartb_device,	
 	&tegra_uartd_device,
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
-	[0] = {.name = "pll_m"},
-	[1] = {.name = "pll_p"},
-	[2] = {.name = "clk_m"},
+	[0] = {.name = "pll_p"},	
+	[1] = {.name = "pll_m"},
+	[2] = {.name = "pll_p"},
+	[3] = {.name = "clk_m"},
 };
 
 static struct tegra_uart_platform_data colibri_t20_uart_pdata;
@@ -919,17 +922,17 @@ static void __init uart_debug_init(void)
 	unsigned long rate;
 	struct clk *c;
 
-	/* UARTA is the debug port. */
-	pr_info("Selecting UARTA as the debug console\n");
-	colibri_t20_uart_devices[0] = &debug_uarta_device;
+	/* UARTE is the debug port. */
+	pr_info("Selecting UARTE as the debug console\n");
+	colibri_t20_uart_devices[0] = &debug_uarte_device;
 	debug_uart_port_base = ((struct plat_serial8250_port *)(
-			debug_uarta_device.dev.platform_data))->mapbase;
-	debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
+			debug_uarte_device.dev.platform_data))->mapbase;
+	debug_uart_clk = clk_get_sys("serial8250.0", "uarte");
 
 	/* Clock enable for the debug channel */
 	if (!IS_ERR_OR_NULL(debug_uart_clk)) {
 		rate = ((struct plat_serial8250_port *)(
-			debug_uarta_device.dev.platform_data))->uartclk;
+			debug_uarte_device.dev.platform_data))->uartclk;
 		pr_info("The debug console clock name is %s\n",
 						debug_uart_clk->name);
 		c = tegra_get_clock_by_name("pll_p");
@@ -963,6 +966,7 @@ static void __init colibri_t20_uart_init(void)
 	}
 	colibri_t20_uart_pdata.parent_clk_list = uart_parent_clk;
 	colibri_t20_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
+	tegra_uarte_device.dev.platform_data = &colibri_t20_uart_pdata;	
 	tegra_uarta_device.dev.platform_data = &colibri_t20_uart_pdata;
 	tegra_uartb_device.dev.platform_data = &colibri_t20_uart_pdata;
 	tegra_uartd_device.dev.platform_data = &colibri_t20_uart_pdata;
