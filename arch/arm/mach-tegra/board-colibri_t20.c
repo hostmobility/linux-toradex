@@ -371,6 +371,7 @@ static struct gpio colibri_t20_gpios[] = {
 //conflicts with CAN reset on MECS Tellurium xPOD1 CAN
 	{TEGRA_GPIO_PK4,	GPIOF_IN,	"SODIMM pin 106"},
 #endif
+/* Conflicts with MX4/VCB Extern UART Interrupt INTC */
 //	{TEGRA_GPIO_PK5,	GPIOF_IN,	"USBC_DET"},
 #ifndef CONFIG_KEYBOARD_GPIO
 	{TEGRA_GPIO_PK6,	GPIOF_IN,	"SODIMM pin 135"},
@@ -409,7 +410,9 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PT0,	GPIOF_IN,	"SODIMM pin 96"},
 	{TEGRA_GPIO_PT1,	GPIOF_IN,	"SODIMM pin 75"},
 #endif
+#ifndef CONFIG_SERIAL_8250
 	{TEGRA_GPIO_PT2,	GPIOF_IN,	"SODIMM pin 69"},
+#endif
 #ifndef CONFIG_KEYBOARD_GPIO
 //conflicts with find key
 	{TEGRA_GPIO_PT3,	GPIOF_IN,	"SODIMM pin 77"},
@@ -435,8 +438,10 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PAA7,	GPIOF_IN,	"SODIMM pin 172"},
 #endif
 #ifndef CONFIG_KEYBOARD_GPIO
-//conflicts with back key
+//conflicts with back key and extern uart INTB
+#ifndef CONFIG_SERIAL_8250
 	{TEGRA_GPIO_PBB2,	GPIOF_IN,	"SOD-133, Iris X16-14"},
+#endif
 //conflicts with home key
 	{TEGRA_GPIO_PBB3,	GPIOF_IN,	"SODIMM pin 127"},
 //conflicts with volume up key
@@ -444,6 +449,14 @@ static struct gpio colibri_t20_gpios[] = {
 //conflicts with volume down key
 	{TEGRA_GPIO_PBB5,	GPIOF_IN,	"SODIMM pin 24"},
 #endif
+
+/* MX4/VCB Extern UART Interrupts */
+#ifdef CONFIG_SERIAL_8250
+	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"}, 
+	{TEGRA_GPIO_PBB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P133 - UART-INTB"},
+	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},	
+#endif
+
 };
 
 static void colibri_t20_gpio_init(void)
@@ -900,19 +913,64 @@ static void __init colibri_t20_register_spidev(void)
 #endif /* CONFIG_SPI_TEGRA && CONFIG_SPI_SPIDEV */
 
 /* UART */
+#define SERIAL_FLAGS (UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST)
+#define SERIAL_CLK   (24000000)
+static struct plat_serial8250_port extern_uart_platform_data[] = {
+	[0] = { 	/* Extern uart A (LIN) - Do not mix up with UARTA */
+		.mapbase	= TEGRA_EXT_UARTA_BASE,
+		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_EXT_UARTA_INT),
+		.irqflags 	= IRQF_TRIGGER_RISING,
+		.flags		= SERIAL_FLAGS,
+		.iotype		= UPIO_MEM,
+		.regshift	= 5,
+		.uartclk	= SERIAL_CLK,
+	},
+	[1] = { 	/* Extern uart B (J1708)*/
+		.mapbase	= TEGRA_EXT_UARTB_BASE,
+		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_EXT_UARTB_INT),
+		.irqflags 	= IRQF_TRIGGER_RISING,
+		.flags		= SERIAL_FLAGS,
+		.iotype		= UPIO_MEM,
+		.regshift	= 5,
+		.uartclk	= SERIAL_CLK,
+	},
+	[2] = { 	/* Extern uart C (RS232)*/
+		.mapbase	= TEGRA_EXT_UARTC_BASE,
+		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_EXT_UARTC_INT),
+		.irqflags 	= IRQF_TRIGGER_RISING,
+		.flags		= SERIAL_FLAGS,
+		.iotype		= UPIO_MEM,
+		.regshift	= 5,
+		.uartclk	= SERIAL_CLK,
+	},
+	{
+		.flags = 0	
+	},
+};
+
+static struct platform_device extern_uart = {
+	.name = "serial8250",
+	.id = PLAT8250_DEV_PLATFORM1,
+	.dev = {
+		.platform_data = extern_uart_platform_data,
+	},
+};
 
 static struct platform_device *colibri_t20_uart_devices[] __initdata = {
 	&tegra_uarte_device,	
 	&tegra_uarta_device,
-	&tegra_uartb_device,	
+	&tegra_uartb_device,
+	&tegra_uartc_device,		
 	&tegra_uartd_device,
+	&extern_uart,
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
 	[0] = {.name = "pll_p"},	
 	[1] = {.name = "pll_m"},
 	[2] = {.name = "pll_p"},
-	[3] = {.name = "clk_m"},
+	[3] = {.name = "pll_p"},
+	[4] = {.name = "clk_m"},
 };
 
 static struct tegra_uart_platform_data colibri_t20_uart_pdata;
@@ -969,6 +1027,7 @@ static void __init colibri_t20_uart_init(void)
 	tegra_uarte_device.dev.platform_data = &colibri_t20_uart_pdata;	
 	tegra_uarta_device.dev.platform_data = &colibri_t20_uart_pdata;
 	tegra_uartb_device.dev.platform_data = &colibri_t20_uart_pdata;
+	tegra_uartc_device.dev.platform_data = &colibri_t20_uart_pdata;	
 	tegra_uartd_device.dev.platform_data = &colibri_t20_uart_pdata;
 
 	/* Register low speed only if it is selected */
