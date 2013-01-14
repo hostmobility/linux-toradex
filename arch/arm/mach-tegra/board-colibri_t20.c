@@ -316,7 +316,7 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 #define LAN_RESET	TEGRA_GPIO_PV4
 #define LAN_V_BUS	TEGRA_GPIO_PBB1
 
-#define MMC_CD		TEGRA_GPIO_PC7	/* SODIMM 43 */
+#define MMC_CD		TEGRA_GPIO_PT4	/* SODIMM 43 */
 
 #define NAND_WP_N	TEGRA_GPIO_PS0
 
@@ -358,7 +358,8 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PB7,	GPIOF_IN,	"SODIMM pin 63"},
 #endif
 #ifndef COLIBRI_T20_VI
-	{TEGRA_GPIO_PD5,	GPIOF_IN,	"SODI-98, Iris X16-13"},
+	//Conflicts with SDIO2 interface
+	//{TEGRA_GPIO_PD5,	GPIOF_IN,	"SODI-98, Iris X16-13"},
 	{TEGRA_GPIO_PD6,	GPIOF_IN,	"SODIMM pin 81"},
 	{TEGRA_GPIO_PD7,	GPIOF_IN,	"SODIMM pin 94"},
 #endif
@@ -377,11 +378,13 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PK6,	GPIOF_IN,	"SODIMM pin 135"},
 #endif
 #ifndef COLIBRI_T20_VI
-	{TEGRA_GPIO_PL0,	GPIOF_IN,	"SOD-101, Iris X16-16"},
-	{TEGRA_GPIO_PL1,	GPIOF_IN,	"SOD-103, Iris X16-15"},
+	//Conflicts with SDIO2 interface
+	//{TEGRA_GPIO_PL0,	GPIOF_IN,	"SOD-101, Iris X16-16"},
+	//{TEGRA_GPIO_PL1,	GPIOF_IN,	"SOD-103, Iris X16-15"},
 //conflicts with Ethernet interrupt on Protea
-	{TEGRA_GPIO_PL2,	GPIOF_IN,	"SODI-79, Iris X16-19"},
-	{TEGRA_GPIO_PL3,	GPIOF_IN,	"SODI-97, Iris X16-17"},
+	//Conflicts with SDIO2 interface
+	//{TEGRA_GPIO_PL2,	GPIOF_IN,	"SODI-79, Iris X16-19"},
+	//{TEGRA_GPIO_PL3,	GPIOF_IN,	"SODI-97, Iris X16-17"},
 	{TEGRA_GPIO_PL6,	GPIOF_IN,	"SODI-85, Iris X16-18"},
 	{TEGRA_GPIO_PL7,	GPIOF_IN,	"SODIMM pin 65"},
 #endif
@@ -407,7 +410,8 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PP6,	GPIOF_IN,	"SODIMM pin 124"},
 	{TEGRA_GPIO_PP7,	GPIOF_IN,	"SODIMM pin 188"},
 #ifndef COLIBRI_T20_VI
-	{TEGRA_GPIO_PT0,	GPIOF_IN,	"SODIMM pin 96"},
+//Conlficts with SDIO2 interface	
+	//{TEGRA_GPIO_PT0,	GPIOF_IN,	"SODIMM pin 96"},
 	{TEGRA_GPIO_PT1,	GPIOF_IN,	"SODIMM pin 75"},
 #endif
 #ifndef CONFIG_SERIAL_8250
@@ -627,21 +631,30 @@ static struct platform_device colibri_t20_keys_device = {
 
 /* MMC/SD */
 
-static struct tegra_sdhci_platform_data colibri_t20_sdhci_platform_data = {
-	.cd_gpio	= MMC_CD,
-#ifndef SDHCI_8BIT
+static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
+	/* We dont have a card detect pin for wifi. I is always connected. */
 	.is_8bit	= 0,
-#else
-	.is_8bit	= 1,
-#endif
+	.cd_gpio	= -1,
+	.power_gpio	= -1,
+	.wp_gpio	= -1,
+};
+
+static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
+	.cd_gpio	= MMC_CD,
+	.is_8bit	= 0,
 	.power_gpio	= -1,
 	.wp_gpio	= -1,
 };
 
 int __init colibri_t20_sdhci_init(void)
 {
+	tegra_sdhci_device2.dev.platform_data = 
+			&colibri_t20_sdhci_mmc_platform_data;
+
 	tegra_sdhci_device4.dev.platform_data =
-			&colibri_t20_sdhci_platform_data;
+			&colibri_t20_sdhci_wifi_platform_data;
+
+	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device4);
 
 	return 0;

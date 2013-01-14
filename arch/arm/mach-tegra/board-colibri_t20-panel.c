@@ -42,7 +42,9 @@
 #include "tegra2_host1x_devices.h"
 
 #ifndef COLIBRI_T20_VI
-#define colibri_t20_bl_enb	TEGRA_GPIO_PT4	/* BL_ON */
+ /* BL_ON 2013-01-14 MK: Temporery mapped to a NC pin. 
+ Previos map TEGRA_GPIO_PT4 conflicted with MMC cd signal*/
+#define colibri_t20_bl_enb	TEGRA_GPIO_PP4	
 #endif
 #define colibri_t20_hdmi_hpd	TEGRA_GPIO_PN7	/* HOTPLUG_DETECT */
 #ifdef IRIS
