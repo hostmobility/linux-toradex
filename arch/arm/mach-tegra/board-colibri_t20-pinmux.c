@@ -73,7 +73,7 @@ static __initdata int colibri_t20_gpio_input_pinmux[] = {
 #endif /* COLIBRI_T20_VI */
 
 	/* SODIMM pin 93 RDnWR */
-#if 1
+#if 0
 	TEGRA_GPIO_PW0, /* gated GMI_WR_N multiplexed LCD_CS1_N */
 #endif
 
@@ -92,7 +92,7 @@ static __initdata int colibri_t20_gpio_input_pinmux[] = {
 #endif
 
 	/* SODIMM pin 99 nPWE */
-#if 0
+#if 1
 	TEGRA_GPIO_PZ3, /* gated GMI_WR_N multiplexed LCD_WR_N */
 #endif
 
