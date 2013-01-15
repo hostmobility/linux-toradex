@@ -24,7 +24,6 @@
 #include <linux/colibri_usb.h>
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
-#include <linux/gpio_keys.h>
 #include <linux/i2c.h>
 #include <linux/i2c-tegra.h>
 #include <linux/init.h>
@@ -333,140 +332,6 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 #define USBH_OC		TEGRA_GPIO_PW3	/* SODIMM 131 */
 #define USBH_PEN	TEGRA_GPIO_PW2	/* SODIMM 129 */
 
-
-#if 0
-static struct gpio colibri_t20_gpios[] = {
-//conflicts with MCP251X & SJA1000 CAN interfaces in MX4
-//conflicts with CAN interrupt on Colibri Evaluation Board and MECS Tellurium xPOD1 CAN
-//conflicts with DAC_PSAVE# on Iris
-#if !defined(CONFIG_CAN_MCP251X) && !defined(CONFIG_CAN_MCP251X_MODULE) && \
-	!defined(CONFIG_CAN_SJA1000) && !defined(CONFIG_CAN_SJA1000_MODULE) && \
-	!defined(IRIS)
-	{TEGRA_GPIO_PA0,	GPIOF_IN,	"SODIMM pin 73"},
-#endif
-	{TEGRA_GPIO_PA2,	GPIOF_IN,	"SODIMM pin 186"},
-	{TEGRA_GPIO_PA3,	GPIOF_IN,	"SODIMM pin 184"},
-//multiplexed VI_D6
-	{TEGRA_GPIO_PA7,	GPIOF_IN,	"SODIMM pin 67"},
-	{TEGRA_GPIO_PB2,	GPIOF_IN,	"SODIMM pin 154"},
-//multiplexed VI_D7
-	{TEGRA_GPIO_PB4,	GPIOF_IN,	"SODIMM pin 59"},
-#if !defined(CONFIG_SPI_GPIO) && !defined(CONFIG_SPI_GPIO_MODULE)
-//conflicts with MECS Tellurium xPOD2 SSPCLK2
-	{TEGRA_GPIO_PB6,	GPIOF_IN,	"SODIMM pin 55"},
-#endif
-#ifndef MECS_TELLURIUM_XPOD2
-//conflicts with MECS Tellurium xPOD2 SSPFRM2
-	{TEGRA_GPIO_PB7,	GPIOF_IN,	"SODIMM pin 63"},
-#endif
-#ifndef COLIBRI_T20_VI
-	//Conflicts with SDIO2 interface
-	//{TEGRA_GPIO_PD5,	GPIOF_IN,	"SODI-98, Iris X16-13"},
-	{TEGRA_GPIO_PD6,	GPIOF_IN,	"SODIMM pin 81"},
-	{TEGRA_GPIO_PD7,	GPIOF_IN,	"SODIMM pin 94"},
-#endif
-	{TEGRA_GPIO_PI3,	GPIOF_IN,	"SODIMM pin 130"},
-	{TEGRA_GPIO_PI6,	GPIOF_IN,	"SODIMM pin 132"},
-	{TEGRA_GPIO_PK0,	GPIOF_IN,	"SODIMM pin 150"},
-//multiplexed OWR
-	{TEGRA_GPIO_PK1,	GPIOF_IN,	"SODIMM pin 152"},
-#if !defined(CONFIG_CAN_MCP251X) && !defined(CONFIG_CAN_MCP251X_MODULE)
-//conflicts with CAN reset on MECS Tellurium xPOD1 CAN
-	{TEGRA_GPIO_PK4,	GPIOF_IN,	"SODIMM pin 106"},
-#endif
-/* Conflicts with MX4/VCB Extern UART Interrupt INTC */
-//	{TEGRA_GPIO_PK5,	GPIOF_IN,	"USBC_DET"},
-#ifndef CONFIG_KEYBOARD_GPIO
-	{TEGRA_GPIO_PK6,	GPIOF_IN,	"SODIMM pin 135"},
-#endif
-#ifndef COLIBRI_T20_VI
-	//Conflicts with SDIO2 interface
-	//{TEGRA_GPIO_PL0,	GPIOF_IN,	"SOD-101, Iris X16-16"},
-	//{TEGRA_GPIO_PL1,	GPIOF_IN,	"SOD-103, Iris X16-15"},
-//conflicts with Ethernet interrupt on Protea
-	//Conflicts with SDIO2 interface
-	//{TEGRA_GPIO_PL2,	GPIOF_IN,	"SODI-79, Iris X16-19"},
-	//{TEGRA_GPIO_PL3,	GPIOF_IN,	"SODI-97, Iris X16-17"},
-	{TEGRA_GPIO_PL6,	GPIOF_IN,	"SODI-85, Iris X16-18"},
-	{TEGRA_GPIO_PL7,	GPIOF_IN,	"SODIMM pin 65"},
-#endif
-
-//multiplexed SPI2_CS0_N, SPI2_MISO, SPI2_MOSI and SPI2_SCK
-	{TEGRA_GPIO_PM2,	GPIOF_IN,	"SODIMM pin 136"},
-	{TEGRA_GPIO_PM3,	GPIOF_IN,	"SODIMM pin 138"},
-	{TEGRA_GPIO_PM4,	GPIOF_IN,	"SODIMM pin 140"},
-	{TEGRA_GPIO_PM5,	GPIOF_IN,	"SODIMM pin 142"},
-
-	{TEGRA_GPIO_PN0,	GPIOF_IN,	"SODIMM pin 174"},
-	{TEGRA_GPIO_PN1,	GPIOF_IN,	"SODIMM pin 176"},
-	{TEGRA_GPIO_PN2,	GPIOF_IN,	"SODIMM pin 178"},
-	{TEGRA_GPIO_PN3,	GPIOF_IN,	"SODIMM pin 180"},
-	{TEGRA_GPIO_PN4,	GPIOF_IN,	"SODIMM pin 160"},
-	{TEGRA_GPIO_PN5,	GPIOF_IN,	"SODIMM pin 158"},
-	{TEGRA_GPIO_PN6,	GPIOF_IN,	"SODIMM pin 162"},
-//conflicts with ADDRESS13
-	{TEGRA_GPIO_PP4,	GPIOF_IN,	"SODIMM pin 120"},
-//conflicts with ADDRESS14
-	{TEGRA_GPIO_PP5,	GPIOF_IN,	"SODIMM pin 122"},
-//conflicts with ADDRESS15
-	{TEGRA_GPIO_PP6,	GPIOF_IN,	"SODIMM pin 124"},
-	{TEGRA_GPIO_PP7,	GPIOF_IN,	"SODIMM pin 188"},
-#ifndef COLIBRI_T20_VI
-//Conlficts with SDIO2 interface	
-	//{TEGRA_GPIO_PT0,	GPIOF_IN,	"SODIMM pin 96"},
-	{TEGRA_GPIO_PT1,	GPIOF_IN,	"SODIMM pin 75"},
-#endif
-#ifndef CONFIG_SERIAL_8250
-	{TEGRA_GPIO_PT2,	GPIOF_IN,	"SODIMM pin 69"},
-#endif
-#ifndef CONFIG_KEYBOARD_GPIO
-//conflicts with find key
-	{TEGRA_GPIO_PT3,	GPIOF_IN,	"SODIMM pin 77"},
-#endif
-//conflicts with BL_ON
-//	{TEGRA_GPIO_PT4,	GPIOF_IN,	"SODIMM pin 71"},
-//conflicts with ADDRESS12
-	{TEGRA_GPIO_PU6,	GPIOF_IN,	"SODIMM pin 118"},
-#ifndef CONFIG_KEYBOARD_GPIO
-//conflicts with power key (WAKE1)
-	{TEGRA_GPIO_PV3,	GPIOF_IN,	"SODI-45, Iris X16-20"},
-#endif
-
-	{TEGRA_GPIO_PX4,	GPIOF_IN,	"SODIMM pin 134"},
-	{TEGRA_GPIO_PX6,	GPIOF_IN,	"102, I X13 ForceOFF#"},
-	{TEGRA_GPIO_PX7,	GPIOF_IN,	"104, I X14 ForceOFF#"},
-	{TEGRA_GPIO_PZ2,	GPIOF_IN,	"SODIMM pin 156"},
-	{TEGRA_GPIO_PZ4,	GPIOF_IN,	"SODIMM pin 164"},
-#ifndef SDHCI_8BIT
-	{TEGRA_GPIO_PAA4,	GPIOF_IN,	"SODIMM pin 166"},
-	{TEGRA_GPIO_PAA5,	GPIOF_IN,	"SODIMM pin 168"},
-	{TEGRA_GPIO_PAA6,	GPIOF_IN,	"SODIMM pin 170"},
-	{TEGRA_GPIO_PAA7,	GPIOF_IN,	"SODIMM pin 172"},
-#endif
-#ifndef CONFIG_KEYBOARD_GPIO
-//conflicts with back key and extern uart INTB
-#ifndef CONFIG_SERIAL_8250
-	{TEGRA_GPIO_PBB2,	GPIOF_IN,	"SOD-133, Iris X16-14"},
-#endif
-//conflicts with home key
-	{TEGRA_GPIO_PBB3,	GPIOF_IN,	"SODIMM pin 127"},
-//conflicts with volume up key
-	{TEGRA_GPIO_PBB4,	GPIOF_IN,	"SODIMM pin 22"},
-//conflicts with volume down key
-	{TEGRA_GPIO_PBB5,	GPIOF_IN,	"SODIMM pin 24"},
-#endif
-
-/* MX4/VCB Extern UART Interrupts */
-#ifdef CONFIG_SERIAL_8250
-	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"}, 
-	{TEGRA_GPIO_PBB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P133 - UART-INTB"},
-	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},	
-#endif
-
-};
-#endif
-
-
 static struct gpio colibri_t20_gpios[] = {
 	/* Not connected pins */
 	//Might conflict with Volume up key
@@ -706,16 +571,6 @@ static void colibri_t20_i2c_init(void)
 		.debounce_interval = 10,		\
 	}
 
-static struct gpio_keys_button colibri_t20_keys[] = {
-	[0] = GPIO_KEY(KEY_FIND, PT3, 1, 0),		/* SODIMM pin 77 */
-	[1] = GPIO_KEY(KEY_HOME, PBB3, 1, 0),		/* SODIMM pin 127 */
-	[2] = GPIO_KEY(KEY_BACK, PBB2, 1, 0),		/* SODIMM pin 133, Iris X16-14 */
-	[3] = GPIO_KEY(KEY_VOLUMEUP, PBB4, 1, 0),	/* SODIMM pin 22 */
-	[4] = GPIO_KEY(KEY_VOLUMEDOWN, PBB5, 1, 0),	/* SODIMM pin 24 */
-	[5] = GPIO_KEY(KEY_POWER, PV3, 0, 1),		/* SODIMM pin 45, Iris X16-20 */
-	[6] = GPIO_KEY(KEY_MENU, PK6, 1, 0),		/* SODIMM pin 135 */
-};
-
 #define PMC_WAKE_STATUS 0x14
 
 static int colibri_t20_wakeup_key(void)
@@ -726,12 +581,6 @@ static int colibri_t20_wakeup_key(void)
 	return (status & (1 << TEGRA_WAKE_GPIO_PV3)) ?
 		KEY_POWER : KEY_RESERVED;
 }
-
-static struct gpio_keys_platform_data colibri_t20_keys_platform_data = {
-	.buttons	= colibri_t20_keys,
-	.nbuttons	= ARRAY_SIZE(colibri_t20_keys),
-	.wakeup_key	= colibri_t20_wakeup_key,
-};
 
 static struct platform_device colibri_t20_keys_device = {
 	.name	= "gpio-keys",
