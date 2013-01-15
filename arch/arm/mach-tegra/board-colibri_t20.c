@@ -333,6 +333,8 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 #define USBH_OC		TEGRA_GPIO_PW3	/* SODIMM 131 */
 #define USBH_PEN	TEGRA_GPIO_PW2	/* SODIMM 129 */
 
+
+#if 0
 static struct gpio colibri_t20_gpios[] = {
 //conflicts with MCP251X & SJA1000 CAN interfaces in MX4
 //conflicts with CAN interrupt on Colibri Evaluation Board and MECS Tellurium xPOD1 CAN
@@ -462,6 +464,113 @@ static struct gpio colibri_t20_gpios[] = {
 #endif
 
 };
+#endif
+
+
+static struct gpio colibri_t20_gpios[] = {
+	/* Not connected pins */
+	//Might conflict with Volume up key
+	{TEGRA_GPIO_PBB4,	(GPIOF_IN | GPIOF_NO_EXPORT),	"P22 - NC"},
+	//Might conflict with Volume down key
+	{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P24 - NC"},
+	{TEGRA_GPIO_PL7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P65 - NC"},
+	{TEGRA_GPIO_PK4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P106 - NC"},
+	{TEGRA_GPIO_PK1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P152 - NC"},
+	{TEGRA_GPIO_PU5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P116 - NC"}, // Wake up
+	{TEGRA_GPIO_PU6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P118 - NC"}, //Wake up
+	//Might conflict with ADDRESS13
+	{TEGRA_GPIO_PP4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P120 - NC"},
+	//Might conflict with ADDRESS14	
+	{TEGRA_GPIO_PP5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P122 - NC"},
+	//Might conflict with ADDRESS15
+	{TEGRA_GPIO_PP6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P124 - NC"},
+	{TEGRA_GPIO_PP7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P188 - NC"},
+	{TEGRA_GPIO_PJ0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P126 - NC"},
+	{TEGRA_GPIO_PJ2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P128 - NC"},
+	{TEGRA_GPIO_PI3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P130 - NC"},
+	{TEGRA_GPIO_PI6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P132 - NC"},
+    /* GMI_IORDY multiplexed GMI_WAIT/GMI_IORDY in pinmux - not used */
+	//{TEGRA_GPIO_PI7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P95 - NC"},
+	{TEGRA_GPIO_PI5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P95 - NC"},	
+	{TEGRA_GPIO_PX4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P134 - NC"},
+	//Pin 136, 138, 140, 142 Muxed to PM2 et al in pinmux (SPI2). Currently not used
+	{TEGRA_GPIO_PX3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P136 - NC"},
+	{TEGRA_GPIO_PX2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P138 - NC"},
+	{TEGRA_GPIO_PX1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P140 - NC"},
+	{TEGRA_GPIO_PX0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P142 - NC"},
+	{TEGRA_GPIO_PB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P154 - NC"},
+	{TEGRA_GPIO_PN5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P158 - NC"},
+	{TEGRA_GPIO_PN4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P160 - NC"},
+	{TEGRA_GPIO_PN6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P162 - NC"},
+	{TEGRA_GPIO_PZ2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P156 - NC"},
+	{TEGRA_GPIO_PZ4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P164 - NC"},
+	{TEGRA_GPIO_PAA4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P166 - NC"},
+	{TEGRA_GPIO_PAA5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P168 - NC"},
+	{TEGRA_GPIO_PAA6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P170 - NC"},
+	{TEGRA_GPIO_PAA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P172 - NC"},
+	{TEGRA_GPIO_PA3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P184 - NC"},
+	{TEGRA_GPIO_PA2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P186 - NC"},
+	{TEGRA_GPIO_PA5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P144 - NC"},
+	{TEGRA_GPIO_PA4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P146 - NC"},
+
+	/* Digital inputs */
+	{TEGRA_GPIO_PV3,	GPIOF_IN,		"P45 - DIGITAL-IN-1"},
+	{TEGRA_GPIO_PC7,	GPIOF_IN,		"P43 - DIGITAL-IN-2"},
+	{TEGRA_GPIO_PB6,	GPIOF_IN,		"P55 - DIGITAL-IN-3"},
+	{TEGRA_GPIO_PB4,	GPIOF_IN,		"P59 - DIGITAL-IN-4"},
+	{TEGRA_GPIO_PZ0,	GPIOF_IN,		"P23 - DIGITAL-IN-5"},
+	{TEGRA_GPIO_PZ1,	GPIOF_IN,		"P25 - DIGITAL-IN-6"},
+	{TEGRA_GPIO_PY6,	GPIOF_IN,		"P37 - WAKE-UP-CPU"},	
+	{TEGRA_GPIO_PK6,	GPIOF_IN,		"P135 - MODEM-WAKEUP"},
+	{TEGRA_GPIO_PC6,	GPIOF_IN,		"P31 - XANTSHORT"},
+
+	/* PXA300 Pins. Are not connected on T20.*/
+	{TEGRA_GPIO_PK0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P150 - MM_PXA300_CMD"},	
+
+	/* Compact flash - These pins are not connected on T20*/
+	{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P29 - CF-READY"},
+	{TEGRA_GPIO_PT1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P75 - CF-RESET"},
+	{TEGRA_GPIO_PT3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P77 - CF-BVD2/MM_PXA300_CLK"},
+	{TEGRA_GPIO_PD6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P81 - CF-nCD1+2"},
+	{TEGRA_GPIO_PL6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P85 - CF-nPPEN"},
+	{TEGRA_GPIO_PD7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P94 - CF-nPCE1"},
+	{TEGRA_GPIO_PX5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P100 - CF-nPSKTSEL"},
+
+	{TEGRA_GPIO_PX6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P102 - CF-nPWAIT/MM_PXA300_DAT3"},
+	
+	{TEGRA_GPIO_PX7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P104 - CF-nIOIS16/MM_PXA300_DAT2"}, 
+
+	/* Extern UART Interrupts*/
+	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"}, 
+	{TEGRA_GPIO_PBB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P133 - UART-INTB"},
+	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},	
+
+	/* Gyro Interrupts */
+	/* Our gyro driver does not support interrupts though */
+ 	{TEGRA_GPIO_PA0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P73 - GYRO-INT1"},
+ 	{TEGRA_GPIO_PA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P67 - GYRO-INT2"},
+
+	/* These are enabled in respective driver. Only have them here for reference */
+
+	/* MMC Interface*/ 
+	//{TEGRA_GPIO_PT0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P96 - MMC-CLK"},
+	//{TEGRA_GPIO_PD5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P98 - MMC-CMD"},
+	//{TEGRA_GPIO_PL0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P101 - MMC-DAT0"},
+	//{TEGRA_GPIO_PL1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P103 - MMC-DAT1"},
+	//{TEGRA_GPIO_PL2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P79 - MMC-DAT2"},
+	//{TEGRA_GPIO_PL3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P97 - MMC-DAT3"},
+
+	/* MM CARD DETECT*/
+	//{TEGRA_GPIO_PT4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P71 - MM_CD"},	
+
+	/* Accelometer Interrupts */
+ 	//{TEGRA_GPIO_PB7,	GPIOF_IN,		"P63 - ACC-INT1"},
+ 	//{TEGRA_GPIO_PW3,	GPIOF_IN,		"P131 - ACC-INT2"},
+
+	/* CAN Interrupts*/
+	//{TEGRA_GPIO_PB5,	GPIOF_IN,		"P28 - CAN1-INT"}, 
+	//{TEGRA_GPIO_PA6,	GPIOF_IN,		"P30 - CAN2-INT"},	 
+};
 
 static void colibri_t20_gpio_init(void)
 {
@@ -478,7 +587,11 @@ static void colibri_t20_gpio_init(void)
 			pr_warning("gpio_request(%s) failed, err = %d",
 				   colibri_t20_gpios[i].label, err);
 		} else {
-			gpio_export(colibri_t20_gpios[i].gpio, true);
+			tegra_gpio_enable(colibri_t20_gpios[i].gpio);
+
+			if(!(colibri_t20_gpios[i].flags & GPIOF_NO_EXPORT)) {
+				gpio_export(colibri_t20_gpios[i].gpio, true);
+			}
 		}
 	}
 }
