@@ -879,7 +879,7 @@ static void __init colibri_t20_uart_init(void)
 //USB1_IF_USB_PHY_VBUS_WAKEUP_ID_0
 //Offset: 408h 
 //ID_PU: ID pullup enable. Set to 1.
-
+#ifdef CONFIG_USB_GADGET
 static struct tegra_usb_platform_data tegra_udc_pdata = {
 	.has_hostpc	= false,
 	.op_mode	= TEGRA_USB_OPMODE_DEVICE,
@@ -903,6 +903,7 @@ static struct tegra_usb_platform_data tegra_udc_pdata = {
 		.vbus_pmu_irq			= 0,
 	},
 };
+#endif /* CONFIG_USB_GADGET */
 
 static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 	.has_hostpc	= false,
@@ -922,7 +923,7 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 		.hot_plug			= true,
 		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= false,
-		.vbus_gpio			= -1,
+		.vbus_gpio			= -1, // TODO: Set a power enable?
 		.vbus_reg			= NULL,
 	},
 };
@@ -1092,6 +1093,7 @@ static void colibri_t20_usb_init(void)
 	gpio_direction_output(LAN_RESET, 0);
 	gpio_export(LAN_RESET, false);
 
+#ifdef CONFIG_USB_GADGET
 	/* OTG should be the first to be registered
 	   EHCI instance 0: USB1_DP/N -> USBOTG_P/N */
 #ifndef CONFIG_USB_TEGRA_OTG
@@ -1104,7 +1106,11 @@ static void colibri_t20_usb_init(void)
 	/* setup the udc platform data */
 	tegra_udc_device.dev.platform_data = &tegra_udc_pdata;
 	platform_device_register(&tegra_udc_device);
-
+#else
+	/* MX-4 HOST PORT -> USB HUB */
+	tegra_ehci1_device.dev.platform_data = &tegra_ehci1_utmi_pdata;
+	platform_device_register(&tegra_ehci1_device);
+#endif /* CONFIG_USB_GADGET */
 	/* EHCI instance 1: ULPI PHY -> ASIX ETH */
 	tegra_ehci2_device.dev.platform_data = &tegra_ehci2_ulpi_link_pdata;
 	platform_device_register(&tegra_ehci2_device);
