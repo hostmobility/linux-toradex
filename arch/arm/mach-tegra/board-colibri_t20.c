@@ -483,37 +483,6 @@ static void colibri_t20_i2c_init(void)
    Note: active-low means pull-ups required on carrier board resp. via pin-muxing
    Note2: power-key active-high due to EvalBoard v3.1a having 100 K pull-down on SODIMM pin 45 */
 
-#ifdef CONFIG_KEYBOARD_GPIO
-#define GPIO_KEY(_id, _gpio, _lowactive, _iswake)	\
-	{						\
-		.code = _id,				\
-		.gpio = TEGRA_GPIO_##_gpio,		\
-		.active_low = _lowactive,		\
-		.desc = #_id,				\
-		.type = EV_KEY,				\
-		.wakeup = _iswake,			\
-		.debounce_interval = 10,		\
-	}
-
-#define PMC_WAKE_STATUS 0x14
-
-static int colibri_t20_wakeup_key(void)
-{
-	unsigned long status =
-		readl(IO_ADDRESS(TEGRA_PMC_BASE) + PMC_WAKE_STATUS);
-
-	return (status & (1 << TEGRA_WAKE_GPIO_PV3)) ?
-		KEY_POWER : KEY_RESERVED;
-}
-
-static struct platform_device colibri_t20_keys_device = {
-	.name	= "gpio-keys",
-	.id	= 0,
-	.dev	= {
-		.platform_data	= &colibri_t20_keys_platform_data,
-	},
-};
-#endif /* CONFIG_KEYBOARD_GPIO */
 
 /* MMC/SD */
 
