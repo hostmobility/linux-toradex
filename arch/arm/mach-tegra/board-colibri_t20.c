@@ -397,13 +397,6 @@ static struct mxc_mma845x_platform_data mma845x_data = {
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] = {
-#ifdef IRIS
-	{		
-		/* M41T0M6 real time clock on Iris carrier board */
-		I2C_BOARD_INFO("rtc-ds1307", 0x68),
-			.type = "m41t00",
-	},
-#endif
 #ifdef CONFIG_MXC_MMA845X	
 	{
 		I2C_BOARD_INFO("mma845x", 0x1C),
