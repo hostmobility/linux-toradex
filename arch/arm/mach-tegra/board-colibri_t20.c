@@ -267,8 +267,8 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PK1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P152 - NC"},
 	{TEGRA_GPIO_PU5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P116 - NC"}, // Wake up
 	{TEGRA_GPIO_PU6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P118 - NC"}, //Wake up
-	//Might conflict with ADDRESS13
-	{TEGRA_GPIO_PP4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P120 - NC"},
+	// Used by BL_ON (see board-colibri_t20-panel.c)
+	//{TEGRA_GPIO_PP4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P120 - NC"},
 	//Might conflict with ADDRESS14	
 	{TEGRA_GPIO_PP5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P122 - NC"},
 	//Might conflict with ADDRESS15
