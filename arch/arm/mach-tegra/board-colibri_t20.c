@@ -303,6 +303,7 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PA4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P146 - NC"},
 
 	/* Digital inputs */
+	// P45 is used for CF in PXA. Consider change.
 	{TEGRA_GPIO_PV3,	GPIOF_IN,		"P45 - DIGITAL-IN-1"},
 	{TEGRA_GPIO_PC7,	GPIOF_IN,		"P43 - DIGITAL-IN-2"},
 	{TEGRA_GPIO_PB6,	GPIOF_IN,		"P55 - DIGITAL-IN-3"},
