@@ -210,6 +210,9 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 	/* AC97 incl. touch (note: unfortunately no clk source mux exists) */
 	{"ac97",	"pll_a_out0",	24576000,	true},
 
+	//External bus
+	{"nor",		"pll_p",	86500000,	true},
+
 	/* WM9715L XTL_IN 24.576 MHz */
 //[    0.372722] Unable to set parent pll_a_out0 of clock cdev1: -38
 //	{"cdev1",	"pll_a_out0",	24576000,	true},
