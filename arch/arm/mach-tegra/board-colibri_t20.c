@@ -67,6 +67,7 @@
 #include <linux/platform_data/tegra_nor.h>
 //move to board-colibri_t20-power.c?
 #include "pm.h"
+#include "pm-irq.h" 
 #include "wakeups-t2.h"
 
 /* Legacy defines from previous tegra_nor.h (changed) */
@@ -384,7 +385,25 @@ static void colibri_t20_gpio_init(void)
 			}
 		}
 	}
+
+	/* Enable wake up on selected gpio (see mx4_iomap.h) - set edge in sysfs from userspace to enable */
+	err = enable_irq_wake(gpio_to_irq(GPIO_WAKEUP_PIN));
+	if (err) {
+		pr_err("Failed to enable wakeup for irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
+	}
+	else {
+		pr_info("Enabling gpio wakeup on irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
+	}
+	err = tegra_pm_irq_set_wake_type(gpio_to_irq(GPIO_WAKEUP_PIN), IRQF_TRIGGER_FALLING);
+	if (err) {
+		pr_err("Failed to set wake type for irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
+	}
+	else {
+		pr_info("Setting wake type to falling\n");
+	}	
 }
+
+
 
 /* I2C */
 #ifdef CONFIG_MXC_MMA845X
