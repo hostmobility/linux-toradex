@@ -49,7 +49,11 @@
 #define colibri_t20_hdmi_hpd	TEGRA_GPIO_PN7	/* HOTPLUG_DETECT */
 #ifdef IRIS
 #define iris_dac_psave		TEGRA_GPIO_PA0	/* DAC_PSAVE# */
+#else
+/* MX4 LVDS ON/OFF for powersaving */
+#define colibri_t20_lvds_on	TEGRA_GPIO_PY7
 #endif
+
 
 #ifdef CONFIG_TEGRA_DC
 static struct regulator *colibri_t20_hdmi_reg = NULL;
@@ -120,6 +124,9 @@ static int colibri_t20_panel_enable(void)
 {
 #ifdef IRIS
 	gpio_set_value(iris_dac_psave, 1);
+#else
+	/* MX4 */
+	gpio_set_value(colibri_t20_lvds_on, 1);
 #endif
 	return 0;
 }
@@ -128,6 +135,9 @@ static int colibri_t20_panel_disable(void)
 {
 #ifdef IRIS
 	gpio_set_value(iris_dac_psave, 0);
+#else
+	/* MX4 */
+	gpio_set_value(colibri_t20_lvds_on, 0);	
 #endif
 	return 0;
 }
@@ -636,6 +646,10 @@ int __init colibri_t20_panel_init(void)
 #ifdef IRIS
 	gpio_request(iris_dac_psave, "Iris DAC_PSAVE#");
 	gpio_direction_output(iris_dac_psave, 1);
+#else
+	/* MX4 */
+	gpio_request(colibri_t20_lvds_on, "LVDS Standby#");
+	gpio_direction_output(colibri_t20_lvds_on, 1);	
 #endif /* IRIS */
 
 	/* enable hdmi hotplug gpio for hotplug detection */
