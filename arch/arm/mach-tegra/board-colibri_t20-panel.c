@@ -648,7 +648,7 @@ int __init colibri_t20_panel_init(void)
 	gpio_direction_output(iris_dac_psave, 1);
 #else
 	/* MX4 */
-	gpio_request(colibri_t20_lvds_on, "LVDS Standby#");
+	gpio_request(colibri_t20_lvds_on, "P27 LVDS");
 	gpio_direction_output(colibri_t20_lvds_on, 1);	
 #endif /* IRIS */
 
