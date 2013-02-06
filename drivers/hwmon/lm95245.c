@@ -34,6 +34,8 @@
 #include <linux/mutex.h>
 #include <linux/sysfs.h>
 
+#include <linux/lm95245.h>
+
 #define DEVNAME "lm95245"
 
 static const unsigned short normal_i2c[] = {
@@ -93,6 +95,7 @@ static const unsigned short normal_i2c[] = {
 #define RATE_CR1000	0x02
 #define RATE_CR2500	0x03
 
+#define STATUS1_ROS		0x10
 #define STATUS1_DIODE_FAULT	0x04
 #define STATUS1_RTCRIT		0x02
 #define STATUS1_LOC		0x01
@@ -107,10 +110,30 @@ static const u8 lm95245_reg_address[] = {
 	LM95245_REG_R_REMOTE_TEMPL_S,
 	LM95245_REG_R_REMOTE_TEMPH_U,
 	LM95245_REG_R_REMOTE_TEMPL_U,
+	LM95245_REG_RW_REMOTE_OS_LIMIT,
 	LM95245_REG_RW_LOCAL_OS_TCRIT_LIMIT,
 	LM95245_REG_RW_REMOTE_TCRIT_LIMIT,
 	LM95245_REG_RW_COMMON_HYSTERESIS,
 	LM95245_REG_R_STATUS1,
+};
+
+/* Indices and offsets into above register array */
+
+enum {
+	INDEX_LOCAL_TEMP = 0,
+	INDEX_REMOTE_TEMP = 2,
+	INDEX_REMOTE_OS_LIMIT = 6,
+	INDEX_LOCAL_OS_TCRIT_LIMIT,
+	INDEX_REMOTE_TCRIT_LIMIT,
+	INDEX_COMMON_HYSTERESIS,
+	INDEX_STATUS1,
+};
+
+enum {
+	OFFSET_HIGH_SIGNED = 0,
+	OFFSET_LOW_SIGNED,
+	OFFSET_HIGH_UNSIGNED,
+	OFFSET_LOW_UNSIGNED,
 };
 
 /* Client data (each client gets its own) */
@@ -214,24 +237,42 @@ static unsigned long lm95245_set_conversion_rate(struct i2c_client *client,
 }
 
 /* Sysfs stuff */
+void thermal_get_temp(struct device *dev, int *temp, int index)
+{
+	struct lm95245_data *data = lm95245_update_device(dev);
+
+	/*
+	 * Local temp is always signed
+	 * Remote temp has both signed and unsigned data
+	 * use signed calculation for remote if signed bit is set
+	 */
+	if (index == INDEX_LOCAL_TEMP || data->regs[index + OFFSET_HIGH_SIGNED] & 0x80)
+		*temp = temp_from_reg_signed(data->regs[index + OFFSET_HIGH_SIGNED],
+			    data->regs[index + OFFSET_LOW_SIGNED]);
+	else
+		*temp = temp_from_reg_unsigned(data->regs[index + OFFSET_HIGH_UNSIGNED],
+			    data->regs[index + OFFSET_LOW_UNSIGNED]);
+}
+
+void lm95245_get_local_temp(struct device *dev, int *temp)
+{
+	thermal_get_temp(dev, temp, INDEX_LOCAL_TEMP);
+}
+EXPORT_SYMBOL(lm95245_get_local_temp);
+
+void lm95245_get_remote_temp(struct device *dev, int *temp)
+{
+	thermal_get_temp(dev, temp, INDEX_REMOTE_TEMP);
+}
+EXPORT_SYMBOL(lm95245_get_remote_temp);
+
 static ssize_t show_input(struct device *dev, struct device_attribute *attr,
 			  char *buf)
 {
-	struct lm95245_data *data = lm95245_update_device(dev);
-	int temp;
+	int temp = 0;
 	int index = to_sensor_dev_attr(attr)->index;
 
-	/*
-	 * Index 0 (Local temp) is always signed
-	 * Index 2 (Remote temp) has both signed and unsigned data
-	 * use signed calculation for remote if signed bit is set
-	 */
-	if (index == 0 || data->regs[index] & 0x80)
-		temp = temp_from_reg_signed(data->regs[index],
-			    data->regs[index + 1]);
-	else
-		temp = temp_from_reg_unsigned(data->regs[index + 2],
-			    data->regs[index + 3]);
+	thermal_get_temp(dev, &temp, index);
 
 	return snprintf(buf, PAGE_SIZE - 1, "%d\n", temp);
 }
@@ -246,20 +287,14 @@ static ssize_t show_limit(struct device *dev, struct device_attribute *attr,
 			data->regs[index] * 1000);
 }
 
-static ssize_t set_limit(struct device *dev, struct device_attribute *attr,
-			const char *buf, size_t count)
+void thermal_set_limit(struct device *dev, int val, int index)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct lm95245_data *data = i2c_get_clientdata(client);
-	int index = to_sensor_dev_attr(attr)->index;
-	unsigned long val;
-
-	if (strict_strtoul(buf, 10, &val) < 0)
-		return -EINVAL;
 
 	val /= 1000;
 
-	val = SENSORS_LIMIT(val, 0, (index == 6 ? 127 : 255));
+	val = SENSORS_LIMIT(val, 0, (index == INDEX_LOCAL_OS_TCRIT_LIMIT ? 127 : 255));
 
 	mutex_lock(&data->update_lock);
 
@@ -268,6 +303,30 @@ static ssize_t set_limit(struct device *dev, struct device_attribute *attr,
 	i2c_smbus_write_byte_data(client, lm95245_reg_address[index], val);
 
 	mutex_unlock(&data->update_lock);
+}
+
+void lm95245_set_remote_os_limit(struct device *dev, int val)
+{
+	thermal_set_limit(dev, val, INDEX_REMOTE_OS_LIMIT);
+}
+EXPORT_SYMBOL(lm95245_set_remote_os_limit);
+
+void lm95245_set_remote_critical_limit(struct device *dev, int val)
+{
+	thermal_set_limit(dev, val, INDEX_REMOTE_TCRIT_LIMIT);
+}
+EXPORT_SYMBOL(lm95245_set_remote_critical_limit);
+
+static ssize_t set_limit(struct device *dev, struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	int index = to_sensor_dev_attr(attr)->index;
+	unsigned long val;
+
+	if (strict_strtoul(buf, 10, &val) < 0)
+		return -EINVAL;
+
+	thermal_set_limit(dev, (int)val, index);
 
 	return count;
 }
@@ -345,7 +404,7 @@ static ssize_t show_alarm(struct device *dev, struct device_attribute *attr,
 	int index = to_sensor_dev_attr(attr)->index;
 
 	return snprintf(buf, PAGE_SIZE - 1, "%d\n",
-			!!(data->regs[9] & index));
+			!!(data->regs[INDEX_STATUS1] & index));
 }
 
 static ssize_t show_interval(struct device *dev, struct device_attribute *attr,
@@ -375,19 +434,23 @@ static ssize_t set_interval(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, show_input, NULL, 0);
+static SENSOR_DEVICE_ATTR(temp1_input, S_IRUGO, show_input, NULL, INDEX_LOCAL_TEMP);
 static SENSOR_DEVICE_ATTR(temp1_crit, S_IWUSR | S_IRUGO, show_limit,
-		set_limit, 6);
+		set_limit, INDEX_LOCAL_OS_TCRIT_LIMIT);
 static SENSOR_DEVICE_ATTR(temp1_crit_hyst, S_IWUSR | S_IRUGO, show_limit,
-		set_crit_hyst, 8);
+		set_crit_hyst, INDEX_COMMON_HYSTERESIS);
 static SENSOR_DEVICE_ATTR(temp1_crit_alarm, S_IRUGO, show_alarm, NULL,
 		STATUS1_LOC);
 
-static SENSOR_DEVICE_ATTR(temp2_input, S_IRUGO, show_input, NULL, 2);
+static SENSOR_DEVICE_ATTR(temp2_input, S_IRUGO, show_input, NULL, INDEX_REMOTE_TEMP);
+static SENSOR_DEVICE_ATTR(temp2_os, S_IWUSR | S_IRUGO, show_limit,
+		set_limit, INDEX_REMOTE_OS_LIMIT);
 static SENSOR_DEVICE_ATTR(temp2_crit, S_IWUSR | S_IRUGO, show_limit,
-		set_limit, 7);
+		set_limit, INDEX_REMOTE_TCRIT_LIMIT);
 static SENSOR_DEVICE_ATTR(temp2_crit_hyst, S_IWUSR | S_IRUGO, show_limit,
-		set_crit_hyst, 8);
+		set_crit_hyst, INDEX_COMMON_HYSTERESIS);
+static SENSOR_DEVICE_ATTR(temp2_os_alarm, S_IRUGO, show_alarm, NULL,
+		STATUS1_ROS);
 static SENSOR_DEVICE_ATTR(temp2_crit_alarm, S_IRUGO, show_alarm, NULL,
 		STATUS1_RTCRIT);
 static SENSOR_DEVICE_ATTR(temp2_type, S_IWUSR | S_IRUGO, show_type,
@@ -404,8 +467,10 @@ static struct attribute *lm95245_attributes[] = {
 	&sensor_dev_attr_temp1_crit_hyst.dev_attr.attr,
 	&sensor_dev_attr_temp1_crit_alarm.dev_attr.attr,
 	&sensor_dev_attr_temp2_input.dev_attr.attr,
+	&sensor_dev_attr_temp2_os.dev_attr.attr,
 	&sensor_dev_attr_temp2_crit.dev_attr.attr,
 	&sensor_dev_attr_temp2_crit_hyst.dev_attr.attr,
+	&sensor_dev_attr_temp2_os_alarm.dev_attr.attr,
 	&sensor_dev_attr_temp2_crit_alarm.dev_attr.attr,
 	&sensor_dev_attr_temp2_type.dev_attr.attr,
 	&sensor_dev_attr_temp2_fault.dev_attr.attr,
@@ -454,6 +519,13 @@ static void lm95245_init_client(struct i2c_client *client)
 		i2c_smbus_write_byte_data(client, LM95245_REG_RW_CONFIG1,
 			data->config1);
 	}
+
+	/* Configure over-temperature shutdown (OS) output pin */
+	if (client->dev.platform_data && ((struct lm95245_platform_data*)(client->dev.platform_data))->enable_os_pin) {
+		data->config2 |= CFG2_OS_A0;
+		i2c_smbus_write_byte_data(client, LM95245_REG_RW_CONFIG2,
+			data->config2);
+	}
 }
 
 static int lm95245_probe(struct i2c_client *new_client,
@@ -484,6 +556,10 @@ static int lm95245_probe(struct i2c_client *new_client,
 		err = PTR_ERR(data->hwmon_dev);
 		goto exit_remove_files;
 	}
+
+	/* Notify callback that probe is done */
+	if (new_client->dev.platform_data && ((struct lm95245_platform_data*)(new_client->dev.platform_data))->probe_callback)
+		((struct lm95245_platform_data*)(new_client->dev.platform_data))->probe_callback(&new_client->dev);
 
 	return 0;
 

@@ -1,7 +1,7 @@
 /*
- * arch/arm/mach-tegra/board-colibri_t30.h
+ * arch/arm/mach-tegra/board-apalis_t30.h
  *
- * Copyright (c) 2012 Toradex, Inc.
+ * Copyright (c) 2013 Toradex, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,13 +18,81 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#ifndef _MACH_TEGRA_BOARD_COLIBRI_T30_H
-#define _MACH_TEGRA_BOARD_COLIBRI_T30_H
+#ifndef _MACH_TEGRA_BOARD_APALIS_T30_H
+#define _MACH_TEGRA_BOARD_APALIS_T30_H
 
 #include <linux/mfd/tps6591x.h>
 
 #include <mach/gpio.h>
 #include <mach/irqs.h>
+
+/* GPIO */
+
+#define BKL1_ON		TEGRA_GPIO_PV2
+#define BKL1_PWM_EN_N	TEGRA_GPIO_PA1
+
+#define CAN1_INT	TEGRA_GPIO_PW2
+#define CAN2_INT	TEGRA_GPIO_PW3
+
+#define GPIO1		TEGRA_GPIO_PS2
+#define GPIO2		TEGRA_GPIO_PS3
+#define GPIO3		TEGRA_GPIO_PS4
+#define GPIO4		TEGRA_GPIO_PS5
+#define GPIO5		TEGRA_GPIO_PS6
+#define GPIO6		TEGRA_GPIO_PQ0
+#define GPIO7		TEGRA_GPIO_PS7
+#define GPIO8		TEGRA_GPIO_PQ1
+
+#define HDMI1_HPD	TEGRA_GPIO_PN7
+
+#define I2C1_SCL	TEGRA_GPIO_PC4
+#define I2C1_SDA	TEGRA_GPIO_PC5
+
+#define I2C2_SCL	TEGRA_GPIO_PV4
+#define I2C2_SDA	TEGRA_GPIO_PV5
+
+#define I2C3_SCL	TEGRA_GPIO_PBB1
+#define I2C3_SDA	TEGRA_GPIO_PBB2
+
+#define LAN_SMB_ALERT_N	TEGRA_GPIO_PZ5
+
+#define LVDS_MODE	TEGRA_GPIO_PBB0
+#define LVDS_6B_8B_N	TEGRA_GPIO_PBB3
+#define LVDS_OE		TEGRA_GPIO_PBB4
+#define LVDS_PDWN_N	TEGRA_GPIO_PBB5
+#define LVDS_R_F_N	TEGRA_GPIO_PBB6
+#define LVDS_MAP	TEGRA_GPIO_PBB7
+#define LVDS_RS		TEGRA_GPIO_PCC1
+#define LVDS_DDR_N	TEGRA_GPIO_PCC2
+
+#define MMC1_CD_N	TEGRA_GPIO_PV3
+
+#define PWR_I2C_SCL	TEGRA_GPIO_PZ6
+#define PWR_I2C_SDA	TEGRA_GPIO_PZ7
+
+#define RESET_MOCI_N	TEGRA_GPIO_PI4
+
+#define SATA1_ACT_N	TEGRA_GPIO_PDD0
+
+#define SD1_CD_N	TEGRA_GPIO_PCC5
+
+#define THERMD_ALERT_N	TEGRA_GPIO_PD2
+
+#define TOUCH_PEN_INT	TEGRA_GPIO_PV0
+
+#define TS1		TEGRA_GPIO_PI1
+#define TS2		TEGRA_GPIO_PQ7
+#define TS3		TEGRA_GPIO_PQ5
+#define TS4		TEGRA_GPIO_PQ6
+#define TS5		TEGRA_GPIO_PS0
+#define TS6		TEGRA_GPIO_PS1
+
+#define USBH_EN		TEGRA_GPIO_PDD1
+#define USBH_OC_N	TEGRA_GPIO_PDD2
+#define USBO1_EN	TEGRA_GPIO_PT5
+#define USBO1_OC_N	TEGRA_GPIO_PT6
+
+#define WAKE1_MICO	TEGRA_GPIO_PV1
 
 /* External peripheral act as gpio */
 /* TPS6591x GPIOs */
@@ -54,31 +122,20 @@
 #define STMPE811_IRQ_BASE	TPS6591X_IRQ_END
 #define STMPE811_IRQ_END	(STMPE811_IRQ_BASE + 22)
 
-/* Uncomment for SD-card on SDMMC4B rather than SDMMC2 */
-//#define COLIBRI_T30_SDMMC4B
-
-/* Uncomment for Colibri T30 V1.0a prototypes */
-//#define COLIBRI_T30_V10
-
-/* Uncomment for camera interface support on Colibri Evaluation carrier board */
-#ifdef CONFIG_TEGRA_CAMERA
-#define COLIBRI_T30_VI
-#endif
-
 #define TDIODE_OFFSET	(10000)	/* in millicelsius */
 
 /* Run framebuffer in VGA mode */
 #define TEGRA_FB_VGA
 
-int colibri_t30_regulator_init(void);
-int colibri_t30_suspend_init(void);
-int colibri_t30_pinmux_init(void);
-int colibri_t30_panel_init(void);
-int colibri_t30_sensors_init(void);
-int colibri_t30_gpio_switch_regulator_init(void);
-int colibri_t30_pins_state_init(void);
-int colibri_t30_emc_init(void);
-int colibri_t30_power_off_init(void);
-int colibri_t30_edp_init(void);
+int apalis_t30_regulator_init(void);
+int apalis_t30_suspend_init(void);
+int apalis_t30_pinmux_init(void);
+int apalis_t30_panel_init(void);
+int apalis_t30_sensors_init(void);
+int apalis_t30_gpio_switch_regulator_init(void);
+int apalis_t30_pins_state_init(void);
+int apalis_t30_emc_init(void);
+int apalis_t30_power_off_init(void);
+int apalis_t30_edp_init(void);
 
 #endif

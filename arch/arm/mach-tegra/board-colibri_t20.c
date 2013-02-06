@@ -16,56 +16,47 @@
 
 #include <asm/mach/arch.h>
 #include <asm/mach-types.h>
-#include <asm/setup.h>
 
 #include <linux/can/platform/mcp251x.h>
 #include <linux/can/platform/sja1000.h>
 #include <linux/clk.h>
 #include <linux/colibri_usb.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
-#include <linux/dma-mapping.h>
 #include <linux/i2c.h>
 #include <linux/i2c-tegra.h>
-#include <linux/init.h>
 #include <linux/input.h>
 #include <linux/io.h>
-#include <linux/kernel.h>
 #include <linux/leds_pwm.h>
+#include <linux/lm95245.h>
 #include <linux/memblock.h>
-#include <linux/mfd/tps6586x.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/serial_8250.h>
-#include <linux/slab.h>
 #include <linux/spi/spi.h>
 #if defined(CONFIG_SPI_GPIO) || defined(CONFIG_SPI_GPIO_MODULE)
 #include <linux/spi/spi_gpio.h>
 #endif
-#include <linux/suspend.h>
 #include <linux/tegra_uart.h>
 #include <linux/wm97xx.h>
 #include <linux/mma845x.h>
 
-#include <mach/audio.h>
-#include <mach/clk.h>
 #include <mach/gpio.h>
-#include <mach/iomap.h>
 #include <mach/mx4_iomap.h>
-#include <mach/irqs.h>
 #include <mach/nand.h>
 #include <mach/sdhci.h>
-#include <mach/spdif.h>
 #include <mach/usb_phy.h>
 #include <mach/w1.h>
 
 #include "board-colibri_t20.h"
 #include "board.h"
 #include "clock.h"
+#include "cpu-tegra.h"
 #include "devices.h"
 #include "gpio-names.h"
 //#include "../../../drivers/mtd/maps/tegra_nor.h"
 #include <linux/platform_data/tegra_nor.h>
-//move to board-colibri_t20-power.c?
 #include "pm.h"
 #include "pm-irq.h" 
 #include "wakeups-t2.h"
@@ -191,8 +182,8 @@ static struct platform_device colibri_can_device2 = {
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
 
-/* Clock */
-static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
+/* Clocks */
+static struct tegra_clk_init_table colibri_t20_clk_init_table[] __initdata = {
 	/* name		parent		rate		enabled */
 	{"blink",	"clk_32k",	32768,		false},
 	/* SMSC3340 REFCLK 24 MHz */
@@ -234,8 +225,8 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 #define FF_DCD		TEGRA_GPIO_PC6	/* SODIMM 31 */
 #define FF_DSR		TEGRA_GPIO_PC1	/* SODIMM 29 */
 
-#define I2C_SCL		TEGRA_GPIO_PC5	/* SODIMM 196 */
-#define I2C_SDA		TEGRA_GPIO_PC4	/* SODIMM 194 */
+#define I2C_SCL		TEGRA_GPIO_PC4	/* SODIMM 196 */
+#define I2C_SDA		TEGRA_GPIO_PC5	/* SODIMM 194 */
 
 #define LAN_EXT_WAKEUP	TEGRA GPIO_PV5
 #define LAN_PME		TEGRA_GPIO_PV6
@@ -250,6 +241,8 @@ static __initdata struct tegra_clk_init_table colibri_t20_clk_init_table[] = {
 #define PWR_I2C_SDA	TEGRA_GPIO_PZ7
 
 #define MECS_USB_HUB_RESET	TEGRA_GPIO_PBB3	/* SODIMM 127 */
+
+#define THERMD_ALERT	TEGRA_GPIO_PV7
 
 #define TOUCH_PEN_INT	TEGRA_GPIO_PV2
 
@@ -397,12 +390,12 @@ static void colibri_t20_gpio_init(void)
 	else {
 		pr_info("Enabling gpio wakeup on irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
 	}
-	err = tegra_pm_irq_set_wake_type(gpio_to_irq(GPIO_WAKEUP_PIN), IRQF_TRIGGER_FALLING);
+	err = tegra_pm_irq_set_wake_type(gpio_to_irq(GPIO_WAKEUP_PIN), IRQF_TRIGGER_RISING);
 	if (err) {
 		pr_err("Failed to set wake type for irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
 	}
 	else {
-		pr_info("Setting wake type to falling\n");
+		pr_info("Setting wake type to rising\n");
 	}	
 }
 
@@ -419,32 +412,35 @@ static struct mxc_mma845x_platform_data mma845x_data = {
 #endif
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
-static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] = {
+static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
 #ifdef CONFIG_MXC_MMA845X	
 	{
 		I2C_BOARD_INFO("mma845x", 0x1C),
 			.platform_data = (void *)&mma845x_data,
 	},
 #endif
-#if defined(COLIBRI_T20_VI) && !defined(CONFIG_ANDROID)
+#ifdef CONFIG_VIDEO_ADV7180
 	{
 		I2C_BOARD_INFO("adv7180", 0x21),
 	},
+#endif /* CONFIG_VIDEO_ADV7180 */
+#ifdef CONFIG_VIDEO_MT9V111
 	{
 		I2C_BOARD_INFO("mt9v111", 0x5c),
 			.platform_data = (void *)&camera_mt9v111_data,
 	},
-#endif /* COLIBRI_T20_VI && !CONFIG_ANDROID */
+#endif /* CONFIG_VIDEO_MT9V111 */
+
 };
 
 static struct tegra_i2c_platform_data colibri_t20_i2c1_platform_data = {
 	.adapter_nr	= 0,
+	.arb_recovery	= arb_lost_recovery,
 	.bus_count	= 1,
 	.bus_clk_rate	= {400000, 0},
-	.slave_addr	= 0x00FC,
 	.scl_gpio	= {I2C_SCL, 0},
 	.sda_gpio	= {I2C_SDA, 0},
-	.arb_recovery	= arb_lost_recovery,
+	.slave_addr	= 0x00FC,
 };
 
 /* GEN2_I2C: unused */
@@ -457,28 +453,37 @@ static const struct tegra_pingroup_config i2c2_ddc = {
 
 static struct tegra_i2c_platform_data colibri_t20_i2c2_platform_data = {
 	.adapter_nr	= 1,
-	.bus_count	= 1,
-	.bus_clk_rate	= {10000, 10000},
-	.slave_addr	= 0x00FC,
 	.arb_recovery	= arb_lost_recovery,
+	.bus_clk_rate	= {10000, 10000},
+	.bus_count	= 1,
+	.slave_addr	= 0x00FC,
 };
 
 /* PWR_I2C: power I2C to PMIC and temperature sensor */
+
+static void lm95245_probe_callback(struct device *dev);
+
+static struct lm95245_platform_data colibri_t20_lm95245_pdata = {
+	.enable_os_pin	= true,
+	.probe_callback	= lm95245_probe_callback,
+};
+
 static struct i2c_board_info colibri_t20_i2c_bus4_board_info[] __initdata = {
 	{
-		/* LM95245 temperature sensor on PWR_I2C_SCL/SDA */
+		/* LM95245 temperature sensor */
 		I2C_BOARD_INFO("lm95245", 0x4c),
+			.platform_data = &colibri_t20_lm95245_pdata,
 	},
 };
 
 static struct tegra_i2c_platform_data colibri_t20_dvc_platform_data = {
 	.adapter_nr	= 4,
-	.bus_count	= 1,
+	.arb_recovery	= arb_lost_recovery,
 	.bus_clk_rate	= {400000, 0},
+	.bus_count	= 1,
 	.is_dvc		= true,
 	.scl_gpio	= {PWR_I2C_SCL, 0},
 	.sda_gpio	= {PWR_I2C_SDA, 0},
-	.arb_recovery	= arb_lost_recovery,
 };
 
 static void colibri_t20_i2c_init(void)
@@ -714,6 +719,7 @@ static struct platform_device tegra_led_pwm_device = {
 };
 
 /* RTC */
+#ifdef CONFIG_RTC_DRV_TEGRA
 static struct resource tegra_rtc_resources[] = {
 	[0] = {
 		.start	= TEGRA_RTC_BASE,
@@ -733,13 +739,14 @@ static struct platform_device tegra_rtc_device = {
 	.resource	= tegra_rtc_resources,
 	.num_resources	= ARRAY_SIZE(tegra_rtc_resources),
 };
+#endif /* CONFIG_RTC_DRV_TEGRA */
 
 /* SPI */
 
 #if defined(CONFIG_SPI_TEGRA) && defined(CONFIG_SPI_SPIDEV)
 static struct spi_board_info tegra_spi_devices[] __initdata = {
 	{
-		.bus_num	= 3,
+		.bus_num	= 3,		/* SPI4 */
 		.chip_select	= 0,
 		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PY6),
 		.max_speed_hz	= 5000000,
@@ -765,9 +772,164 @@ static void __init colibri_t20_register_spidev(void)
 	spi_register_board_info(tegra_spi_devices,
 				ARRAY_SIZE(tegra_spi_devices));
 }
-#else /* CONFIG_SPI_TEGRA && CONFIG_SPI_SPIDEV */
+#else /* CONFIG_SPI_TEGRA & CONFIG_SPI_SPIDEV */
 #define colibri_t20_register_spidev() do {} while (0)
-#endif /* CONFIG_SPI_TEGRA && CONFIG_SPI_SPIDEV */
+#endif /* CONFIG_SPI_TEGRA & CONFIG_SPI_SPIDEV */
+
+/* Thermal throttling
+   Note: As our hardware only allows triggering an interrupt on
+	 over-temperature shutdown we first use it to catch entering throttle
+	 and only then set it up to catch an actual over-temperature shutdown.
+	 While throttling we setup a workqueue to catch leaving it again. */
+
+static int colibri_t20_shutdown_temp = 115000;
+static int colibri_t20_throttle_hysteresis = 3000;
+static int colibri_t20_throttle_temp = 90000;
+static struct device *lm95245_device = NULL;
+static int thermd_alert_irq_disabled = 0;
+struct work_struct thermd_alert_work;
+struct workqueue_struct *thermd_alert_workqueue;
+
+/* Over-temperature shutdown OS pin GPIO interrupt handler */
+static irqreturn_t thermd_alert_irq(int irq, void *data)
+{
+	disable_irq_nosync(irq);
+	thermd_alert_irq_disabled = 1;
+	queue_work(thermd_alert_workqueue, &thermd_alert_work);
+
+	return IRQ_HANDLED;
+}
+
+/* Gets both entered by THERMD_ALERT GPIO interrupt as well as re-scheduled
+   while throttling. */
+static void thermd_alert_work_func(struct work_struct *work)
+{
+	int temp = 0;
+
+	lm95245_get_remote_temp(lm95245_device, &temp);
+
+	if (temp > colibri_t20_shutdown_temp) {
+		/* First check for hardware over-temperature condition mandating
+		   immediate shutdown */
+		pr_err("over-temperature condition %d degC reached, initiating "
+				"immediate shutdown", temp);
+		kernel_power_off();
+	} else if (temp < colibri_t20_throttle_temp - colibri_t20_throttle_hysteresis) {
+		/* Make sure throttling gets disabled again */
+		if (tegra_is_throttling()) {
+			tegra_throttling_enable(false);
+			lm95245_set_remote_os_limit(lm95245_device, colibri_t20_throttle_temp);
+		}
+	} else if (temp < colibri_t20_throttle_temp) {
+		/* Operating within hysteresis so keep re-scheduling to catch
+		   leaving below throttle again */
+		if (tegra_is_throttling()) {
+			msleep(100);
+			queue_work(thermd_alert_workqueue, &thermd_alert_work);
+		}
+	} else if (temp >= colibri_t20_throttle_temp) {
+		/* Make sure throttling gets enabled and set shutdown limit */
+		if (!tegra_is_throttling()) {
+			tegra_throttling_enable(true);
+			lm95245_set_remote_os_limit(lm95245_device, colibri_t20_shutdown_temp);
+		}
+		/* And re-schedule again */
+		msleep(100);
+		queue_work(thermd_alert_workqueue, &thermd_alert_work);
+	}
+
+	/* Avoid unbalanced enable for IRQ 367 */
+	if (thermd_alert_irq_disabled) {
+		thermd_alert_irq_disabled = 0;
+		enable_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT));
+	}
+}
+
+static void colibri_t20_thermd_alert_init(void)
+{
+	gpio_request(THERMD_ALERT, "THERMD_ALERT");
+	gpio_direction_input(THERMD_ALERT);
+
+	thermd_alert_workqueue = create_singlethread_workqueue("THERMD_ALERT");
+
+	INIT_WORK(&thermd_alert_work, thermd_alert_work_func);
+}
+
+static void lm95245_probe_callback(struct device *dev)
+{
+	lm95245_device = dev;
+
+	lm95245_set_remote_os_limit(lm95245_device, colibri_t20_throttle_temp);
+
+	if (request_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT), thermd_alert_irq,
+			IRQF_TRIGGER_LOW, "THERMD_ALERT", NULL))
+		pr_err("%s: unable to register THERMD_ALERT interrupt\n", __func__);
+}
+
+#ifdef CONFIG_DEBUG_FS
+static int colibri_t20_thermal_get_throttle_temp(void *data, u64 *val)
+{
+	*val = (u64)colibri_t20_throttle_temp;
+	return 0;
+}
+
+static int colibri_t20_thermal_set_throttle_temp(void *data, u64 val)
+{
+	colibri_t20_throttle_temp = val;
+	if (!tegra_is_throttling() && lm95245_device)
+		lm95245_set_remote_os_limit(lm95245_device, colibri_t20_throttle_temp);
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(throttle_fops,
+			colibri_t20_thermal_get_throttle_temp,
+			colibri_t20_thermal_set_throttle_temp,
+			"%llu\n");
+
+static int colibri_t20_thermal_get_shutdown_temp(void *data, u64 *val)
+{
+	*val = (u64)colibri_t20_shutdown_temp;
+	return 0;
+}
+
+static int colibri_t20_thermal_set_shutdown_temp(void *data, u64 val)
+{
+	colibri_t20_shutdown_temp = val;
+	if (tegra_is_throttling() && lm95245_device)
+		lm95245_set_remote_os_limit(lm95245_device, colibri_t20_shutdown_temp);
+
+	/* Carefull as we can only actively monitor one temperatur limit and
+	   assumption is throttling is lower than shutdown one. */
+	if (colibri_t20_shutdown_temp < colibri_t20_throttle_temp)
+		colibri_t20_thermal_set_throttle_temp(NULL, colibri_t20_shutdown_temp);
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(shutdown_fops,
+			colibri_t20_thermal_get_shutdown_temp,
+			colibri_t20_thermal_set_shutdown_temp,
+			"%llu\n");
+
+static int __init colibri_t20_thermal_debug_init(void)
+{
+	struct dentry *thermal_debugfs_root;
+
+	thermal_debugfs_root = debugfs_create_dir("thermal", 0);
+
+	if (!debugfs_create_file("throttle", 0644, thermal_debugfs_root,
+					NULL, &throttle_fops))
+		return -ENOMEM;
+
+	if (!debugfs_create_file("shutdown", 0644, thermal_debugfs_root,
+					NULL, &shutdown_fops))
+		return -ENOMEM;
+
+	return 0;
+}
+late_initcall(colibri_t20_thermal_debug_init);
+#endif /* CONFIG_DEBUG_FS */
 
 /* UART */
 #define SERIAL_FLAGS (UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST)
@@ -899,9 +1061,7 @@ static void __init colibri_t20_uart_init(void)
 
 //overcurrent?
 
-//USB1_IF_USB_PHY_VBUS_WAKEUP_ID_0
-//Offset: 408h 
-//ID_PU: ID pullup enable. Set to 1.
+//TODO: overcurrent
 #ifdef CONFIG_USB_GADGET
 static struct tegra_usb_platform_data tegra_udc_pdata = {
 	.has_hostpc	= false,
@@ -1144,32 +1304,35 @@ static void colibri_t20_usb_init(void)
 
 }
 
-#ifdef CONFIG_W1_MASTER_TEGRA
 /* W1, aka OWR, aka OneWire */
-struct tegra_w1_timings colibri_t20_w1_timings = {
-		.tsu = 1,
-		.trelease = 0xf,
-		.trdv = 0xf,
-		.tlow0 = 0x3c,
-		.tlow1 = 1,
-		.tslot=0x77,
 
-		.tpdl = 0x78,
-		.tpdh = 0x1e,
-		.trstl = 0x1df,
-		.trsth = 0x1df,
-		.rdsclk = 0x7,
-		.psclk = 0x50,
+#ifdef CONFIG_W1_MASTER_TEGRA
+struct tegra_w1_timings colibri_t20_w1_timings = {
+		.tsu		= 1,
+		.trelease	= 0xf,
+		.trdv		= 0xf,
+		.tlow0		= 0x3c,
+		.tlow1		= 1,
+		.tslot		= 0x77,
+
+		.tpdl		= 0x78,
+		.tpdh		= 0x1e,
+		.trstl		= 0x1df,
+		.trsth		= 0x1df,
+		.rdsclk		= 0x7,
+		.psclk		= 0x50,
 };
 
 struct tegra_w1_platform_data colibri_t20_w1_platform_data = {
-	.clk_id = "tegra_w1",
-	.timings = &colibri_t20_w1_timings,
+	.clk_id		= "tegra_w1",
+	.timings	= &colibri_t20_w1_timings,
 };
 #endif /* CONFIG_W1_MASTER_TEGRA */
 
 static struct platform_device *colibri_t20_devices[] __initdata = {
+#ifdef CONFIG_RTC_DRV_TEGRA
 	&tegra_rtc_device,
+#endif
 	&tegra_nand_device,
 
 	&tegra_pmu_device,
@@ -1180,7 +1343,7 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 #endif
 	&tegra_wdt_device,
 	&tegra_avp_device,
-#ifdef COLIBRI_T20_VI
+#ifdef CONFIG_TEGRA_CAMERA
 	&tegra_camera,
 #endif
 	&tegra_ac97_device,
@@ -1200,7 +1363,7 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 #endif
 };
 
-static void __init tegra_colibri_t20_init(void)
+static void __init colibri_t20_init(void)
 {
 
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
@@ -1223,6 +1386,7 @@ static void __init tegra_colibri_t20_init(void)
 
 	tegra_clk_init_from_table(colibri_t20_clk_init_table);
 	colibri_t20_pinmux_init();
+	colibri_t20_thermd_alert_init();
 	colibri_t20_i2c_init();
 	colibri_t20_uart_init();
 //
@@ -1266,7 +1430,7 @@ int __init tegra_colibri_t20_protected_aperture_init(void)
 }
 late_initcall(tegra_colibri_t20_protected_aperture_init);
 
-void __init tegra_colibri_t20_reserve(void)
+void __init colibri_t20_reserve(void)
 {
 	if (memblock_reserve(0x0, 4096) < 0)
 		pr_warn("Cannot reserve first 4K of memory for safety\n");
@@ -1291,8 +1455,8 @@ MACHINE_START(COLIBRI_T20, "Toradex Colibri T20")
 	.dt_compat	= colibri_t20_dt_board_compat,
 	.init_early	= tegra_init_early,
 	.init_irq	= tegra_init_irq,
-	.init_machine	= tegra_colibri_t20_init,
+	.init_machine	= colibri_t20_init,
 	.map_io		= tegra_map_common_io,
-	.reserve        = tegra_colibri_t20_reserve,
+	.reserve	= colibri_t20_reserve,
 	.timer		= &tegra_timer,
 MACHINE_END

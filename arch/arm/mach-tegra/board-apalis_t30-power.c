@@ -1,7 +1,7 @@
 /*
- * arch/arm/mach-tegra/board-colibri_t30-power.c
+ * arch/arm/mach-tegra/board-apalis_t30-power.c
  *
- * Copyright (C) 2012 Toradex, Inc.
+ * Copyright (C) 2013 Toradex, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,13 +23,9 @@
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/io.h>
-#include <linux/mfd/max77663-core.h>
 #include <linux/mfd/tps6591x.h>
-#include <linux/pda_power.h>
 #include <linux/platform_device.h>
-//#include <linux/power/gpio-charger.h>
 #include <linux/regulator/fixed.h>
-//#include <linux/regulator/gpio-switch-regulator.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/tps62360.h>
 #include <linux/regulator/tps6591x-regulator.h>
@@ -39,9 +35,8 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
-//#include <mach/suspend.h>
 
-#include "board-colibri_t30.h"
+#include "board-apalis_t30.h"
 #include "board.h"
 #include "gpio-names.h"
 #include "tegra3_tsensor.h"
@@ -58,9 +53,11 @@ static struct regulator_consumer_supply tps6591x_vdd1_supply_0[] = {
 	REGULATOR_SUPPLY("t30_vddio_ddr", NULL),
 };
 
-/* SW2: unused */
+/* SW2: +V1.05 */
 static struct regulator_consumer_supply tps6591x_vdd2_supply_0[] = {
-	REGULATOR_SUPPLY("unused_rail_vdd2", NULL),
+	REGULATOR_SUPPLY("avdd_sata", NULL),
+	REGULATOR_SUPPLY("vdd_sata", NULL),
+	REGULATOR_SUPPLY("avdd_sata_pll", NULL),
 };
 
 /* SW CTRL: +V1.0_VDD_CPU */
@@ -101,11 +98,16 @@ static struct regulator_consumer_supply tps6591x_ldo1_supply_0[] = {
 
 /* EN_+V3.3 switching via FET: +V3.3_AUDIO_AVDD_S, +V3.3 and +V1.8_VDD_LAN
    see also v3_3 fixed supply */
+//Apalis T30
+//+V3.3_VPP_FUSE
+//POWER_ENABLE_MOCI
+//+V3.3_TOUCH_AVDD_S
+//+V3.3_AUDIO_AVDD_S
 static struct regulator_consumer_supply tps6591x_ldo2_supply_0[] = {
 	REGULATOR_SUPPLY("en_V3_3", NULL),
 };
 
-/* unused in Colibri T30, used in Apalis T30 */
+/* +V1.2_CSI */
 static struct regulator_consumer_supply tps6591x_ldo3_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", NULL),
 	REGULATOR_SUPPLY("pwrdet_mipi", NULL),
@@ -122,6 +124,7 @@ static struct regulator_consumer_supply tps6591x_ldo5_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_vdac", NULL),
 };
 
+//Apalis T30
 /* +V1.05_AVDD_PLLE */
 static struct regulator_consumer_supply tps6591x_ldo6_supply_0[] = {
 	REGULATOR_SUPPLY("avdd_plle", NULL),
@@ -170,8 +173,8 @@ static struct regulator_consumer_supply tps6591x_ldo8_supply_0[] = {
 		.flags = _flags,					\
 	}
 
-TPS_PDATA_INIT(vdd1, 0,         1350, 1350, 0, 1, 1, 0, -1, 0, 0, 0, 0);
-TPS_PDATA_INIT(vdd2, 0,         1050, 1050, 0, 0, 1, 0, -1, 0, 0, EXT_CTRL_SLEEP_OFF, 0);
+TPS_PDATA_INIT(vdd1, 0,         1350, 1350, 0, 1, 1, 1, -1, 0, 0, 0, 0);
+TPS_PDATA_INIT(vdd2, 0,         1050, 1050, 0, 1, 1, 1, -1, 0, 0, EXT_CTRL_SLEEP_OFF, 0);
 TPS_PDATA_INIT(vddctrl, 0,      800,  1300, 0, 1, 1, 0, -1, 0, 0, EXT_CTRL_EN1, 0);
 TPS_PDATA_INIT(vio,  0,         1800, 1800, 0, 1, 1, 0, -1, 0, 0, 0, 0);
 
@@ -216,7 +219,7 @@ static struct tps6591x_rtc_platform_data rtc_data = {
 		.platform_data	= &pdata_##_name##_##_sname,	\
 	}
 
-static struct tps6591x_subdev_info colibri_t30_tps_devs[] = {
+static struct tps6591x_subdev_info apalis_t30_tps_devs[] = {
 	TPS_REG(VDD_1, vdd1, 0),
 	TPS_REG(VDD_2, vdd2, 0),
 	TPS_REG(VDDCTRL, vddctrl, 0),
@@ -246,7 +249,7 @@ static struct tps6591x_platform_data tps_platform = {
 	.use_power_off	= true,
 };
 
-static struct i2c_board_info __initdata colibri_t30_regulators[] = {
+static struct i2c_board_info __initdata apalis_t30_regulators[] = {
 	{
 		I2C_BOARD_INFO("tps6591x", 0x2D),
 //PWR_INT_IN wake18
@@ -256,8 +259,7 @@ static struct i2c_board_info __initdata colibri_t30_regulators[] = {
 };
 
 /* TPS62362 DC-DC converter
-   SW: +V1.2_VDD_CORE
-   Note: Colibri T30 V1.0 have TPS62360 with different voltage levels at startup */
+   SW: +V1.2_VDD_CORE */
 static struct regulator_consumer_supply tps6236x_dcdc_supply[] = {
 	REGULATOR_SUPPLY("vdd_core", NULL),
 };
@@ -404,17 +406,20 @@ static struct regulator_consumer_supply fixed_reg_v3_3_supply[] = {
 	/* SGTL5000 */
 	REGULATOR_SUPPLY("VDDA", "4-000a"),
 	REGULATOR_SUPPLY("VDDIO", "4-000a"),
+
+	REGULATOR_SUPPLY("hvdd_pex", NULL),
+	REGULATOR_SUPPLY("hvdd_sata", NULL),
 };
 
 FIXED_REG(3, v3_3, v3_3, NULL, 1, 1, -1, true, 1, 3300);
 
 /* Gpio switch regulator platform data */
-static struct platform_device *fixed_reg_devs_colibri_t30[] = {
+static struct platform_device *fixed_reg_devs_apalis_t30[] = {
 		ADD_FIXED_REG(en_hdmi),
 		ADD_FIXED_REG(v3_3),
 };
 
-int __init colibri_t30_regulator_init(void)
+int __init apalis_t30_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	u32 pmc_ctrl;
@@ -429,10 +434,10 @@ int __init colibri_t30_regulator_init(void)
 	regulator_has_full_constraints();
 
 	tps_platform.num_subdevs =
-			ARRAY_SIZE(colibri_t30_tps_devs);
-	tps_platform.subdevs = colibri_t30_tps_devs;
+			ARRAY_SIZE(apalis_t30_tps_devs);
+	tps_platform.subdevs = apalis_t30_tps_devs;
 
-	i2c_register_board_info(4, colibri_t30_regulators, 1);
+	i2c_register_board_info(4, apalis_t30_regulators, 1);
 
 	/* Register the TPS6236x. */
 	pr_info("Registering the device TPS62360\n");
@@ -441,25 +446,25 @@ int __init colibri_t30_regulator_init(void)
 	return 0;
 }
 
-int __init colibri_t20_fixed_regulator_init(void)
+int __init apalis_t20_fixed_regulator_init(void)
 {
-	return platform_add_devices(fixed_reg_devs_colibri_t30, ARRAY_SIZE(fixed_reg_devs_colibri_t30));
+	return platform_add_devices(fixed_reg_devs_apalis_t30, ARRAY_SIZE(fixed_reg_devs_apalis_t30));
 }
-subsys_initcall_sync(colibri_t20_fixed_regulator_init);
+subsys_initcall_sync(apalis_t20_fixed_regulator_init);
 
-static void colibri_t30_board_suspend(int lp_state, enum suspend_stage stg)
+static void apalis_t30_board_suspend(int lp_state, enum suspend_stage stg)
 {
 	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_SUSPEND_BEFORE_CPU))
 		tegra_console_uart_suspend();
 }
 
-static void colibri_t30_board_resume(int lp_state, enum resume_stage stg)
+static void apalis_t30_board_resume(int lp_state, enum resume_stage stg)
 {
 	if ((lp_state == TEGRA_SUSPEND_LP1) && (stg == TEGRA_RESUME_AFTER_CPU))
 		tegra_console_uart_resume();
 }
 
-static struct tegra_suspend_platform_data colibri_t30_suspend_data = {
+static struct tegra_suspend_platform_data apalis_t30_suspend_data = {
 	.cpu_timer	= 2000,
 	.cpu_off_timer	= 200,
 	.suspend_mode	= TEGRA_SUSPEND_LP1,
@@ -468,28 +473,28 @@ static struct tegra_suspend_platform_data colibri_t30_suspend_data = {
 	.corereq_high	= true,
 	.sysclkreq_high	= true,
 	.cpu_lp2_min_residency = 2000,
-	.board_suspend = colibri_t30_board_suspend,
-	.board_resume = colibri_t30_board_resume,
+	.board_suspend = apalis_t30_board_suspend,
+	.board_resume = apalis_t30_board_resume,
 };
 
-int __init colibri_t30_suspend_init(void)
+int __init apalis_t30_suspend_init(void)
 {
 	/* Make core_pwr_req to high */
-	colibri_t30_suspend_data.corereq_high = true;
+	apalis_t30_suspend_data.corereq_high = true;
 
 	/* CORE_PWR_REQ to be high required to enable the dc-dc converter tps62361x */
-	colibri_t30_suspend_data.corereq_high = true;
+	apalis_t30_suspend_data.corereq_high = true;
 
 //required?
-	colibri_t30_suspend_data.cpu_timer = 5000;
-	colibri_t30_suspend_data.cpu_off_timer = 5000;
+	apalis_t30_suspend_data.cpu_timer = 5000;
+	apalis_t30_suspend_data.cpu_off_timer = 5000;
 
-	tegra_init_suspend(&colibri_t30_suspend_data);
+	tegra_init_suspend(&apalis_t30_suspend_data);
 	return 0;
 }
 
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-int __init colibri_t30_edp_init(void)
+int __init apalis_t30_edp_init(void)
 {
 	unsigned int regulator_mA;
 

@@ -1,7 +1,7 @@
 /*
- * arch/arm/mach-tegra/board-colibri_t30.c
+ * arch/arm/mach-tegra/board-apalis_t30.c
  *
- * Copyright (c) 2012-2013 Toradex, Inc.
+ * Copyright (c) 2013 Toradex, Inc.
  *
  * This source code is licensed under the GNU General Public License,
  * Version 2. See the file COPYING for more details.
@@ -10,14 +10,15 @@
 #include <asm/mach/arch.h>
 #include <asm/mach-types.h>
 
+#include <linux/can/platform/mcp251x.h>
 #include <linux/clk.h>
-#include <linux/colibri_usb.h>
 #include <linux/types.h> /* required by linux/gpio_keys.h */
 #include <linux/gpio_keys.h>
 #include <linux/i2c.h>
 #include <linux/i2c-tegra.h>
 #include <linux/input.h>
 #include <linux/io.h>
+#include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/lm95245.h>
 #include <linux/mfd/stmpe.h>
@@ -29,6 +30,7 @@
 #include <linux/tegra_uart.h>
 
 #include <mach/io_dpd.h>
+#include <mach/pci.h>
 #include <mach/sdhci.h>
 #include <mach/tegra_asoc_pdata.h>
 #include <mach/tegra_fiq_debugger.h>
@@ -36,7 +38,7 @@
 #include <mach/usb_phy.h>
 #include <mach/w1.h>
 
-#include "board-colibri_t30.h"
+#include "board-apalis_t30.h"
 #include "board.h"
 #include "clock.h"
 #include "devices.h"
@@ -49,14 +51,20 @@
 
 /* Audio */
 
-static struct tegra_asoc_platform_data colibri_t30_audio_sgtl5000_pdata = {
+/* HDA */
+
+//TODO
+
+/* I2S */
+
+static struct tegra_asoc_platform_data apalis_t30_audio_sgtl5000_pdata = {
 	.gpio_spkr_en		= -1,
 	.gpio_hp_det		= -1,
 	.gpio_hp_mute		= -1,
 	.gpio_int_mic_en	= -1,
 	.gpio_ext_mic_en	= -1,
 	.i2s_param[HIFI_CODEC] = {
-		.audio_port_id	= 0,
+		.audio_port_id	= 2,
 		.i2s_mode	= TEGRA_DAIFMT_I2S,
 		.is_i2s_master	= 1,
 		.sample_size	= 16,
@@ -69,11 +77,11 @@ static struct tegra_asoc_platform_data colibri_t30_audio_sgtl5000_pdata = {
 	},
 };
 
-static struct platform_device colibri_t30_audio_sgtl5000_device = {
+static struct platform_device apalis_t30_audio_sgtl5000_device = {
 	.name	= "tegra-snd-colibri_t30-sgtl5000",
 	.id	= 0,
 	.dev = {
-		.platform_data = &colibri_t30_audio_sgtl5000_pdata,
+		.platform_data = &apalis_t30_audio_sgtl5000_pdata,
 	},
 };
 
@@ -85,8 +93,48 @@ static struct platform_device tegra_camera = {
 };
 #endif /* CONFIG_TEGRA_CAMERA */
 
+/* CAN */
+
+#if defined(CONFIG_CAN_MCP251X) || defined(CONFIG_CAN_MCP251X_MODULE)
+static struct mcp251x_platform_data can_pdata = {
+	.oscillator_frequency	= 16000000,
+	.power_enable		= NULL,
+	.transceiver_enable	= NULL
+};
+
+static struct spi_board_info can_board_info[] = {
+	{
+		.bus_num	= 1,		/* SPI2: CAN1 */
+		.chip_select	= 0,
+		.max_speed_hz	= 10000000,
+		.modalias	= "mcp2515",
+		.platform_data	= &can_pdata,
+	},
+	{
+		.bus_num	= 3,		/* SPI4: CAN2 */
+		.chip_select	= 1,
+		.max_speed_hz	= 10000000,
+		.modalias	= "mcp2515",
+		.platform_data	= &can_pdata,
+	},
+};
+
+static void __init apalis_t20_mcp2515_can_init(void)
+{
+	can_board_info[0].irq = gpio_to_irq(CAN1_INT);
+	can_board_info[1].irq = gpio_to_irq(CAN2_INT);
+	spi_register_board_info(can_board_info, ARRAY_SIZE(can_board_info));
+}
+#else /* CONFIG_CAN_MCP251X | CONFIG_CAN_MCP251X_MODULE */
+#define apalis_t20_mcp2515_can_init() do {} while (0)
+#endif /* CONFIG_CAN_MCP251X | CONFIG_CAN_MCP251X_MODULE */
+
+/* CEC */
+
+//TODO
+
 /* Clocks */
-static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
+static struct tegra_clk_init_table apalis_t30_clk_init_table[] __initdata = {
 	/* name		parent		rate		enabled */
 	{"audio1",	"i2s1_sync",	0,		false},
 	{"audio2",	"i2s2_sync",	0,		false},
@@ -120,40 +168,6 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 
 /* GPIO */
 
-#define DDC_SCL		TEGRA_GPIO_PV4	/* X2-15 */
-#define DDC_SDA		TEGRA_GPIO_PV5	/* X2-16 */
-
-#ifdef COLIBRI_T30_V10
-#define EMMC_DETECT	TEGRA_GPIO_PC7
-#endif
-
-#define EN_MIC_GND	TEGRA_GPIO_PT1
-
-#define I2C_SCL		TEGRA_GPIO_PC4	/* SODIMM 196 */
-#define I2C_SDA		TEGRA_GPIO_PC5	/* SODIMM 194 */
-
-#define LAN_EXT_WAKEUP	TEGRA_GPIO_PDD1
-#define LAN_PME		TEGRA_GPIO_PDD3
-#define LAN_RESET	TEGRA_GPIO_PDD0
-#define LAN_V_BUS	TEGRA_GPIO_PDD2
-
-#ifdef COLIBRI_T30_V10
-#define MMC_CD		TEGRA_GPIO_PU6	/* SODIMM 43 */
-#else
-#define MMC_CD		TEGRA_GPIO_PC7	/* SODIMM 43 */
-#endif
-
-#define PWR_I2C_SCL	TEGRA_GPIO_PZ6
-#define PWR_I2C_SDA	TEGRA_GPIO_PZ7
-
-#define TOUCH_PEN_INT	TEGRA_GPIO_PV0
-
-#define THERMD_ALERT	TEGRA_GPIO_PD2
-
-#define USBC_DET	TEGRA_GPIO_PK5	/* SODIMM 137 */
-#define USBH_OC		TEGRA_GPIO_PW3	/* SODIMM 131 */
-#define USBH_PEN	TEGRA_GPIO_PW2	/* SODIMM 129 */
-
 //TODO: sysfs GPIO exports
 
 /* I2C */
@@ -161,8 +175,8 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 /* Make sure that the pinmuxing enable the 'open drain' feature for pins used
    for I2C */
 
-/* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
-static struct i2c_board_info colibri_t30_i2c_bus1_board_info[] __initdata = {
+/* GEN1_I2C: I2C1_SDA/SCL on MXM3 pin 209/211 (e.g. RTC on carrier board) */
+static struct i2c_board_info apalis_t30_i2c_bus1_board_info[] __initdata = {
 	{
 		/* M41T0M6 real time clock on Iris carrier board */
 		I2C_BOARD_INFO("rtc-ds1307", 0x68),
@@ -170,26 +184,38 @@ static struct i2c_board_info colibri_t30_i2c_bus1_board_info[] __initdata = {
 	},
 };
 
-static struct tegra_i2c_platform_data colibri_t30_i2c1_platform_data = {
+static struct tegra_i2c_platform_data apalis_t30_i2c1_platform_data = {
 	.adapter_nr	= 0,
 	.arb_recovery	= arb_lost_recovery,
 	.bus_clk_rate	= {400000, 0},
 	.bus_count	= 1,
-	.scl_gpio	= {I2C_SCL, 0},
-	.sda_gpio	= {I2C_SDA, 0},
+	.scl_gpio	= {I2C1_SCL, 0},
+	.sda_gpio	= {I2C1_SDA, 0},
 	.slave_addr	= 0x00FC,
 };
 
 /* GEN2_I2C: unused */
 
-/* DDC_CLOCK/DATA on X3 pin 15/16 (e.g. display EDID) */
-static struct tegra_i2c_platform_data colibri_t30_i2c4_platform_data = {
+/* DDC: I2C2_SDA/SCL on MXM3 pin 205/207 (e.g. display EDID) */
+static struct tegra_i2c_platform_data apalis_t30_i2c4_platform_data = {
 	.adapter_nr	= 3,
 	.arb_recovery	= arb_lost_recovery,
 	.bus_clk_rate	= {10000, 10000},
 	.bus_count	= 1,
-	.scl_gpio	= {DDC_SCL, 0},
-	.sda_gpio	= {DDC_SDA, 0},
+	.scl_gpio	= {I2C2_SCL, 0},
+	.sda_gpio	= {I2C2_SDA, 0},
+	.slave_addr	= 0x00FC,
+};
+
+/* CAM_I2C: I2C3_SDA/SCL on MXM3 pin 201/203 (e.g. camera sensor on carrier
+   board) */
+static struct tegra_i2c_platform_data apalis_t30_i2c3_platform_data = {
+	.adapter_nr	= 2,
+	.arb_recovery	= arb_lost_recovery,
+	.bus_clk_rate	= {400000, 0},
+	.bus_count	= 1,
+	.scl_gpio	= {I2C3_SCL, 0},
+	.sda_gpio	= {I2C3_SDA, 0},
 	.slave_addr	= 0x00FC,
 };
 
@@ -219,12 +245,12 @@ static struct stmpe_platform_data stmpe811_data = {
 
 static void lm95245_probe_callback(struct device *dev);
 
-static struct lm95245_platform_data colibri_t30_lm95245_pdata = {
+static struct lm95245_platform_data apalis_t30_lm95245_pdata = {
 	.enable_os_pin	= true,
 	.probe_callback	= lm95245_probe_callback,
 };
 
-static struct i2c_board_info colibri_t30_i2c_bus5_board_info[] __initdata = {
+static struct i2c_board_info apalis_t30_i2c_bus5_board_info[] __initdata = {
 	{
 		/* SGTL5000 audio codec */
 		I2C_BOARD_INFO("sgtl5000", 0x0a),
@@ -241,11 +267,11 @@ static struct i2c_board_info colibri_t30_i2c_bus5_board_info[] __initdata = {
 		/* LM95245 temperature sensor
 		   Note: OVERT_N directly connected to PMIC PWRDN */
 		I2C_BOARD_INFO("lm95245", 0x4c),
-			.platform_data = &colibri_t30_lm95245_pdata,
+			.platform_data = &apalis_t30_lm95245_pdata,
 	},
 };
 
-static struct tegra_i2c_platform_data colibri_t30_i2c5_platform_data = {
+static struct tegra_i2c_platform_data apalis_t30_i2c5_platform_data = {
 	.adapter_nr	= 4,
 	.arb_recovery	= arb_lost_recovery,
 	.bus_clk_rate	= {400000, 0},
@@ -254,69 +280,38 @@ static struct tegra_i2c_platform_data colibri_t30_i2c5_platform_data = {
 	.sda_gpio	= {PWR_I2C_SDA, 0},
 };
 
-static void __init colibri_t30_i2c_init(void)
+static void __init apalis_t30_i2c_init(void)
 {
-	tegra_i2c_device1.dev.platform_data = &colibri_t30_i2c1_platform_data;
-	tegra_i2c_device4.dev.platform_data = &colibri_t30_i2c4_platform_data;
-	tegra_i2c_device5.dev.platform_data = &colibri_t30_i2c5_platform_data;
+	tegra_i2c_device1.dev.platform_data = &apalis_t30_i2c1_platform_data;
+	tegra_i2c_device3.dev.platform_data = &apalis_t30_i2c3_platform_data;
+	tegra_i2c_device4.dev.platform_data = &apalis_t30_i2c4_platform_data;
+	tegra_i2c_device5.dev.platform_data = &apalis_t30_i2c5_platform_data;
 
 	platform_device_register(&tegra_i2c_device1);
+	platform_device_register(&tegra_i2c_device3);
 	platform_device_register(&tegra_i2c_device4);
 	platform_device_register(&tegra_i2c_device5);
 
-	i2c_register_board_info(0, colibri_t30_i2c_bus1_board_info, ARRAY_SIZE(colibri_t30_i2c_bus1_board_info));
+	i2c_register_board_info(0, apalis_t30_i2c_bus1_board_info, ARRAY_SIZE(apalis_t30_i2c_bus1_board_info));
 
 	/* enable touch interrupt GPIO */
 	gpio_request(TOUCH_PEN_INT, "TOUCH_PEN_INT");
 	gpio_direction_input(TOUCH_PEN_INT);
 
-	i2c_register_board_info(4, colibri_t30_i2c_bus5_board_info, ARRAY_SIZE(colibri_t30_i2c_bus5_board_info));
+	i2c_register_board_info(4, apalis_t30_i2c_bus5_board_info, ARRAY_SIZE(apalis_t30_i2c_bus5_board_info));
 }
 
-/* Keys
-   Note: active-low means pull-ups required on carrier board resp. via pin-muxing
-   Note2: power-key active-high due to EvalBoard v3.1a having 100 K pull-down on SODIMM pin 45 */
+/* IrDA */
 
-#ifdef CONFIG_KEYBOARD_GPIO
-#define GPIO_KEY(_id, _gpio, _lowactive, _iswake)	\
-	{						\
-		.code = _id,				\
-		.gpio = TEGRA_GPIO_##_gpio,		\
-		.active_low = _lowactive,		\
-		.desc = #_id,				\
-		.type = EV_KEY,				\
-		.wakeup = _iswake,			\
-		.debounce_interval = 10,		\
-	}
+//TODO
 
-static struct gpio_keys_button colibri_t30_keys[] = {
-	[0] = GPIO_KEY(KEY_FIND, PCC2, 1, 0),		/* SODIMM pin 77 */
-	[1] = GPIO_KEY(KEY_HOME, PT6, 1, 0),		/* SODIMM pin 127 */
-	[2] = GPIO_KEY(KEY_BACK, PT5, 1, 0),		/* SODIMM pin 133, Iris X16-14 */
-	[3] = GPIO_KEY(KEY_VOLUMEUP, PDD7, 1, 0),	/* SODIMM pin 22 */
-	[4] = GPIO_KEY(KEY_VOLUMEDOWN, PCC6, 1, 0),	/* SODIMM pin 24 */
-	[5] = GPIO_KEY(KEY_POWER, PV1, 0, 1),		/* SODIMM pin 45, Iris X16-20 */
-	[6] = GPIO_KEY(KEY_MENU, PK6, 1, 0),		/* SODIMM pin 135 */
-};
+/* Keys */
 
-static struct gpio_keys_platform_data colibri_t30_keys_platform_data = {
-	.buttons	= colibri_t30_keys,
-	.nbuttons	= ARRAY_SIZE(colibri_t30_keys),
-};
-
-static struct platform_device colibri_t30_keys_device = {
-	.name	= "gpio-keys",
-	.id	= 0,
-	.dev = {
-		.platform_data = &colibri_t30_keys_platform_data,
-	},
-};
-#endif /* CONFIG_KEYBOARD_GPIO */
+//TODO
 
 /* MMC/SD */
 
-#ifndef COLIBRI_T30_SDMMC4B
-static struct tegra_sdhci_platform_data colibri_t30_emmc_platform_data = {
+static struct tegra_sdhci_platform_data apalis_t30_emmc_platform_data = {
 	.cd_gpio	= -1,
 	.ddr_clk_limit	= 52000000,
 	.is_8bit	= 1,
@@ -327,50 +322,75 @@ static struct tegra_sdhci_platform_data colibri_t30_emmc_platform_data = {
 	.tap_delay	= 0x0f,
 	.wp_gpio	= -1,
 };
-#endif /* COLIBRI_T30_SDMMC4B */
 
-static struct tegra_sdhci_platform_data colibri_t30_sdcard_platform_data = {
-	.cd_gpio	= MMC_CD,
+static struct tegra_sdhci_platform_data apalis_t30_mmccard_platform_data = {
+//GPIO tested with GPIOConfig but interrupt not working
+//even 8-bit cards work if plugged during boot
+	.cd_gpio	= MMC1_CD_N,
 	.ddr_clk_limit	= 52000000,
+	.is_8bit	= 1,
 	.power_gpio	= -1,
 	.tap_delay	= 0x0f,
 	.wp_gpio	= -1,
 };
 
-static void __init colibri_t30_sdhci_init(void)
+static struct tegra_sdhci_platform_data apalis_t30_sdcard_platform_data = {
+	.cd_gpio	= SD1_CD_N,
+	.ddr_clk_limit	= 52000000,
+	.is_8bit	= 0,
+	.power_gpio	= -1,
+	.tap_delay	= 0x0f,
+	.wp_gpio	= -1,
+};
+
+static void __init apalis_t30_sdhci_init(void)
 {
 	/* register eMMC first */
 	tegra_sdhci_device4.dev.platform_data =
-#ifdef COLIBRI_T30_SDMMC4B
-			&colibri_t30_sdcard_platform_data;
-#else
-			&colibri_t30_emmc_platform_data;
-#endif
+			&apalis_t30_emmc_platform_data;
 	platform_device_register(&tegra_sdhci_device4);
 
-#ifndef COLIBRI_T30_SDMMC4B
-	tegra_sdhci_device2.dev.platform_data =
-			&colibri_t30_sdcard_platform_data;
-	platform_device_register(&tegra_sdhci_device2);
-#endif
+	tegra_sdhci_device3.dev.platform_data =
+			&apalis_t30_mmccard_platform_data;
+	platform_device_register(&tegra_sdhci_device3);
+
+	tegra_sdhci_device1.dev.platform_data =
+			&apalis_t30_sdcard_platform_data;
+	platform_device_register(&tegra_sdhci_device1);
+}
+
+/* PCIe */
+
+static struct tegra_pci_platform_data apalis_t30_pci_platform_data = {
+	.port_status[0]		= 1,
+	.port_status[1]		= 1,
+	.port_status[2]		= 1,
+	.use_dock_detect	= 0,
+	.gpio			= 0,
+};
+
+static void apalis_t30_pci_init(void)
+{
+	tegra_pci_device.dev.platform_data = &apalis_t30_pci_platform_data;
+	platform_device_register(&tegra_pci_device);
 }
 
 /* PWM LEDs */
 static struct led_pwm tegra_leds_pwm[] = {
 	{
-		.name		= "pwm_b",
+		.name		= "PWM3",
 		.pwm_id		= 1,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
 	},
 	{
-		.name		= "pwm_c",
+		.name		= "PWM2",
 		.pwm_id		= 2,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
 	},
 	{
-		.name		= "pwm_d",
+		.name		= "PWM1",
 		.pwm_id		= 3,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
@@ -414,13 +434,56 @@ static struct platform_device tegra_rtc_device = {
 };
 #endif /* CONFIG_RTC_DRV_TEGRA */
 
+/* SATA */
+
+static struct gpio_led apalis_gpio_leds[] = {
+	[0] = {
+		.name                   = "SATA1_ACT_N",
+		.default_trigger        = "ide-disk",
+		.gpio                   = SATA1_ACT_N,
+		.active_low             = 1,
+		.retain_state_suspended = 0,
+	},
+};
+
+static struct gpio_led_platform_data apalis_gpio_led_data = {
+	.num_leds	= ARRAY_SIZE(apalis_gpio_leds),
+	.leds		= apalis_gpio_leds,
+};
+
+static struct platform_device apalis_led_gpio_device = {
+	.name = "leds-gpio",
+	.dev = {
+		.platform_data = &apalis_gpio_led_data,
+	},
+};
+
+#ifdef CONFIG_SATA_AHCI_TEGRA
+static void apalis_t30_sata_init(void)
+{
+	platform_device_register(&tegra_sata_device);
+	platform_device_register(&apalis_led_gpio_device);
+}
+#else
+static void apalis_t30_sata_init(void) { }
+#endif
+
 /* SPI */
 
 #if defined(CONFIG_SPI_TEGRA) && defined(CONFIG_SPI_SPIDEV)
 static struct spi_board_info tegra_spi_devices[] __initdata = {
 	{
-		.bus_num	= 0,		/* SPI1 */
+		.bus_num	= 0,		/* SPI1: Apalis SPI1 */
 		.chip_select	= 0,
+		.irq		= 0,
+		.max_speed_hz	= 50000000,
+		.modalias	= "spidev",
+		.mode		= SPI_MODE_0,
+		.platform_data	= NULL,
+	},
+	{
+		.bus_num	= 4,		/* SPI5: Apalis SPI2 */
+		.chip_select	= 2,
 		.irq		= 0,
 		.max_speed_hz	= 50000000,
 		.modalias	= "spidev",
@@ -429,17 +492,20 @@ static struct spi_board_info tegra_spi_devices[] __initdata = {
 	},
 };
 
-static void __init colibri_t30_register_spidev(void)
+static void __init apalis_t30_register_spidev(void)
 {
 	spi_register_board_info(tegra_spi_devices,
 				ARRAY_SIZE(tegra_spi_devices));
 }
 #else /* CONFIG_SPI_TEGRA && CONFIG_SPI_SPIDEV */
-#define colibri_t30_register_spidev() do {} while (0)
+#define apalis_t30_register_spidev() do {} while (0)
 #endif /* CONFIG_SPI_TEGRA && CONFIG_SPI_SPIDEV */
 
-static struct platform_device *colibri_t30_spi_devices[] __initdata = {
+static struct platform_device *apalis_t30_spi_devices[] __initdata = {
 	&tegra_spi_device1,
+	&tegra_spi_device2,
+	&tegra_spi_device4,
+	&tegra_spi_device5,
 };
 
 static struct spi_clk_parent spi_parent_clk[] = {
@@ -452,14 +518,14 @@ static struct spi_clk_parent spi_parent_clk[] = {
 #endif /* !CONFIG_TEGRA_PLLM_RESTRICTED */
 };
 
-static struct tegra_spi_platform_data colibri_t30_spi_pdata = {
+static struct tegra_spi_platform_data apalis_t30_spi_pdata = {
 	.is_dma_based		= true,
 	.max_dma_buffer		= 16 * 1024,
 	.is_clkon_always	= false,
 	.max_rate		= 100000000,
 };
 
-static void __init colibri_t30_spi_init(void)
+static void __init apalis_t30_spi_init(void)
 {
 	int i;
 	struct clk *c;
@@ -474,20 +540,20 @@ static void __init colibri_t30_spi_init(void)
 		spi_parent_clk[i].parent_clk = c;
 		spi_parent_clk[i].fixed_clk_rate = clk_get_rate(c);
 	}
-	colibri_t30_spi_pdata.parent_clk_list = spi_parent_clk;
-	colibri_t30_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk);
-	tegra_spi_device1.dev.platform_data = &colibri_t30_spi_pdata;
-	platform_add_devices(colibri_t30_spi_devices,
-				ARRAY_SIZE(colibri_t30_spi_devices));
+	apalis_t30_spi_pdata.parent_clk_list = spi_parent_clk;
+	apalis_t30_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk);
+	tegra_spi_device1.dev.platform_data = &apalis_t30_spi_pdata;
+	platform_add_devices(apalis_t30_spi_devices,
+				ARRAY_SIZE(apalis_t30_spi_devices));
 }
 
 /* Thermal throttling */
 
-static void *colibri_t30_alert_data;
-static void (*colibri_t30_alert_func)(void *);
-static int colibri_t30_low_edge = 0;
-static int colibri_t30_low_hysteresis = 3000;
-static int colibri_t30_low_limit = 0;
+static void *apalis_t30_alert_data;
+static void (*apalis_t30_alert_func)(void *);
+static int apalis_t30_low_edge = 0;
+static int apalis_t30_low_hysteresis = 3000;
+static int apalis_t30_low_limit = 0;
 static struct device *lm95245_device = NULL;
 static int thermd_alert_irq_disabled = 0;
 struct work_struct thermd_alert_work;
@@ -599,18 +665,18 @@ static void thermd_alert_work_func(struct work_struct *work)
 	lm95245_get_remote_temp(lm95245_device, &temp);
 
 	/* This emulates NCT1008 low limit behaviour */
-	if (!colibri_t30_low_edge && temp <= colibri_t30_low_limit) {
-		colibri_t30_alert_func(colibri_t30_alert_data);
-		colibri_t30_low_edge = 1;
-	} else if (colibri_t30_low_edge && temp > colibri_t30_low_limit + colibri_t30_low_hysteresis) {
-		colibri_t30_low_edge = 0;
+	if (!apalis_t30_low_edge && temp <= apalis_t30_low_limit) {
+		apalis_t30_alert_func(apalis_t30_alert_data);
+		apalis_t30_low_edge = 1;
+	} else if (apalis_t30_low_edge && temp > apalis_t30_low_limit + apalis_t30_low_hysteresis) {
+		apalis_t30_low_edge = 0;
 	}
 
 	/* Avoid unbalanced enable for IRQ 367 */
 	if (thermd_alert_irq_disabled) {
-		colibri_t30_alert_func(colibri_t30_alert_data);
+		apalis_t30_alert_func(apalis_t30_alert_data);
 		thermd_alert_irq_disabled = 0;
-		enable_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT));
+		enable_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT_N));
 	}
 
 	/* Keep re-scheduling */
@@ -641,7 +707,7 @@ static int lm95245_set_limits(void *_data,
 			long hi_limit_milli)
 {
 	struct device *lm95245_device = _data;
-	colibri_t30_low_limit = lo_limit_milli;
+	apalis_t30_low_limit = lo_limit_milli;
 	if (lm95245_device) lm95245_set_remote_os_limit(lm95245_device, hi_limit_milli);
 	return 0;
 }
@@ -651,8 +717,8 @@ static int lm95245_set_alert(void *_data,
 				void *alert_data)
 {
 	lm95245_device = _data;
-	colibri_t30_alert_func = alert_func;
-	colibri_t30_alert_data = alert_data;
+	apalis_t30_alert_func = alert_func;
+	apalis_t30_alert_data = alert_data;
 	return 0;
 }
 
@@ -718,27 +784,28 @@ static void lm95245_probe_callback(struct device *dev)
 	}
 #endif /* CONFIG_TEGRA_SKIN_THROTTLE */
 
-	if (request_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT), thermd_alert_irq,
-			IRQF_TRIGGER_LOW, "THERMD_ALERT", NULL))
-		pr_err("%s: unable to register THERMD_ALERT interrupt\n", __func__);
+	if (request_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT_N), thermd_alert_irq,
+			IRQF_TRIGGER_LOW, "THERMD_ALERT_N", NULL))
+		pr_err("%s: unable to register THERMD_ALERT_N interrupt\n", __func__);
 }
 
-static void colibri_t30_thermd_alert_init(void)
+static void apalis_t30_thermd_alert_init(void)
 {
-	gpio_request(THERMD_ALERT, "THERMD_ALERT");
-	gpio_direction_input(THERMD_ALERT);
+	gpio_request(THERMD_ALERT_N, "THERMD_ALERT_N");
+	gpio_direction_input(THERMD_ALERT_N);
 
-	thermd_alert_workqueue = create_singlethread_workqueue("THERMD_ALERT");
+	thermd_alert_workqueue = create_singlethread_workqueue("THERMD_ALERT_N");
 
 	INIT_WORK(&thermd_alert_work, thermd_alert_work_func);
 }
 
 /* UART */
 
-static struct platform_device *colibri_t30_uart_devices[] __initdata = {
-	&tegra_uarta_device, /* FF */
-	&tegra_uartb_device, /* STD */
-	&tegra_uartd_device, /* BT */
+static struct platform_device *apalis_t30_uart_devices[] __initdata = {
+	&tegra_uarta_device, /* Apalis UART1 */
+	&tegra_uartd_device, /* Apalis UART2 */
+	&tegra_uartb_device, /* Apalis UART3 */
+	&tegra_uartc_device, /* Apalis UART4 */
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
@@ -749,7 +816,7 @@ static struct uart_clk_parent uart_parent_clk[] = {
 #endif
 };
 
-static struct tegra_uart_platform_data colibri_t30_uart_pdata;
+static struct tegra_uart_platform_data apalis_t30_uart_pdata;
 
 static void __init uart_debug_init(void)
 {
@@ -764,7 +831,7 @@ static void __init uart_debug_init(void)
 	case 0:
 		/* UARTA is the debug port. */
 		pr_info("Selecting UARTA as the debug console\n");
-		colibri_t30_uart_devices[0] = &debug_uarta_device;
+		apalis_t30_uart_devices[0] = &debug_uarta_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
 			debug_uarta_device.dev.platform_data))->mapbase;
@@ -773,8 +840,17 @@ static void __init uart_debug_init(void)
 	case 1:
 		/* UARTB is the debug port. */
 		pr_info("Selecting UARTB as the debug console\n");
-		colibri_t30_uart_devices[1] = &debug_uartb_device;
+		apalis_t30_uart_devices[2] = &debug_uartb_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uartb");
+		debug_uart_port_base = ((struct plat_serial8250_port *)(
+			debug_uartb_device.dev.platform_data))->mapbase;
+		break;
+
+	case 2:
+		/* UARTC is the debug port. */
+		pr_info("Selecting UARTC as the debug console\n");
+		apalis_t30_uart_devices[3] = &debug_uartc_device;
+		debug_uart_clk = clk_get_sys("serial8250.0", "uartc");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
 			debug_uartb_device.dev.platform_data))->mapbase;
 		break;
@@ -782,7 +858,7 @@ static void __init uart_debug_init(void)
 	case 3:
 		/* UARTD is the debug port. */
 		pr_info("Selecting UARTD as the debug console\n");
-		colibri_t30_uart_devices[2] = &debug_uartd_device;
+		apalis_t30_uart_devices[1] = &debug_uartd_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uartd");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
 			debug_uartd_device.dev.platform_data))->mapbase;
@@ -790,7 +866,7 @@ static void __init uart_debug_init(void)
 
 	default:
 		pr_info("The debug console id %d is invalid, Assuming UARTA", debug_port_id);
-		colibri_t30_uart_devices[0] = &debug_uarta_device;
+		apalis_t30_uart_devices[0] = &debug_uarta_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
 			debug_uarta_device.dev.platform_data))->mapbase;
@@ -799,7 +875,7 @@ static void __init uart_debug_init(void)
 	return;
 }
 
-static void __init colibri_t30_uart_init(void)
+static void __init apalis_t30_uart_init(void)
 {
 	struct clk *c;
 	int i;
@@ -814,11 +890,12 @@ static void __init colibri_t30_uart_init(void)
 		uart_parent_clk[i].parent_clk = c;
 		uart_parent_clk[i].fixed_clk_rate = clk_get_rate(c);
 	}
-	colibri_t30_uart_pdata.parent_clk_list = uart_parent_clk;
-	colibri_t30_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
-	tegra_uarta_device.dev.platform_data = &colibri_t30_uart_pdata;
-	tegra_uartb_device.dev.platform_data = &colibri_t30_uart_pdata;
-	tegra_uartd_device.dev.platform_data = &colibri_t30_uart_pdata;
+	apalis_t30_uart_pdata.parent_clk_list = uart_parent_clk;
+	apalis_t30_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
+	tegra_uarta_device.dev.platform_data = &apalis_t30_uart_pdata;
+	tegra_uartb_device.dev.platform_data = &apalis_t30_uart_pdata;
+	tegra_uartc_device.dev.platform_data = &apalis_t30_uart_pdata;
+	tegra_uartd_device.dev.platform_data = &apalis_t30_uart_pdata;
 
 	/* Register low speed only if it is selected */
 	if (!is_tegra_debug_uartport_hs()) {
@@ -841,8 +918,8 @@ static void __init colibri_t30_uart_init(void)
 		}
 	}
 
-	platform_add_devices(colibri_t30_uart_devices,
-				ARRAY_SIZE(colibri_t30_uart_devices));
+	platform_add_devices(apalis_t30_uart_devices,
+				ARRAY_SIZE(apalis_t30_uart_devices));
 }
 
 /* USB */
@@ -893,40 +970,15 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 		.hot_plug			= true,
 		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= true,
-		.vbus_gpio			= -1,
+		.vbus_gpio			= USBO1_EN,
+		.vbus_gpio_inverted		= 0,
 		.vbus_reg			= NULL,
 	},
-};
-
-static void ehci2_utmi_platform_post_phy_on(void)
-{
-	/* enable VBUS */
-	gpio_set_value(LAN_V_BUS, 1);
-
-	/* reset */
-	gpio_set_value(LAN_RESET, 0);
-
-	udelay(5);
-
-	/* unreset */
-	gpio_set_value(LAN_RESET, 1);
-}
-
-static void ehci2_utmi_platform_pre_phy_off(void)
-{
-	/* disable VBUS */
-	gpio_set_value(LAN_V_BUS, 0);
-}
-
-static struct tegra_usb_phy_platform_ops ehci2_utmi_plat_ops = {
-	.post_phy_on = ehci2_utmi_platform_post_phy_on,
-	.pre_phy_off = ehci2_utmi_platform_pre_phy_off,
 };
 
 static struct tegra_usb_platform_data tegra_ehci2_utmi_pdata = {
 	.has_hostpc	= true,
 	.op_mode	= TEGRA_USB_OPMODE_HOST,
-	.ops		= &ehci2_utmi_plat_ops,
 	.phy_intf	= TEGRA_USB_PHY_INTF_UTMI,
 	.port_otg	= false,
 	.u_cfg.utmi = {
@@ -941,10 +993,11 @@ static struct tegra_usb_platform_data tegra_ehci2_utmi_pdata = {
 		.xcvr_use_fuses		= 1,
 	},
 	.u_data.host = {
-		.hot_plug			= false,
-		.power_off_on_suspend		= true,
+		.hot_plug			= true,
+		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= true,
-		.vbus_gpio			= -1,
+		.vbus_gpio			= USBH_EN,
+		.vbus_gpio_inverted		= 0,
 		.vbus_reg			= NULL,
 	},
 };
@@ -969,112 +1022,34 @@ static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 		.hot_plug			= true,
 		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= true,
-		.vbus_gpio			= USBH_PEN,
-		.vbus_gpio_inverted		= 1,
+		/* Uses same USBH_EN as EHCI2 */
+		.vbus_gpio			= -1,
+		.vbus_gpio_inverted		= 0,
 		.vbus_reg			= NULL,
 	},
 };
 
-#ifndef CONFIG_USB_TEGRA_OTG
-static struct platform_device *tegra_usb_otg_host_register(void)
-{
-	struct platform_device *pdev;
-	void *platform_data;
-	int val;
-
-	pdev = platform_device_alloc(tegra_ehci1_device.name,
-				     tegra_ehci1_device.id);
-	if (!pdev)
-		return NULL;
-
-	val = platform_device_add_resources(pdev, tegra_ehci1_device.resource,
-					    tegra_ehci1_device.num_resources);
-	if (val)
-		goto error;
-
-	pdev->dev.dma_mask = tegra_ehci1_device.dev.dma_mask;
-	pdev->dev.coherent_dma_mask = tegra_ehci1_device.dev.coherent_dma_mask;
-
-	platform_data = kmalloc(sizeof(struct tegra_usb_platform_data),
-				GFP_KERNEL);
-	if (!platform_data)
-		goto error;
-
-	memcpy(platform_data, &tegra_ehci1_utmi_pdata,
-	       sizeof(struct tegra_usb_platform_data));
-	pdev->dev.platform_data = platform_data;
-
-	val = platform_device_add(pdev);
-	if (val)
-		goto error_add;
-
-	return pdev;
-
-error_add:
-	kfree(platform_data);
-error:
-	pr_err("%s: failed to add the host controller device\n", __func__);
-	platform_device_put(pdev);
-	return NULL;
-}
-
-static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
-{
-	kfree(pdev->dev.platform_data);
-	pdev->dev.platform_data = NULL;
-	platform_device_unregister(pdev);
-}
-
-static struct colibri_otg_platform_data colibri_otg_pdata = {
-	.cable_detect_gpio	= USBC_DET,
-	.host_register		= &tegra_usb_otg_host_register,
-	.host_unregister	= &tegra_usb_otg_host_unregister,
-};
-#else /* !CONFIG_USB_TEGRA_OTG */
 static struct tegra_usb_otg_data tegra_otg_pdata = {
 	.ehci_device = &tegra_ehci1_device,
 	.ehci_pdata = &tegra_ehci1_utmi_pdata,
 };
-#endif /* !CONFIG_USB_TEGRA_OTG */
 
-#ifndef CONFIG_USB_TEGRA_OTG
-struct platform_device colibri_otg_device = {
-	.name	= "colibri-otg",
-	.id	= -1,
-	.dev = {
-		.platform_data = &colibri_otg_pdata,
-	},
-};
-#endif /* !CONFIG_USB_TEGRA_OTG */
-
-static void colibri_t30_usb_init(void)
+static void apalis_t30_usb_init(void)
 {
-	gpio_request(LAN_V_BUS, "LAN_V_BUS");
-	gpio_direction_output(LAN_V_BUS, 0);
-	gpio_export(LAN_V_BUS, false);
-
-	gpio_request(LAN_RESET, "LAN_RESET");
-	gpio_direction_output(LAN_RESET, 0);
-	gpio_export(LAN_RESET, false);
-
 	/* OTG should be the first to be registered
-	   EHCI instance 0: USB1_DP/N -> USBOTG_P/N */
-#ifndef CONFIG_USB_TEGRA_OTG
-	platform_device_register(&colibri_otg_device);
-#else /* !CONFIG_USB_TEGRA_OTG */
+	   EHCI instance 0: USB1_DP/N -> USBO1_DP/N */
 	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 	platform_device_register(&tegra_otg_device);
-#endif /* !CONFIG_USB_TEGRA_OTG */
 
 	/* setup the udc platform data */
 	tegra_udc_device.dev.platform_data = &tegra_udc_pdata;
 	platform_device_register(&tegra_udc_device);
 
-	/* EHCI instance 1: ASIX ETH */
+	/* EHCI instance 1: USB2_DP/N -> USBH2_DP/N */
 	tegra_ehci2_device.dev.platform_data = &tegra_ehci2_utmi_pdata;
 	platform_device_register(&tegra_ehci2_device);
 
-	/* EHCI instance 2: USB3_DP/N -> USBH1_P/N */
+	/* EHCI instance 2: USB3_DP/N -> USBH3_DP/N */
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci3_utmi_pdata;
 	platform_device_register(&tegra_ehci3_device);
 }
@@ -1082,7 +1057,7 @@ static void colibri_t30_usb_init(void)
 /* W1, aka OWR, aka OneWire */
 
 #ifdef CONFIG_W1_MASTER_TEGRA
-struct tegra_w1_timings colibri_t30_w1_timings = {
+struct tegra_w1_timings apalis_t30_w1_timings = {
 		.tsu		= 1,
 		.trelease	= 0xf,
 		.trdv		= 0xf,
@@ -1098,13 +1073,13 @@ struct tegra_w1_timings colibri_t30_w1_timings = {
 		.psclk		= 0x50,
 };
 
-struct tegra_w1_platform_data colibri_t30_w1_platform_data = {
+struct tegra_w1_platform_data apalis_t30_w1_platform_data = {
 	.clk_id		= "tegra_w1",
-	.timings	= &colibri_t30_w1_timings,
+	.timings	= &apalis_t30_w1_timings,
 };
 #endif /* CONFIG_W1_MASTER_TEGRA */
 
-static struct platform_device *colibri_t30_devices[] __initdata = {
+static struct platform_device *apalis_t30_devices[] __initdata = {
 	&tegra_pmu_device,
 #if defined(CONFIG_RTC_DRV_TEGRA)
 	&tegra_rtc_device,
@@ -1136,14 +1111,14 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 	&tegra_spdif_device,
 	&spdif_dit_device,
 	&tegra_pcm_device,
-	&colibri_t30_audio_sgtl5000_device,
+	&apalis_t30_audio_sgtl5000_device,
 
 	&tegra_cec_device,
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
 #endif
 #ifdef CONFIG_KEYBOARD_GPIO
-	&colibri_t30_keys_device,
+//	&apalis_t30_keys_device,
 #endif
 	&tegra_led_pwm_device,
 	&tegra_pwfm1_device,
@@ -1154,47 +1129,46 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 #endif
 };
 
-static void __init colibri_t30_init(void)
+static void __init apalis_t30_init(void)
 {
 	tegra_thermal_init(&thermal_data,
 				throttle_list,
 				ARRAY_SIZE(throttle_list));
-	tegra_clk_init_from_table(colibri_t30_clk_init_table);
-	colibri_t30_pinmux_init();
-	colibri_t30_thermd_alert_init();
-	colibri_t30_i2c_init();
-	colibri_t30_spi_init();
-	colibri_t30_usb_init();
+	tegra_clk_init_from_table(apalis_t30_clk_init_table);
+	apalis_t30_pinmux_init();
+	apalis_t30_thermd_alert_init();
+	apalis_t30_i2c_init();
+	apalis_t30_spi_init();
+	apalis_t30_usb_init();
 #ifdef CONFIG_TEGRA_EDP_LIMITS
-	colibri_t30_edp_init();
+	apalis_t30_edp_init();
 #endif
-	colibri_t30_uart_init();
+	apalis_t30_uart_init();
 #ifdef CONFIG_W1_MASTER_TEGRA
-	tegra_w1_device.dev.platform_data = &colibri_t30_w1_platform_data;
+	tegra_w1_device.dev.platform_data = &apalis_t30_w1_platform_data;
 #endif
-	platform_add_devices(colibri_t30_devices, ARRAY_SIZE(colibri_t30_devices));
+	platform_add_devices(apalis_t30_devices, ARRAY_SIZE(apalis_t30_devices));
 	tegra_ram_console_debug_init();
 	tegra_io_dpd_init();
-	colibri_t30_sdhci_init();
-	colibri_t30_regulator_init();
-	colibri_t30_suspend_init();
-	colibri_t30_panel_init();
-//	colibri_t30_sensors_init();
-	colibri_t30_emc_init();
-	colibri_t30_register_spidev();
+	apalis_t30_sdhci_init();
+	apalis_t30_regulator_init();
+	apalis_t30_suspend_init();
+	apalis_t30_panel_init();
+//	apalis_t30_sensors_init();
+	apalis_t30_sata_init();
+	apalis_t30_emc_init();
+	apalis_t30_register_spidev();
 
 	tegra_release_bootloader_fb();
+	apalis_t30_pci_init();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
 	tegra_wdt_recovery_init();
 #endif
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
-
-	/* Activate Mic Bias */
-	gpio_request(EN_MIC_GND, "EN_MIC_GND");
-	gpio_direction_output(EN_MIC_GND, 1);
+	apalis_t20_mcp2515_can_init();
 }
 
-static void __init colibri_t30_reserve(void)
+static void __init apalis_t30_reserve(void)
 {
 #if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
 	/* Support 1920X1080 32bpp,double buffered on HDMI*/
@@ -1205,18 +1179,18 @@ static void __init colibri_t30_reserve(void)
 	tegra_ram_console_debug_reserve(SZ_1M);
 }
 
-static const char *colibri_t30_dt_board_compat[] = {
-	"toradex,colibri_t30",
+static const char *apalis_t30_dt_board_compat[] = {
+	"toradex,apalis_t30",
 	NULL
 };
 
-MACHINE_START(COLIBRI_T30, "Toradex Colibri T30")
+MACHINE_START(APALIS_T30, "Toradex Apalis T30")
 	.boot_params	= 0x80000100,
-	.dt_compat	= colibri_t30_dt_board_compat,
+	.dt_compat	= apalis_t30_dt_board_compat,
 	.init_early	= tegra_init_early,
 	.init_irq	= tegra_init_irq,
-	.init_machine	= colibri_t30_init,
+	.init_machine	= apalis_t30_init,
 	.map_io		= tegra_map_common_io,
-	.reserve	= colibri_t30_reserve,
+	.reserve	= apalis_t30_reserve,
 	.timer		= &tegra_timer,
 MACHINE_END
