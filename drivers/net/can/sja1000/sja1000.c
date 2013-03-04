@@ -146,7 +146,10 @@ static void set_normal_mode(struct net_device *dev)
 	for (i = 0; i < 100; i++) {
 		/* check reset bit */
 		if ((status & MOD_RM) == 0) {
-			priv->can.state = CAN_STATE_ERROR_ACTIVE;
+			
+			priv->can.state = (status & MOD_LOM) ? CAN_STATE_ERROR_PASSIVE :
+												   CAN_STATE_ERROR_ACTIVE;
+
 			/* enable interrupts */
 			if (priv->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING)
 				priv->write_reg(priv, REG_IER, IRQ_ALL);
