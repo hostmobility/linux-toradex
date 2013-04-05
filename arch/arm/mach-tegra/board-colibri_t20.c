@@ -77,7 +77,11 @@
 
 /* We define a no export flag. We dont want to export the gpio 
 for a NC pin By: Mirza */
-#define GPIOF_NO_EXPORT		(1 << 2)
+#define GPIOF_NO_EXPORT		(1 << 6)
+
+/* Active LOW flag - Supplement to gpio.h flags in line with the 
+   GPIOF_NO_EXPORT flag */
+#define GPIOF_ACT_LOW		(1 << 7)
 
 static struct wm97xx_batt_pdata colibri_t20_adc_pdata = {
 	.batt_aux	= WM97XX_AUX_ID1,	/* AD0 - ANALOG_IN0 */
@@ -301,15 +305,15 @@ static struct gpio colibri_t20_gpios[] = {
 
 	/* Digital inputs */
 	// P45 is used for CF in PXA. Consider change.
-	{TEGRA_GPIO_PV3,	GPIOF_IN,		"P45 - DIGITAL-IN-1"},
-	{TEGRA_GPIO_PC7,	GPIOF_IN,		"P43 - DIGITAL-IN-2"},
-	{TEGRA_GPIO_PB6,	GPIOF_IN,		"P55 - DIGITAL-IN-3"},
-	{TEGRA_GPIO_PB4,	GPIOF_IN,		"P59 - DIGITAL-IN-4"},
-	{TEGRA_GPIO_PZ0,	GPIOF_IN,		"P23 - DIGITAL-IN-5"},
-	{TEGRA_GPIO_PZ1,	GPIOF_IN,		"P25 - DIGITAL-IN-6"},
-	{TEGRA_GPIO_PY6,	GPIOF_IN,		"P37 - WAKE-UP-CPU"},	
-	{TEGRA_GPIO_PK6,	GPIOF_IN,		"P135 - MODEM-WAKEUP"},
-	{TEGRA_GPIO_PC6,	GPIOF_IN,		"P31 - XANTSHORT"},
+	{TEGRA_GPIO_PV3,	(GPIOF_IN | GPIOF_ACT_LOW),		"P45 - DIGITAL-IN-1"},
+	{TEGRA_GPIO_PC7,	(GPIOF_IN | GPIOF_ACT_LOW),		"P43 - DIGITAL-IN-2"},
+	{TEGRA_GPIO_PB6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P55 - DIGITAL-IN-3"},
+	{TEGRA_GPIO_PB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P59 - DIGITAL-IN-4"},
+	{TEGRA_GPIO_PZ0,	(GPIOF_IN | GPIOF_ACT_LOW),		"P23 - DIGITAL-IN-5"},
+	{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
+	{TEGRA_GPIO_PY6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P37 - WAKE-UP-CPU"},	
+	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
+	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
 
 	/* PXA300 Pins. Are not connected on T20.*/
 	{TEGRA_GPIO_PK0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P150 - MM_PXA300_CMD"},	
@@ -379,6 +383,9 @@ static void colibri_t20_gpio_init(void)
 			if(!(colibri_t20_gpios[i].flags & GPIOF_NO_EXPORT)) {
 				gpio_export(colibri_t20_gpios[i].gpio, true);
 			}
+			if(colibri_t20_gpios[i].flags & GPIOF_ACT_LOW) {
+				gpio_sysfs_set_active_low(colibri_t20_gpios[i].gpio, true);
+			}			
 		}
 	}
 
