@@ -96,6 +96,19 @@ config TEGRA_IRDA
 	  Adds support for Vishay IrDA transceiver at UARTB port
 	  of Verbier Boards(E1186 and E1198) with no ULPI rework done.
 
+config HM_EXT_8250_UART
+	bool "External 8250 UART"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	help
+	  Support for external 8250 UART on Host Mobility's carrier board for Toradex T20.
+
+config HM_DIGITAL_INPUTS
+	bool "Digital inputs on connector"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	help
+	  Support for CPU-based digital inputs on Host Mobility's carrier board for Toradex T20.
+
+
 comment "Tegra board type"
 
 config MACH_COLIBRI_T20
@@ -103,6 +116,22 @@ config MACH_COLIBRI_T20
        depends on ARCH_TEGRA_2x_SOC
        help
          Support for Toradex Colibri T20 module on Iris carrier board
+
+config MACH_HM_MX4
+       bool "Host Mobility MX4"
+       depends on ARCH_TEGRA_2x_SOC
+       select MACH_COLIBRI_T20
+       select HM_EXT_8250_UART
+       select HM_DIGITAL_INPUTS
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 board
+
+config MACH_HM_VCB
+        bool "Host Mobility VCB"
+        depends on ARCH_TEGRA_2x_SOC
+        select MACH_COLIBRI_T20
+        help
+          Support for Toradex Colibri T20 module on Host Mobility's VCB board
 
 config MACH_HARMONY
        bool "Harmony board"

@@ -99,7 +99,7 @@ static struct wm97xx_pdata colibri_t20_wm97xx_pdata = {
 };
 
 /* Audio */
-
+#ifdef CONFIG_SOUND
 static struct platform_device colibri_t20_audio_device = {
 	.name	= "colibri_t20-snd-wm9715l",
 	.id	= 0,
@@ -110,6 +110,7 @@ void *get_colibri_t20_audio_platform_data(void)
 	return &colibri_t20_wm97xx_pdata;
 }
 EXPORT_SYMBOL(get_colibri_t20_audio_platform_data);
+#endif /* CONFIG_SOUND */
 
 #ifdef COLIBRI_T20_VI
 /* Camera */
@@ -305,13 +306,16 @@ static struct gpio colibri_t20_gpios[] = {
 
 	/* Digital inputs */
 	// P45 is used for CF in PXA. Consider change.
+
+#ifdef CONFIG_HM_DIGITAL_INPUTS
 	{TEGRA_GPIO_PV3,	(GPIOF_IN | GPIOF_ACT_LOW),		"P45 - DIGITAL-IN-1"},
 	{TEGRA_GPIO_PC7,	(GPIOF_IN | GPIOF_ACT_LOW),		"P43 - DIGITAL-IN-2"},
 	{TEGRA_GPIO_PB6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P55 - DIGITAL-IN-3"},
 	{TEGRA_GPIO_PB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P59 - DIGITAL-IN-4"},
 	{TEGRA_GPIO_PZ0,	(GPIOF_IN | GPIOF_ACT_LOW),		"P23 - DIGITAL-IN-5"},
 	{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
-	{TEGRA_GPIO_PY6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P37 - WAKE-UP-CPU"},	
+#endif /* CONFIG_HM_DIGITAL_INPUTS */
+	{TEGRA_GPIO_PY6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P37 - WAKE-UP-CPU"},
 	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
 	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
 
@@ -332,9 +336,11 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PX7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P104 - CF-nIOIS16/MM_PXA300_DAT2"}, 
 
 	/* Extern UART Interrupts*/
+#ifdef CONFIG_HM_EXT_8250_UART
 	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"}, 
 	{TEGRA_GPIO_PBB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P133 - UART-INTB"},
 	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},	
+#endif /* CONFIG_HM_EXT_8250_UART */
 
 	/* Gyro Interrupts */
 	/* Our gyro driver does not support interrupts though */
@@ -939,8 +945,10 @@ late_initcall(colibri_t20_thermal_debug_init);
 #endif /* CONFIG_DEBUG_FS */
 
 /* UART */
+#ifdef CONFIG_HM_EXT_8250_UART
 #define SERIAL_FLAGS (UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST)
 #define SERIAL_CLK   (24000000)
+
 static struct plat_serial8250_port extern_uart_platform_data[] = {
 	[0] = { 	/* Extern uart A (LIN) - Do not mix up with UARTA */
 		.mapbase	= TEGRA_EXT_UARTA_BASE,
@@ -981,6 +989,7 @@ static struct platform_device extern_uart = {
 		.platform_data = extern_uart_platform_data,
 	},
 };
+#endif /* ifdef CONFIG_HM_EXT_8250_UART */
 
 static struct platform_device *colibri_t20_uart_devices[] __initdata = {
 	&tegra_uarte_device,	
@@ -988,7 +997,9 @@ static struct platform_device *colibri_t20_uart_devices[] __initdata = {
 	&tegra_uartb_device,
 	&tegra_uartc_device,		
 	&tegra_uartd_device,
+#ifdef CONFIG_HM_EXT_8250_UART
 	&extern_uart,
+#endif /* CONFIG_HM_EXT_8250_UART */
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
@@ -1359,7 +1370,9 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 	&spdif_dit_device,
 //bluetooth
 	&tegra_pcm_device,
+#ifdef CONFIG_SOUND
 	&colibri_t20_audio_device,
+#endif
 	&tegra_spi_device4,
 	&tegra_led_pwm_device,
 	&tegra_pwfm1_device,
@@ -1425,6 +1438,14 @@ static void __init colibri_t20_init(void)
 	colibri_t20_register_spidev();
 
 	tegra_release_bootloader_fb();
+
+	/* Show platform version */
+#ifdef CONFIG_MACH_HM_VCB
+	pr_info("Host Mobility VCB\n");
+#endif
+#ifdef CONFIG_MACH_HM_MX4
+	pr_info("Host Mobility MX4\n");
+#endif	
 }
 
 int __init tegra_colibri_t20_protected_aperture_init(void)
