@@ -419,8 +419,13 @@ static void colibri_t20_gpio_init(void)
 static struct mxc_mma845x_platform_data mma845x_data = {
 	.gpio_pin_get = NULL,
 	.gpio_pin_put = NULL,
+#ifdef CONFIG_MACH_HM_VCB
+	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB6), 
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5),
+#else
 	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), 
 	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PW3),
+#endif
 };
 #endif
 
