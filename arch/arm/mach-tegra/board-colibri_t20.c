@@ -344,6 +344,12 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},	
 #endif /* CONFIG_HM_EXT_8250_UART */
 
+/* Wakeup of external ethernet interface */
+#ifdef CONFIG_HM_EXT_AX88772B
+	{TEGRA_GPIO_PAA2,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW | GPIOF_ACT_LOW),		"P51 - OPT1-WAKE"}, 
+	{TEGRA_GPIO_PAA3,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW | GPIOF_ACT_LOW),		"P53 - OPT2-WAKE"},
+#endif /* CONFIG_HM_EXT_AX88772B */
+
 	/* Gyro Interrupts */
 	/* Our gyro driver does not support interrupts though */
  	{TEGRA_GPIO_PA0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P73 - GYRO-INT1"},

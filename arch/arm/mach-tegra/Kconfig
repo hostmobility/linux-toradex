@@ -108,6 +108,11 @@ config HM_DIGITAL_INPUTS
 	help
 	  Support for CPU-based digital inputs on Host Mobility's carrier board for Toradex T20.
 
+config HM_EXT_AX88772B
+	bool "External ASIX AX88772B ethernet adapter"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_VCB
+	help
+	  Support for external ASIX AX88772B ethernet adapter on Host Mobility's carrier board for Toradex T20.
 
 comment "Tegra board type"
 
@@ -130,6 +135,7 @@ config MACH_HM_VCB
         bool "Host Mobility VCB"
         depends on ARCH_TEGRA_2x_SOC
         select MACH_COLIBRI_T20
+        select HM_EXT_AX88772B
         help
           Support for Toradex Colibri T20 module on Host Mobility's VCB board
 
