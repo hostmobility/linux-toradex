@@ -326,7 +326,9 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P29 - CF-READY"},
 	{TEGRA_GPIO_PT1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P75 - CF-RESET"},
 	{TEGRA_GPIO_PT3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P77 - CF-BVD2/MM_PXA300_CLK"},
+/*
 	{TEGRA_GPIO_PD6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P81 - CF-nCD1+2"},
+*/
 	{TEGRA_GPIO_PL6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P85 - CF-nPPEN"},
 	{TEGRA_GPIO_PD7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P94 - CF-nPCE1"},
 	{TEGRA_GPIO_PX5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P100 - CF-nPSKTSEL"},
@@ -525,6 +527,7 @@ static void colibri_t20_i2c_init(void)
 
 /* MMC/SD */
 
+#ifndef CONFIG_MACH_HM_VCB
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 	/* We dont have a card detect pin for wifi. I is always connected. */
 	.is_8bit	= 0,
@@ -553,6 +556,7 @@ int __init colibri_t20_sdhci_init(void)
 
 	return 0;
 }
+#endif
 
 /* NAND */
 
@@ -700,41 +704,55 @@ static struct platform_device tegra_nand_device = {
 	},
 };
 
-/* PWM LEDs */
-static struct led_pwm tegra_leds_pwm[] = {
-		{
-                .name           = "pwm_b",
-                .pwm_id         = 1,
-                .max_brightness = 255,
-                .pwm_period_ns  = 19600,
-        },
-		{
-                .name           = "pwm_c",
-                .pwm_id         = 2,
-                .max_brightness = 255,
-                .pwm_period_ns  = 19600,
-        },
-
-		{
-                .name           = "pwm_d",
-                .pwm_id         = 3,
-                .max_brightness = 255,
-                .pwm_period_ns  = 19600,
-        },
+/* VCB LED:s */
+#ifdef CONFIG_MACH_HM_VCB
+static struct gpio_led status_leds[] = {
+	[0] =  {
+		/* Global on switch for LEDs */
+		.name = "led-on-2",
+		.gpio = (TEGRA_GPIO_PAA1),
+		.active_low = 0,
+	},
+	[1] =  {
+		.name = "led-vehicle",
+		.gpio = (TEGRA_GPIO_PD6),
+		.active_low = 0,
+	},
+	[2] =  {
+		.name = "led-usb",
+		.gpio = (TEGRA_GPIO_PL2),
+		.active_low = 0,
+	},
 };
 
-static struct led_pwm_platform_data tegra_leds_pwm_data = {
-        .num_leds       = ARRAY_SIZE(tegra_leds_pwm),
-        .leds           = tegra_leds_pwm,
+static struct gpio_led_platform_data status_led_data = {
+	.num_leds	= ARRAY_SIZE(status_leds),
+	.leds		= status_leds
+};
+ 
+static struct platform_device status_led_dev = {
+	.name		= "leds-gpio",
+	.id		= -1,
+	.dev		= {
+		.platform_data	= &status_led_data,
+	},
 };
 
-static struct platform_device tegra_led_pwm_device = {
-        .name   = "leds_pwm",
-        .id     = -1,
-        .dev    = {
-                .platform_data = &tegra_leds_pwm_data,
-        },
+#if 0
+static struct gpio status_leds_gpios[] = {
+	{ TEGRA_GPIO_PL2, GPIOF_OUT_INIT_LOW, "LED-USB" }, /* default to OFF */
+	{ TEGRA_GPIO_PAA1, GPIOF_OUT_INIT_HIGH,  "LED-ON-2" }, /* default to ON */
+	{ TEGRA_GPIO_PD6, GPIOF_OUT_INIT_HIGH,  "LED-VEHICLE" }, /* default to OFF */
 };
+//err = gpio_request_array(status_leds_gpios, ARRAY_SIZE(status_leds_gpios));
+gpio_request_one(TEGRA_GPIO_PL2, GPIOF_OUT_INIT_LOW, "LED-USB");
+if (err) {
+	pr_err("Failed to register status LED:s\n");
+}
+#endif
+
+#endif
+
 
 /* RTC */
 #ifdef CONFIG_RTC_DRV_TEGRA
@@ -1379,7 +1397,9 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 	&colibri_t20_audio_device,
 #endif
 	&tegra_spi_device4,
-	&tegra_led_pwm_device,
+#ifdef CONFIG_MACH_HM_VCB
+	&status_led_dev,
+#endif
 	&tegra_pwfm1_device,
 	&tegra_pwfm2_device,
 	&tegra_pwfm3_device,
@@ -1423,7 +1443,9 @@ static void __init colibri_t20_init(void)
 	platform_add_devices(colibri_t20_devices,
 			     ARRAY_SIZE(colibri_t20_devices));
 	tegra_ram_console_debug_init();
+#ifndef CONFIG_MACH_HM_VCB
 	colibri_t20_sdhci_init();
+#endif /* CONFIG_MACH_HM_VCB */
 	colibri_t20_regulator_init();
 
 //	tegra_das_device.dev.platform_data = &tegra_das_pdata;
