@@ -1021,11 +1021,25 @@ static struct platform_device extern_uart = {
 #endif /* ifdef CONFIG_HM_EXT_8250_UART */
 
 static struct platform_device *colibri_t20_uart_devices[] __initdata = {
-	&tegra_uarte_device,	
+/*
+	MX-4
+	---
+
+	VCB
+	---
+	UARTA - Not used
+	UARTB(ttyHS0) - J1708
+	UARTC(ttyHS1) - K-Line
+	UARTD(ttyHS2) - RS232/RS485
+
+*/
+	&tegra_uarte_device,
+#ifdef CONFIG_MACH_HM_MX4		
 	&tegra_uarta_device,
-	&tegra_uartb_device,
-	&tegra_uartc_device,		
-	&tegra_uartd_device,
+#endif /* CONFIG_MACH_HM_MX4 */
+	&tegra_uartb_device, /* J1708 */
+	&tegra_uartc_device, /* K-Line */		
+	&tegra_uartd_device, /* RS232/RS485 */
 #ifdef CONFIG_HM_EXT_8250_UART
 	&extern_uart,
 #endif /* CONFIG_HM_EXT_8250_UART */
