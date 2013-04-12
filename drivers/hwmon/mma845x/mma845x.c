@@ -1489,6 +1489,9 @@ static struct device_attribute common_attributes[] = {
 	DECLARE_ATTR(fifo_threshold_min, 0444, fifo_threshold_min_show, NULL),
 	DECLARE_ATTR(fifo_threshold_max, 0444, fifo_threshold_max_show, NULL),
 	DECLARE_ATTR(value, 0444, value_show,  NULL),
+	DECLARE_ATTR(value_x, 0444, value_x_show,  NULL),
+	DECLARE_ATTR(value_y, 0444, value_y_show,  NULL),
+	DECLARE_ATTR(value_z, 0444, value_z_show,  NULL),
 	DECLARE_ATTR(calibration_offset, 0666, calibration_offset_show, calibration_offset_store),
 	DECLARE_ATTR(poll_time, 0666, poll_time_show, poll_time_store),
 };

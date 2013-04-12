@@ -185,6 +185,9 @@ struct ChipInfo_t{
 	int resolution;
 	int range;
 	int value;
+	int value_x;
+	int value_y;
+	int value_z;	
 	int calibration_offset;
 	int xCalOffset;
 	int yCalOffset;

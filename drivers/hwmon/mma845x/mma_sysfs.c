@@ -839,13 +839,71 @@ ssize_t sample_rate_show(struct device *dev, struct device_attribute *attr, char
 ssize_t value_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	ssize_t ret = 0;
-
-// TODO:Set value here
-	// sprintf(buf, "%d\n", pChip->value);
+	struct mxc_mma_device_t *pDev = dev_get_drvdata(dev);
+	struct ChipInfo_t *pChip = pDev->pChip;
+	sprintf(buf, "%d\n", pChip->value);
 	ret = strlen(buf) + 1;
 
 	return ret;
 }
+
+/*!
+* This method is used to show X-axis value. 
+* dev  : Pointer to device structure.
+* attr : Pointer to device attributes.
+* buf  : Pointer to buffer containing trigger set value.
+* return     : Length of string.
+*/
+
+ssize_t value_x_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+	struct mxc_mma_device_t *pDev = dev_get_drvdata(dev);
+	struct ChipInfo_t *pChip = pDev->pChip;
+	sprintf(buf, "%d\n", pChip->value_x);
+	ret = strlen(buf) + 1;
+
+	return ret;
+}
+
+/*!
+* This method is used to show Y-axis value. 
+* dev  : Pointer to device structure.
+* attr : Pointer to device attributes.
+* buf  : Pointer to buffer containing trigger set value.
+* return     : Length of string.
+*/
+
+ssize_t value_y_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+	struct mxc_mma_device_t *pDev = dev_get_drvdata(dev);
+	struct ChipInfo_t *pChip = pDev->pChip;
+	sprintf(buf, "%d\n", pChip->value_y);
+	ret = strlen(buf) + 1;
+
+	return ret;
+}
+
+/*!
+* This method is used to show Z-axis value. 
+* dev  : Pointer to device structure.
+* attr : Pointer to device attributes.
+* buf  : Pointer to buffer containing trigger set value.
+* return     : Length of string.
+*/
+
+ssize_t value_z_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+	struct mxc_mma_device_t *pDev = dev_get_drvdata(dev);
+	struct ChipInfo_t *pChip = pDev->pChip;
+	sprintf(buf, "%d\n", pChip->value_z);
+	ret = strlen(buf) + 1;
+
+	return ret;
+}
+
 
 /*!
 * This method is used to store calibration offset. 

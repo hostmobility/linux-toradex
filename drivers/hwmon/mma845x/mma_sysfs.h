@@ -128,6 +128,15 @@ extern ssize_t sample_rate_show(struct device *dev,struct device_attribute *attr
 extern ssize_t value_show(struct device *dev,struct device_attribute *attr,
 				char *buf);
 
+extern ssize_t value_x_show(struct device *dev,struct device_attribute *attr,
+				char *buf);
+
+extern ssize_t value_y_show(struct device *dev,struct device_attribute *attr,
+				char *buf);
+
+extern ssize_t value_z_show(struct device *dev,struct device_attribute *attr,
+				char *buf);
+
 extern ssize_t calibration_offset_store(struct device *dev, struct device_attribute *attr,
 				const char *buf, size_t count);
 

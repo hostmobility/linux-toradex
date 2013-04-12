@@ -287,15 +287,19 @@ int ReportEvent(struct mxc_mma_device_t *pDev, int type, void *buff)
 		case ACCL_DATA:
 			{
 				pAcclData_t pData = (pAcclData_t)buff;
+				struct ChipInfo_t *pChip = pDev->pChip;
 
 				if(pDev->inp1 && pData)
 				{
 					if(pData->x != 0xffff)
 						input_report_abs(pDev->inp1, ABS_X, pData->x);
+						pChip->value_x = pData->x;
 					if(pData->y != 0xffff)
 						input_report_abs(pDev->inp1, ABS_Y, pData->y);
+						pChip->value_y = pData->y;
 					if(pData->z != 0xffff)
 						input_report_abs(pDev->inp1, ABS_Z, pData->z);
+						pChip->value_z = pData->z;
 
 					input_sync(pDev->inp1);
 #ifdef DEBUG				
