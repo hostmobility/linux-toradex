@@ -718,22 +718,25 @@ static struct gpio_led status_leds[] = {
 		.name = "led-on-2",
 		.gpio = (TEGRA_GPIO_PAA1),
 		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_ON,
 	},
 	[1] =  {
 		.name = "led-vehicle",
 		.gpio = (TEGRA_GPIO_PD6),
 		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_ON,
 	},
 	[2] =  {
 		.name = "led-usb",
 		.gpio = (TEGRA_GPIO_PL2),
 		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_ON,
 	},
 };
 
 static struct gpio_led_platform_data status_led_data = {
 	.num_leds	= ARRAY_SIZE(status_leds),
-	.leds		= status_leds
+	.leds		= status_leds	
 };
  
 static struct platform_device status_led_dev = {
@@ -1028,9 +1031,9 @@ static struct platform_device *colibri_t20_uart_devices[] __initdata = {
 	VCB
 	---
 	UARTA - Not used
-	UARTB(ttyHS0) - J1708
-	UARTC(ttyHS1) - K-Line
-	UARTD(ttyHS2) - RS232/RS485
+	UARTB(ttyHS1) - J1708
+	UARTC(ttyHS2) - K-Line
+	UARTD(ttyHS3) - RS232/RS485
 
 */
 	&tegra_uarte_device,
