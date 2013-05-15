@@ -13,6 +13,7 @@
    external address pin A[1] to internal memory address bit 2, and so on. Found in Colibri_T20_Datasheet 5.6.1*/
 #define PXA_ADDR_TO_T20_ADDR(x) (x << 1)
 
+#ifndef CONFIG_HM_GTT_CAN /* MX4 GTT uses different addressing on CAN */
 #define TEGRA_CAN_BASE 			GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x180)
 #define TEGRA_CAN_SIZE			0x3f
 #define TEGRA_CAN_INT			TEGRA_GPIO_PB5			
@@ -20,6 +21,31 @@
 #define TEGRA_CAN2_BASE 		(GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x1A0))
 #define TEGRA_CAN2_SIZE			0x3f
 #define TEGRA_CAN2_INT			TEGRA_GPIO_PA6
+#else
+#define TEGRA_CAN_BASE 			GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x010)
+#define TEGRA_CAN_SIZE			0x3f
+#define TEGRA_CAN_INT			TEGRA_GPIO_PB5			
+ 
+#define TEGRA_CAN2_BASE 		(GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x030))
+#define TEGRA_CAN2_SIZE			0x3f
+#define TEGRA_CAN2_INT			TEGRA_GPIO_PA6
+
+#define TEGRA_CAN3_BASE         (GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x050))
+#define TEGRA_CAN3_SIZE			0x3f
+#define TEGRA_CAN3_INT			TEGRA_GPIO_PN0
+
+#define TEGRA_CAN4_BASE         (GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x070))
+#define TEGRA_CAN4_SIZE			0x3f
+#define TEGRA_CAN4_INT			TEGRA_GPIO_PN1
+
+#define TEGRA_CAN5_BASE         (GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x090))
+#define TEGRA_CAN5_SIZE			0x3f
+#define TEGRA_CAN5_INT			TEGRA_GPIO_PN2
+
+#define TEGRA_CAN6_BASE         (GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x0B0))
+#define TEGRA_CAN6_SIZE			0x3f
+#define TEGRA_CAN6_INT			TEGRA_GPIO_PN3
+#endif /* CONFIG_HM_GTT_CAN */
 
 #define TEGRA_EXT_UARTA_BASE 		(GMI_CS_BASE_TEGRA)
 #define TEGRA_EXT_UARTA_INT		TEGRA_GPIO_PT2

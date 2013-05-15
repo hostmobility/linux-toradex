@@ -114,6 +114,12 @@ config HM_EXT_AX88772B
 	help
 	  Support for external ASIX AX88772B ethernet adapter on Host Mobility's carrier board for Toradex T20.
 
+config HM_GTT_CAN
+    bool "MX4 GTT additional CAN"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+    help
+      Support for additional CAN busses on Host Mobility's MX4 GTT board.
+
 comment "Tegra board type"
 
 config MACH_COLIBRI_T20
