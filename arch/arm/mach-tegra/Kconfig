@@ -116,7 +116,8 @@ config HM_EXT_AX88772B
 
 config HM_GTT_CAN
     bool "MX4 GTT additional CAN"
-	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && MACH_HM_MX4_GTT && CAN_SJA1000
+    default n
     help
       Support for additional CAN busses on Host Mobility's MX4 GTT board.
 
@@ -136,6 +137,13 @@ config MACH_HM_MX4
        select HM_DIGITAL_INPUTS
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 board
+
+config MACH_HM_MX4_GTT
+       bool "Host Mobility MX4 GTT"
+       depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+       select HM_GTT_CAN
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 GTT board
 
 config MACH_HM_VCB
         bool "Host Mobility VCB"
