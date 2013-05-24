@@ -845,13 +845,13 @@ static struct gpio_led status_leds[] = {
 		.name = "led-vehicle",
 		.gpio = (TEGRA_GPIO_PD6),
 		.active_low = 0,
-		.default_state = LEDS_GPIO_DEFSTATE_ON,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
 	[2] =  {
 		.name = "led-usb",
 		.gpio = (TEGRA_GPIO_PL2),
 		.active_low = 0,
-		.default_state = LEDS_GPIO_DEFSTATE_ON,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
 };
 
