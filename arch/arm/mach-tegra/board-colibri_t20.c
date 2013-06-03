@@ -1102,40 +1102,6 @@ late_initcall(colibri_t20_thermal_debug_init);
 #define SERIAL_FLAGS (UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST)
 #define SERIAL_CLK   (24000000)
 
-#ifndef CONFIG_MACH_HM_MX4_GTT 
-static struct plat_serial8250_port extern_uart_platform_data[] = {
-	[0] = { 	/* Extern uart A (LIN) - Do not mix up with UARTA */
-		.mapbase	= TEGRA_EXT_UARTA_BASE,
-		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_EXT_UARTA_INT),
-		.irqflags 	= IRQF_TRIGGER_RISING,
-		.flags		= SERIAL_FLAGS,
-		.iotype		= UPIO_MEM,
-		.regshift	= 5,
-		.uartclk	= SERIAL_CLK,
-	},
-	[1] = { 	/* Extern uart B (J1708)*/
-		.mapbase	= TEGRA_EXT_UARTB_BASE,
-		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_EXT_UARTB_INT),
-		.irqflags 	= IRQF_TRIGGER_RISING,
-		.flags		= SERIAL_FLAGS,
-		.iotype		= UPIO_MEM,
-		.regshift	= 5,
-		.uartclk	= SERIAL_CLK,
-	},
-	[2] = { 	/* Extern uart C (RS232)*/
-		.mapbase	= TEGRA_EXT_UARTC_BASE,
-		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_EXT_UARTC_INT),
-		.irqflags 	= IRQF_TRIGGER_RISING,
-		.flags		= SERIAL_FLAGS,
-		.iotype		= UPIO_MEM,
-		.regshift	= 5,
-		.uartclk	= SERIAL_CLK,
-	},
-	{
-		.flags = 0	
-	},
-};
-#else /* MX4 GTT UART */
 static struct plat_serial8250_port extern_uart_platform_data[] = {
 	[0] = { 	/* Extern uart C (RS232)*/
 		.mapbase	= TEGRA_EXT_UARTC_BASE,
@@ -1150,7 +1116,6 @@ static struct plat_serial8250_port extern_uart_platform_data[] = {
 		.flags = 0	
 	},
 };
-#endif /* ifndef CONFIG_MACH_HM_MX4_GTT */
 
 static struct platform_device extern_uart = {
 	.name = "serial8250",
@@ -1165,6 +1130,10 @@ static struct platform_device *colibri_t20_uart_devices[] __initdata = {
 /*
 	MX-4
 	---
+	UARTA(ttyHS0) - J1708
+	UARTB(ttyHS1) - RS485
+	UARTC(ttyHS2) - LIN
+	UARTD(ttyHS3) - RS232/CTS/RTS
 
 	VCB
 	---
@@ -1178,9 +1147,9 @@ static struct platform_device *colibri_t20_uart_devices[] __initdata = {
 #ifdef CONFIG_MACH_HM_MX4		
 	&tegra_uarta_device,
 #endif /* CONFIG_MACH_HM_MX4 */
-	&tegra_uartb_device, /* J1708 */
-	&tegra_uartc_device, /* K-Line */		
-	&tegra_uartd_device, /* RS232/RS485 */
+	&tegra_uartb_device, 
+	&tegra_uartc_device, 	
+	&tegra_uartd_device, 
 #ifdef CONFIG_HM_EXT_8250_UART
 	&extern_uart,
 #endif /* CONFIG_HM_EXT_8250_UART */
