@@ -491,7 +491,7 @@ static struct gpio colibri_t20_gpios[] = {
 
 	/* Accelometer Interrupts */
  	//{TEGRA_GPIO_PB7,	GPIOF_IN,		"P63 - ACC-INT1"},
- 	//{TEGRA_GPIO_PW3,	GPIOF_IN,		"P131 - ACC-INT2"},
+ 	//{TEGRA_GPIO_PK4,	GPIOF_IN,		"P131 - ACC-INT2"},
 
 	/* CAN Interrupts*/
 	//{TEGRA_GPIO_PB5,	GPIOF_IN,		"P28 - CAN1-INT"}, 
@@ -553,7 +553,7 @@ static struct mxc_mma845x_platform_data mma845x_data = {
 	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5),
 #else
 	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), 
-	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PW3),
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4),
 #endif
 };
 #endif
