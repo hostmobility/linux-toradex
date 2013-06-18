@@ -27,6 +27,7 @@
 #include <linux/can/dev.h>
 #include <linux/can/platform/sja1000.h>
 #include <linux/io.h>
+#include <linux/spinlock_types.h>
 
 #include "sja1000.h"
 
@@ -36,16 +37,29 @@ MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
 MODULE_DESCRIPTION("Socket-CAN driver for SJA1000 on the platform bus");
 MODULE_LICENSE("GPL v2");
 
+static DEFINE_SPINLOCK(snor_bus_lock);
+
 static u8 sp_read_reg8(const struct sja1000_priv *priv, int reg)
 {
+	u8 value;
+	unsigned long flags;
+
+	spin_lock_irqsave(&snor_bus_lock, flags);
 	iowrite8(reg, priv->reg_base);
-	return ioread8(priv->reg_base + 0x20);
+	value = ioread8(priv->reg_base + 0x20);
+	spin_unlock_irqrestore(&snor_bus_lock, flags);
+
+	return value;
 }
 
 static void sp_write_reg8(const struct sja1000_priv *priv, int reg, u8 val)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&snor_bus_lock, flags);
 	iowrite8(reg, priv->reg_base);
 	iowrite8(val, (priv->reg_base + 0x20));
+	spin_unlock_irqrestore(&snor_bus_lock, flags);
 }
 
 static u8 sp_read_reg16(const struct sja1000_priv *priv, int reg)
