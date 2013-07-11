@@ -41,6 +41,7 @@
 #include <linux/tegra_uart.h>
 #include <linux/wm97xx.h>
 #include <linux/mma845x.h>
+#include <linux/l3g4200d.h>
 
 #include <mach/gpio.h>
 #include <mach/mx4_iomap.h>
@@ -82,6 +83,8 @@ for a NC pin By: Mirza */
 /* Active LOW flag - Supplement to gpio.h flags in line with the 
    GPIOF_NO_EXPORT flag */
 #define GPIOF_ACT_LOW		(1 << 7)
+
+ #define L3G4200D_DRDY_GPIO      TEGRA_GPIO_PA7
 
 static struct wm97xx_batt_pdata colibri_t20_adc_pdata = {
 	.batt_aux	= WM97XX_AUX_ID1,	/* AD0 - ANALOG_IN0 */
@@ -544,22 +547,58 @@ static void colibri_t20_gpio_init(void)
 
 
 /* I2C */
+#ifdef CONFIG_SENSORS_L3G4200D
+static int colibri_l3g4200d_init(void)
+{
+        tegra_gpio_enable(L3G4200D_DRDY_GPIO);
+        gpio_request(L3G4200D_DRDY_GPIO, "l3g4200d_irq");
+        gpio_direction_input(L3G4200D_DRDY_GPIO);
+        return 0;
+}
+
+struct l3g4200d_platform_data colibri_gyro_pdata = {
+        .poll_interval = 10,
+        .gpio_drdy = L3G4200D_DRDY_GPIO,
+
+        .ctrl_reg1 = 0x1f,      /* ODR100 */
+        .ctrl_reg2 = 0x00,
+        .ctrl_reg3 = 0x08,      /* Enable DRDY interrupt */
+        .ctrl_reg4 = 0xA0,      /* BDU enable, 2000 dps */
+        .ctrl_reg5 = 0x00,
+        .reference = 0x00,
+        .fifo_ctrl_reg = 0x00,
+        .int1_cfg = 0x00,
+        .int1_tsh_xh = 0x00,
+        .int1_tsh_xl = 0x00,
+        .int1_tsh_yh = 0x00,
+        .int1_tsh_yl = 0x00,
+        .int1_tsh_zh = 0x00,
+        .int1_tsh_zl = 0x00,
+        .int1_duration = 0x00,
+};
+#else
+static int colibri_l3g4200d_init(void){ return 0; }
+#endif
+
 #ifdef CONFIG_MXC_MMA845X
 static struct mxc_mma845x_platform_data mma845x_data = {
 	.gpio_pin_get = NULL,
 	.gpio_pin_put = NULL,
-#ifdef CONFIG_MACH_HM_VCB
-	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB6), 
-	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5),
-#else
 	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), 
 	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4),
-#endif
 };
 #endif
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
+//#ifdef CONFIG_SENSORS_L3G4200D
+#if 0	{
+        I2C_BOARD_INFO(L3G4200D_NAME, 0x68),
+        .platform_data = &colibri_gyro_pdata,
+        .irq = TEGRA_GPIO_TO_IRQ(L3G4200D_DRDY_GPIO),
+    },
+#endif
+
 #ifdef CONFIG_MXC_MMA845X	
 	{
 		I2C_BOARD_INFO("mma845x", 0x1C),
@@ -1588,6 +1627,8 @@ static void __init colibri_t20_init(void)
 #endif /* CONFIG_HM_GTT_CAN */
 
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
+
+	colibri_l3g4200d_init();
 
 	tegra_clk_init_from_table(colibri_t20_clk_init_table);
 	colibri_t20_pinmux_init();

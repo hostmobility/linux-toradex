@@ -575,6 +575,14 @@ config TEGRA_THROUGHPUT
 	---help---
 	Dev node /dev/tegra-throughput used to set a throughput target.
 
+config SENSORS_L3G4200D
+        tristate "ST Micro Gyroscope"
+        default n
+        depends on I2C
+        help
+         Say yes here if you wish to include the ST Micro
+         L3G4200D gyroscope driver.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
