@@ -737,9 +737,8 @@ static int mma845x_remove(struct i2c_client *client)
 */
 static int mma845x_suspend(struct i2c_client *client, pm_message_t state)
 {
-     printk(KERN_INFO "%s:: Enter____ STATE [%d]\n", __func__, state.event);
-    if (plat_data->int2 > 0)
-    	enable_irq_wake(plat_data->int2);
+    printk(KERN_INFO "%s:: Enter____ STATE [%d]\n", __func__, state.event);
+    IsSuspended = 1;
     return 0;
 }
 
