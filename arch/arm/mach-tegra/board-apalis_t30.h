@@ -26,13 +26,27 @@
 #include <mach/gpio.h>
 #include <mach/irqs.h>
 
+/* Run framebuffer in VGA mode */
+//#define TEGRA_FB_VGA
+
 /* GPIO */
+
+#define APALIS_GPIO1	TEGRA_GPIO_PS2
+#define APALIS_GPIO2	TEGRA_GPIO_PS3
+#define APALIS_GPIO3	TEGRA_GPIO_PS4
+#define APALIS_GPIO4	TEGRA_GPIO_PS5
+#define APALIS_GPIO5	TEGRA_GPIO_PS6
+#define APALIS_GPIO6	TEGRA_GPIO_PQ0
+#define APALIS_GPIO7	TEGRA_GPIO_PS7
+#define APALIS_GPIO8	TEGRA_GPIO_PQ1
 
 #define BKL1_ON		TEGRA_GPIO_PV2
 #define BKL1_PWM_EN_N	TEGRA_GPIO_PA1
 
 #define CAN1_INT	TEGRA_GPIO_PW2
 #define CAN2_INT	TEGRA_GPIO_PW3
+
+#define FAN_EN		APALIS_GPIO8
 
 #define GPIO1		TEGRA_GPIO_PS2
 #define GPIO2		TEGRA_GPIO_PS3
@@ -67,6 +81,8 @@
 
 #define MMC1_CD_N	TEGRA_GPIO_PV3
 
+#define PEX_PERST_N	APALIS_GPIO7
+
 #define PWR_I2C_SCL	TEGRA_GPIO_PZ6
 #define PWR_I2C_SDA	TEGRA_GPIO_PZ7
 
@@ -79,6 +95,7 @@
 #define THERMD_ALERT_N	TEGRA_GPIO_PD2
 
 #define TOUCH_PEN_INT	TEGRA_GPIO_PV0
+#define TOUCH_WIPER	APALIS_GPIO6
 
 #define TS1		TEGRA_GPIO_PI1
 #define TS2		TEGRA_GPIO_PQ7
@@ -94,6 +111,13 @@
 
 #define WAKE1_MICO	TEGRA_GPIO_PV1
 
+/* STMPE811 IRQs */
+#define STMPE811_IRQ_BASE	TEGRA_NR_IRQS
+#define STMPE811_IRQ_END	(STMPE811_IRQ_BASE + 22)
+
+#define TDIODE_OFFSET	(10000)	/* in millicelsius */
+#define TCRIT_LOCAL 95000 /* board temp to switch off PMIC in millicelsius*/
+
 /* External peripheral act as gpio */
 /* TPS6591x GPIOs */
 #define TPS6591X_GPIO_BASE	TEGRA_NR_GPIOS
@@ -108,24 +132,11 @@
 #define TPS6591X_GPIO_8		(TPS6591X_GPIO_BASE + TPS6591X_GPIO_GP8)
 #define TPS6591X_GPIO_END	(TPS6591X_GPIO_BASE + TPS6591X_GPIO_NR)
 
-#define AC_PRESENT_GPIO		TPS6591X_GPIO_4
-
 /*****************Interrupt tables ******************/
 /* External peripheral act as interrupt controller */
 /* TPS6591x IRQs */
-#define TPS6591X_IRQ_BASE	TEGRA_NR_IRQS
+#define TPS6591X_IRQ_BASE	STMPE811_IRQ_END
 #define TPS6591X_IRQ_END	(TPS6591X_IRQ_BASE + 18)
-
-#define AC_PRESENT_INT		(TPS6591X_INT_GPIO4 + TPS6591X_IRQ_BASE)
-
-/* STMPE811 IRQs */
-#define STMPE811_IRQ_BASE	TPS6591X_IRQ_END
-#define STMPE811_IRQ_END	(STMPE811_IRQ_BASE + 22)
-
-#define TDIODE_OFFSET	(10000)	/* in millicelsius */
-
-/* Run framebuffer in VGA mode */
-#define TEGRA_FB_VGA
 
 int apalis_t30_regulator_init(void);
 int apalis_t30_suspend_init(void);

@@ -10,6 +10,8 @@
 #include <asm/mach/arch.h>
 #include <asm/mach-types.h>
 
+#include <linux/can/platform/mcp251x.h>
+#include <linux/can/platform/sja1000.h>
 #include <linux/clk.h>
 #include <linux/colibri_usb.h>
 #include <linux/types.h> /* required by linux/gpio_keys.h */
@@ -36,12 +38,27 @@
 #include <mach/usb_phy.h>
 #include <mach/w1.h>
 
+#include <media/soc_camera.h>
+#include <media/tegra_v4l2_camera.h>
+
 #include "board-colibri_t30.h"
 #include "board.h"
 #include "clock.h"
 #include "devices.h"
 #include "gpio-names.h"
 #include "pm.h"
+
+//from former drivers/mtd/maps/tegra_nor.h
+#define TEGRA_GMI_PHYS			0x70009000
+#define TEGRA_GMI_BASE			IO_TO_VIRT(TEGRA_GMI_PHYS)
+#define TEGRA_SNOR_CONFIG_REG		(TEGRA_GMI_BASE + 0x00)
+
+//from drivers/mtd/maps/tegra_nor.c
+#define __BITMASK0(len)			(BIT(len) - 1)
+#define REG_FIELD(val, start, len)	(((val) & __BITMASK0(len)) << (start))
+
+#define TEGRA_SNOR_CONFIG_GO		BIT(31)
+#define TEGRA_SNOR_CONFIG_SNOR_CS(val)	REG_FIELD((val), 4, 3)
 
 /* ADC */
 
@@ -56,7 +73,8 @@ static struct tegra_asoc_platform_data colibri_t30_audio_sgtl5000_pdata = {
 	.gpio_int_mic_en	= -1,
 	.gpio_ext_mic_en	= -1,
 	.i2s_param[HIFI_CODEC] = {
-		.audio_port_id	= 0,
+		.audio_port_id	= 0, /* index of below registered
+					tegra_i2s_device */
 		.i2s_mode	= TEGRA_DAIFMT_I2S,
 		.is_i2s_master	= 1,
 		.sample_size	= 16,
@@ -77,13 +95,165 @@ static struct platform_device colibri_t30_audio_sgtl5000_device = {
 	},
 };
 
-#ifdef CONFIG_TEGRA_CAMERA
 /* Camera */
+
+#ifdef CONFIG_TEGRA_CAMERA
 static struct platform_device tegra_camera = {
 	.name	= "tegra_camera",
 	.id	= -1,
 };
 #endif /* CONFIG_TEGRA_CAMERA */
+
+#if defined(CONFIG_VIDEO_TEGRA) || defined(CONFIG_VIDEO_TEGRA_MODULE)
+static void tegra_camera_disable(struct nvhost_device *ndev)
+{
+}
+
+static int tegra_camera_enable(struct nvhost_device *ndev)
+{
+	return 0;
+}
+
+static struct tegra_camera_platform_data tegra_camera_platform_data = {
+	.disable_camera	= tegra_camera_disable,
+	.enable_camera	= tegra_camera_enable,
+	.flip_h		= 0,
+	.flip_v		= 0,
+	.port		= TEGRA_CAMERA_PORT_VIP,
+};
+
+#if defined(CONFIG_SOC_CAMERA_MAX9526) || defined(CONFIG_SOC_CAMERA_MAX9526_MODULE)
+static struct i2c_board_info camera_i2c_max9526 = {
+	I2C_BOARD_INFO("max9526", 0x21),
+};
+
+static struct soc_camera_link iclink_max9526 = {
+	.board_info	= &camera_i2c_max9526,
+	.bus_id		= -1, /* This must match the .id of tegra_vi01_device */
+	.i2c_adapter_id	= 0,
+};
+
+static struct platform_device soc_camera_max9526 = {
+	.name	= "soc-camera-pdrv",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &iclink_max9526,
+	},
+};
+#endif /* CONFIG_SOC_CAMERA_MAX9526 | CONFIG_SOC_CAMERA_MAX9526_MODULE */
+
+#if defined(CONFIG_VIDEO_ADV7180) || defined(CONFIG_VIDEO_ADV7180_MODULE)
+static struct i2c_board_info camera_i2c_adv7180 = {
+        I2C_BOARD_INFO("adv7180", 0x21),
+};
+
+static struct soc_camera_link iclink_adv7180 = {
+        .board_info     = &camera_i2c_adv7180,
+        .bus_id         = -1, /* This must match the .id of tegra_vi01_device */
+        .i2c_adapter_id = 0,
+};
+
+static struct platform_device soc_camera_adv7180 = {
+        .name   = "soc-camera-pdrv",
+        .id     = 1,
+        .dev    = {
+                .platform_data = &iclink_adv7180,
+        },
+};
+#endif /* CONFIG_VIDEO_ADV7180 | CONFIG_VIDEO_ADV7180_MODULE */
+#endif /* CONFIG_VIDEO_TEGRA | CONFIG_VIDEO_TEGRA_MODULE */
+
+/* CAN */
+#if ((defined(CONFIG_CAN_MCP251X) || defined(CONFIG_CAN_MCP251X_MODULE)) && \
+     (defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)))
+	#error either enable MCP251X or SJA1000 but not both
+#endif
+
+#if defined(CONFIG_CAN_MCP251X) || defined(CONFIG_CAN_MCP251X_MODULE)
+/* Colibri EvalBoard V3.1a */
+
+#define CAN_INTERRUPT_GPIO	TEGRA_GPIO_PS0	/* active low interrupt (MCP2515 nINT) */
+#define CAN_RESET_GPIO		TEGRA_GPIO_PK4	/* active high reset (not MCP2515 nRESET) */
+
+static int __init colibri_t20_mcp2515_setup(struct spi_device *spi)
+{
+	int gpio_status;
+
+	printk("Colibri EvalBoard V3.1a CAN Initialisation\n");
+
+	/* configure MCP2515 reset line as output and pull high into reset */
+	gpio_status = gpio_request(CAN_RESET_GPIO, "CAN_RESET_GPIO");
+	if (gpio_status < 0)
+		pr_warning("CAN_RESET_GPIO request GPIO FAILED\n");
+	gpio_status = gpio_direction_output(CAN_RESET_GPIO, 1);
+	if (gpio_status < 0)
+		pr_warning("CAN_RESET_GPIO request GPIO DIRECTION FAILED\n");
+
+	udelay(2);
+
+	/* pull out of reset */
+	gpio_set_value(CAN_RESET_GPIO, 0);
+
+	return 0;
+}
+
+static struct mcp251x_platform_data mcp251x_pdata = {
+	.board_specific_setup	= colibri_t20_mcp2515_setup,
+	.oscillator_frequency	= 16000000,
+	.power_enable		= NULL,
+	.transceiver_enable	= NULL
+};
+
+static struct spi_board_info mcp251x_board_info[] = {
+	{
+		.bus_num		= 0,
+		.chip_select		= 0,
+		.max_speed_hz		= 10000000,
+		.modalias		= "mcp2515",
+		.platform_data		= &mcp251x_pdata,
+	},
+};
+
+static void __init colibri_t20_mcp2515_can_init(void)
+{
+	mcp251x_board_info[0].irq = gpio_to_irq(CAN_INTERRUPT_GPIO);
+	spi_register_board_info(mcp251x_board_info, ARRAY_SIZE(mcp251x_board_info));
+}
+#else /* CONFIG_CAN_MCP251X | CONFIG_CAN_MCP251X_MODULE */
+#define colibri_t20_mcp2515_can_init() do {} while (0)
+#endif /* CONFIG_CAN_MCP251X | CONFIG_CAN_MCP251X_MODULE */
+
+#if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
+#define CAN_BASE_TEG 0x48000000 /* GMI_CS4_N */
+static struct resource colibri_can_resource[] = {
+	[0] =   {
+		.start	= CAN_BASE_TEG,		/* address */
+		.end	= CAN_BASE_TEG + 0xff,	/* data */
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] =   {
+		/* interrupt assigned during initialisation */
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+	}
+};
+
+static struct sja1000_platform_data colibri_can_platdata = {
+	.osc_freq	= 24000000,
+	.ocr		= (OCR_MODE_NORMAL | OCR_TX0_PUSHPULL),
+	.cdr		= CDR_CLK_OFF | /* Clock off (CLKOUT pin) */
+			  CDR_CBP, /* CAN input comparator bypass */
+};
+
+static struct platform_device colibri_can_device = {
+	.name		= "sja1000_platform",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(colibri_can_resource),
+	.resource	= colibri_can_resource,
+	.dev            = {
+		.platform_data = &colibri_can_platdata,
+	}
+};
+#endif /* CONFIG_CAN_SJA1000 | CONFIG_CAN_SJA1000_MODULE */
 
 /* Clocks */
 static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
@@ -96,11 +266,8 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 	{"dam0",	"clk_m",	12000000,	false},
 	{"dam1",	"clk_m",	12000000,	false},
 	{"dam2",	"clk_m",	12000000,	false},
-
-//required?
-	{"hda",	"pll_p",	108000000,	false},
+	{"hda",		"pll_p",	108000000,	false},
 	{"hda2codec_2x","pll_p",	48000000,	false},
-
 	{"i2c1",	"pll_p",	3200000,	false},
 	{"i2c2",	"pll_p",	3200000,	false},
 	{"i2c3",	"pll_p",	3200000,	false},
@@ -110,6 +277,7 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 	{"i2s1",	"pll_a_out0",	0,		false},
 	{"i2s2",	"pll_a_out0",	0,		false},
 	{"i2s3",	"pll_a_out0",	0,		false},
+	{"nor",		"pll_p",	86500000,	true},
 	{"pll_m",	NULL,		0,		false},
 	{"pwm",		"pll_p",	3187500,	false},
 	{"spdif_out",	"pll_a_out0",	0,		false},
@@ -119,42 +287,140 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 };
 
 /* GPIO */
-
-#define DDC_SCL		TEGRA_GPIO_PV4	/* X2-15 */
-#define DDC_SDA		TEGRA_GPIO_PV5	/* X2-16 */
-
-#ifdef COLIBRI_T30_V10
-#define EMMC_DETECT	TEGRA_GPIO_PC7
+/* Pins in the following struct are configured as GPIO Inputs and
+ * accessible from userspace through /sys/class/gpio
+ * Pins which likely are used with one of their alternate functions
+ * are commented out.
+ * Refer to the TRM, chapters 'Multi-Prupose Io Pins' and 'GPIO Controller'
+ */
+static struct gpio colibri_t30_gpios[] = {
+//	{TEGRA_GPIO_PA2,	GPIOF_IN,	"SODIMM pin 186"},
+//	{TEGRA_GPIO_PA3,	GPIOF_IN,	"SODIMM pin 184"},
+	{TEGRA_GPIO_PB2,	GPIOF_IN,	"SODIMM pin 154"},
+#if !defined(CONFIG_SPI_GPIO) && !defined(CONFIG_SPI_GPIO_MODULE)
+//conflicts with MECS Tellurium xPOD2 SSPCLK2
+//	{TEGRA_GPIO_PB6,	GPIOF_IN,	"SODIMM pin 55"},
+#endif
+#ifndef MECS_TELLURIUM_XPOD2
+//conflicts with MECS Tellurium xPOD2 SSPFRM2
+//	{TEGRA_GPIO_PB7,	GPIOF_IN,	"SODIMM pin 63"},
+#endif
+#ifndef COLIBRI_T30_VI
+	{TEGRA_GPIO_PC1,	GPIOF_IN,	"SODIMM pin 81"},
+#endif
+	{TEGRA_GPIO_PI3,	GPIOF_IN,	"SODIMM pin 130"},
+	{TEGRA_GPIO_PI6,	GPIOF_IN,	"SODIMM pin 132"},
+	//{TEGRA_GPIO_PJ0,	GPIOF_IN,	"SODIMM pin 126"},
+	//{TEGRA_GPIO_PJ2,	GPIOF_IN,	"SODIMM pin 128"},
+//conflicts with GMI_ADV_N used for multiplexed address/data bus
+//	{TEGRA_GPIO_PK0,	GPIOF_IN,	"SODIMM pin 150"},
+//	{TEGRA_GPIO_PK1,	GPIOF_IN,	"SODIMM pin 152"},
+#ifndef CONFIG_KEYBOARD_GPIO
+//conflicts with menu key
+//	{TEGRA_GPIO_PK6,	GPIOF_IN,	"SODIMM pin 135"},
+#endif
+//	{TEGRA_GPIO_PN0,	GPIOF_IN,	"SODIMM pin 174"},
+//	{TEGRA_GPIO_PN1,	GPIOF_IN,	"SODIMM pin 176"},
+//	{TEGRA_GPIO_PN2,	GPIOF_IN,	"SODIMM pin 178"},
+//	{TEGRA_GPIO_PN3,	GPIOF_IN,	"SODIMM pin 180"},
+//	{TEGRA_GPIO_PN4,	GPIOF_IN,	"SODIMM pin 160"},
+//	{TEGRA_GPIO_PN5,	GPIOF_IN,	"SODIMM pin 158"},
+	{TEGRA_GPIO_PN6,	GPIOF_IN,	"SODIMM pin 162"},
+//conflicts with ADDRESS13
+//	{TEGRA_GPIO_PP4,	GPIOF_IN,	"SODIMM pin 120"},
+//conflicts with ADDRESS14
+//	{TEGRA_GPIO_PP5,	GPIOF_IN,	"SODIMM pin 122"},
+//conflicts with ADDRESS15
+//	{TEGRA_GPIO_PP6,	GPIOF_IN,	"SODIMM pin 124"},
+//	{TEGRA_GPIO_PP7,	GPIOF_IN,	"SODIMM pin 188"},
+#if !defined(IRIS) && !defined(CONFIG_CAN_MCP251X) && \
+		!defined(CONFIG_CAN_MCP251X_MODULE) && \
+		!defined(CONFIG_CAN_SJA1000) && \
+		!defined(CONFIG_CAN_SJA1000_MODULE)
+//conflicts with CAN interrupt on Colibri Evaluation Board and MECS Tellurium
+//xPOD1 CAN
+//conflicts with DAC_PSAVE# on Iris
+	{TEGRA_GPIO_PS0,	GPIOF_IN,	"SODIMM pin 73"},
+#endif
+#ifndef CONFIG_KEYBOARD_GPIO
+//conflicts with back key
+	{TEGRA_GPIO_PT5,	GPIOF_IN,	"SOD-133, Iris X16-14"},
+//conflicts with home key
+	{TEGRA_GPIO_PT6,	GPIOF_IN,	"SODIMM pin 127"},
+//conflicts with power key (WAKE1)
+	{TEGRA_GPIO_PV1,	GPIOF_IN,	"SODI-45, Iris X16-20"},
+#endif
+#ifndef COLIBRI_T30_VI
+	{TEGRA_GPIO_PW5,	GPIOF_IN,	"SODIMM pin 75"},
+	//conflicts with BL_ON
+	//{TEGRA_GPIO_PV2,	GPIOF_IN,	"SODIMM pin 71"},
+	{TEGRA_GPIO_PV3,	GPIOF_IN,	"SODI-85, Iris X16-18"},
+#endif
+//conflicts with ADDRESS12
+//	{TEGRA_GPIO_PU6,	GPIOF_IN,	"SODIMM pin 118"},
+//multiplexed LCD_D21
+//	{TEGRA_GPIO_PX0,	GPIOF_IN,	"SODIMM pin 142"},
+//multiplexed LCD_D20
+//	{TEGRA_GPIO_PX1,	GPIOF_IN,	"SODIMM pin 140"},
+//multiplexed LCD_D19
+//	{TEGRA_GPIO_PX2,	GPIOF_IN,	"SODIMM pin 138"},
+//multiplexed LCD_D18
+//	{TEGRA_GPIO_PX3,	GPIOF_IN,	"SODIMM pin 136"},
+	{TEGRA_GPIO_PX4,	GPIOF_IN,	"SODIMM pin 134"},
+	{TEGRA_GPIO_PX6,	GPIOF_IN,	"102, I X13 ForceOFF#"},
+	{TEGRA_GPIO_PX7,	GPIOF_IN,	"104, I X14 ForceOFF#"},
+#ifndef COLIBRI_T30_VI
+//	{TEGRA_GPIO_PY4,	GPIOF_IN,	"SODI-97, Iris X16-17"},
+//	{TEGRA_GPIO_PY5,	GPIOF_IN,	"SODI-79, Iris X16-19"},
+#ifndef CONFIG_TOUCHSCREEN_FUSION_F0710A
+//	{TEGRA_GPIO_PY6,	GPIOF_IN,	"103, Iris X16-15 Pen"},
+//	{TEGRA_GPIO_PY7,	GPIOF_IN,	"101, Iris X16-16 RST"},
+#endif
+//	{TEGRA_GPIO_PZ0,	GPIOF_IN,	"SODIMM pin 96"},
+//	{TEGRA_GPIO_PZ1,	GPIOF_IN,	"SODI-98, Iris X16-13"},
+#endif
+//	{TEGRA_GPIO_PZ2,	GPIOF_IN,	"SODIMM pin 156"},
+//	{TEGRA_GPIO_PZ4,	GPIOF_IN,	"SODIMM pin 164"},
+	{TEGRA_GPIO_PBB4,	GPIOF_IN,	"SODIMM pin 166"},
+	{TEGRA_GPIO_PBB5,	GPIOF_IN,	"SODIMM pin 168"},
+	{TEGRA_GPIO_PBB6,	GPIOF_IN,	"SODIMM pin 170"},
+	{TEGRA_GPIO_PBB7,	GPIOF_IN,	"SODIMM pin 172"},
+#ifndef COLIBRI_T30_VI
+//	{TEGRA_GPIO_PCC2,	GPIOF_IN,	"SODIMM pin 77"},
+	{TEGRA_GPIO_PCC7,	GPIOF_IN,	"SODIMM pin 94"},
+#endif
+#ifndef CONFIG_KEYBOARD_GPIO
+//conflicts with volume down key
+	{TEGRA_GPIO_PCC6,	GPIOF_IN,	"SODIMM pin 24"},
+//conflicts with volume up key
+	{TEGRA_GPIO_PDD7,	GPIOF_IN,	"SODIMM pin 22"},
+#endif
+#ifndef COLIBRI_T30_VI
+	{TEGRA_GPIO_PDD5,	GPIOF_IN,	"SODIMM pin 69"},
+	{TEGRA_GPIO_PDD6,	GPIOF_IN,	"SODIMM pin 65"},
 #endif
 
-#define EN_MIC_GND	TEGRA_GPIO_PT1
+};
 
-#define I2C_SCL		TEGRA_GPIO_PC4	/* SODIMM 196 */
-#define I2C_SDA		TEGRA_GPIO_PC5	/* SODIMM 194 */
+static void colibri_t30_gpio_init(void)
+{
+	int i = 0;
+	int length = sizeof(colibri_t30_gpios) / sizeof(struct gpio);
+	int err = 0;
 
-#define LAN_EXT_WAKEUP	TEGRA_GPIO_PDD1
-#define LAN_PME		TEGRA_GPIO_PDD3
-#define LAN_RESET	TEGRA_GPIO_PDD0
-#define LAN_V_BUS	TEGRA_GPIO_PDD2
+	for (i = 0; i < length; i++) {
+		err = gpio_request_one(colibri_t30_gpios[i].gpio,
+					colibri_t30_gpios[i].flags,
+					colibri_t30_gpios[i].label);
 
-#ifdef COLIBRI_T30_V10
-#define MMC_CD		TEGRA_GPIO_PU6	/* SODIMM 43 */
-#else
-#define MMC_CD		TEGRA_GPIO_PC7	/* SODIMM 43 */
-#endif
-
-#define PWR_I2C_SCL	TEGRA_GPIO_PZ6
-#define PWR_I2C_SDA	TEGRA_GPIO_PZ7
-
-#define TOUCH_PEN_INT	TEGRA_GPIO_PV0
-
-#define THERMD_ALERT	TEGRA_GPIO_PD2
-
-#define USBC_DET	TEGRA_GPIO_PK5	/* SODIMM 137 */
-#define USBH_OC		TEGRA_GPIO_PW3	/* SODIMM 131 */
-#define USBH_PEN	TEGRA_GPIO_PW2	/* SODIMM 129 */
-
-//TODO: sysfs GPIO exports
+		if (err) {
+			pr_warning("gpio_request(%s) failed, err = %d",
+				   colibri_t30_gpios[i].label, err);
+		} else {
+			gpio_export(colibri_t30_gpios[i].gpio, true);
+		}
+	}
+}
 
 /* I2C */
 
@@ -168,6 +434,12 @@ static struct i2c_board_info colibri_t30_i2c_bus1_board_info[] __initdata = {
 		I2C_BOARD_INFO("rtc-ds1307", 0x68),
 			.type = "m41t00",
 	},
+#ifdef CONFIG_TOUCHSCREEN_FUSION_F0710A
+	{
+		/* TouchRevolution Fusion 7 and 10 multi-touch controller */
+		I2C_BOARD_INFO("fusion_F0710A", 0x10),
+	},
+#endif /* CONFIG_TOUCHSCREEN_FUSION_F0710A */
 };
 
 static struct tegra_i2c_platform_data colibri_t30_i2c1_platform_data = {
@@ -201,7 +473,8 @@ static struct stmpe_ts_platform_data stmpe811_ts_data = {
 	.adc_freq		= 1, /* 3.25 MHz ADC clock speed */
 	.ave_ctrl		= 3, /* 8 sample average control */
 	.fraction_z		= 7, /* 7 length fractional part in z */
-	.i_drive		= 1, /* 50 mA typical 80 mA max touchscreen drivers current limit value */
+	.i_drive		= 1, /* 50 mA typical 80 mA max touchscreen
+					drivers current limit value */
 	.mod_12b		= 1, /* 12-bit ADC */
 	.ref_sel		= 0, /* internal ADC reference */
 	.sample_time		= 4, /* ADC converstion time: 80 clocks */
@@ -233,7 +506,6 @@ static struct i2c_board_info colibri_t30_i2c_bus5_board_info[] __initdata = {
 		/* STMPE811 touch screen controller */
 		I2C_BOARD_INFO("stmpe", 0x41),
 			.flags = I2C_CLIENT_WAKE,
-			.irq = TEGRA_GPIO_TO_IRQ(TOUCH_PEN_INT),
 			.platform_data = &stmpe811_data,
 			.type = "stmpe811",
 	},
@@ -264,18 +536,45 @@ static void __init colibri_t30_i2c_init(void)
 	platform_device_register(&tegra_i2c_device4);
 	platform_device_register(&tegra_i2c_device5);
 
-	i2c_register_board_info(0, colibri_t30_i2c_bus1_board_info, ARRAY_SIZE(colibri_t30_i2c_bus1_board_info));
+#ifdef CONFIG_TOUCHSCREEN_FUSION_F0710A
+	if ((gpio_request(FUSION_PEN_DOWN, "103, Iris X16-15 Pen") == 0) &&
+	    (gpio_direction_input(FUSION_PEN_DOWN) == 0)) {
+		gpio_export(FUSION_PEN_DOWN, 0);
+	} else {
+		printk(KERN_ERR "Could not obtain GPIO for Fusion pen down\n");
+		return;
+	}
+
+	if ((gpio_request(FUSION_RESET, "101, Iris X16-16 RST") == 0) &&
+	    (gpio_direction_output(FUSION_RESET, 1) == 0)) {
+		gpio_direction_output(FUSION_RESET, 0);
+		mdelay(10);
+		gpio_direction_output(FUSION_RESET, 1);
+	} else {
+		printk(KERN_ERR "Could not obtain GPIO for Fusion reset\n");
+		return;
+	}
+
+	colibri_t30_i2c_bus1_board_info[1].irq = gpio_to_irq(FUSION_PEN_DOWN);
+#endif /* CONFIG_TOUCHSCREEN_FUSION_F0710A */
+
+	i2c_register_board_info(0, colibri_t30_i2c_bus1_board_info,
+				ARRAY_SIZE(colibri_t30_i2c_bus1_board_info));
 
 	/* enable touch interrupt GPIO */
 	gpio_request(TOUCH_PEN_INT, "TOUCH_PEN_INT");
 	gpio_direction_input(TOUCH_PEN_INT);
 
-	i2c_register_board_info(4, colibri_t30_i2c_bus5_board_info, ARRAY_SIZE(colibri_t30_i2c_bus5_board_info));
+	colibri_t30_i2c_bus5_board_info[1].irq = gpio_to_irq(TOUCH_PEN_INT);
+	i2c_register_board_info(4, colibri_t30_i2c_bus5_board_info,
+				ARRAY_SIZE(colibri_t30_i2c_bus5_board_info));
 }
 
 /* Keys
-   Note: active-low means pull-ups required on carrier board resp. via pin-muxing
-   Note2: power-key active-high due to EvalBoard v3.1a having 100 K pull-down on SODIMM pin 45 */
+   Note: active-low means pull-ups required on carrier board resp. via
+	 pin-muxing
+   Note2: power-key active-high due to EvalBoard v3.1a having 100 K pull-down
+	  on SODIMM pin 45 */
 
 #ifdef CONFIG_KEYBOARD_GPIO
 #define GPIO_KEY(_id, _gpio, _lowactive, _iswake)	\
@@ -290,13 +589,17 @@ static void __init colibri_t30_i2c_init(void)
 	}
 
 static struct gpio_keys_button colibri_t30_keys[] = {
-	[0] = GPIO_KEY(KEY_FIND, PCC2, 1, 0),		/* SODIMM pin 77 */
-	[1] = GPIO_KEY(KEY_HOME, PT6, 1, 0),		/* SODIMM pin 127 */
-	[2] = GPIO_KEY(KEY_BACK, PT5, 1, 0),		/* SODIMM pin 133, Iris X16-14 */
-	[3] = GPIO_KEY(KEY_VOLUMEUP, PDD7, 1, 0),	/* SODIMM pin 22 */
-	[4] = GPIO_KEY(KEY_VOLUMEDOWN, PCC6, 1, 0),	/* SODIMM pin 24 */
-	[5] = GPIO_KEY(KEY_POWER, PV1, 0, 1),		/* SODIMM pin 45, Iris X16-20 */
-	[6] = GPIO_KEY(KEY_MENU, PK6, 1, 0),		/* SODIMM pin 135 */
+#ifndef COLIBRI_T30_VI
+	GPIO_KEY(KEY_FIND, PCC2, 1, 0),		/* SODIMM pin 77 */
+#endif
+	GPIO_KEY(KEY_HOME, PT6, 1, 0),		/* SODIMM pin 127 */
+	GPIO_KEY(KEY_BACK, PT5, 1, 1),		/* SODIMM pin 133,
+						   Iris X16-14 */
+	GPIO_KEY(KEY_VOLUMEUP, PDD7, 1, 0),	/* SODIMM pin 22 */
+	GPIO_KEY(KEY_VOLUMEDOWN, PCC6, 1, 0),	/* SODIMM pin 24 */
+	GPIO_KEY(KEY_POWER, PV1, 0, 1),		/* SODIMM pin 45,
+						   Iris X16-20 */
+	GPIO_KEY(KEY_MENU, PK6, 1, 0),		/* SODIMM pin 135 */
 };
 
 static struct gpio_keys_platform_data colibri_t30_keys_platform_data = {
@@ -332,6 +635,7 @@ static struct tegra_sdhci_platform_data colibri_t30_emmc_platform_data = {
 static struct tegra_sdhci_platform_data colibri_t30_sdcard_platform_data = {
 	.cd_gpio	= MMC_CD,
 	.ddr_clk_limit	= 52000000,
+	.is_8bit	= 0,
 	.power_gpio	= -1,
 	.tap_delay	= 0x0f,
 	.wp_gpio	= -1,
@@ -358,19 +662,19 @@ static void __init colibri_t30_sdhci_init(void)
 /* PWM LEDs */
 static struct led_pwm tegra_leds_pwm[] = {
 	{
-		.name		= "pwm_b",
+		.name		= "PWM<B>",
 		.pwm_id		= 1,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
 	},
 	{
-		.name		= "pwm_c",
+		.name		= "PWM<C>",
 		.pwm_id		= 2,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
 	},
 	{
-		.name		= "pwm_d",
+		.name		= "PWM<D>",
 		.pwm_id		= 3,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
@@ -419,8 +723,12 @@ static struct platform_device tegra_rtc_device = {
 #if defined(CONFIG_SPI_TEGRA) && defined(CONFIG_SPI_SPIDEV)
 static struct spi_board_info tegra_spi_devices[] __initdata = {
 	{
-		.bus_num	= 0,		/* SPI1 */
+		.bus_num	= 0,		/* SPI1: Colibri SSP */
+#if !defined(CONFIG_CAN_MCP251X) && !defined(CONFIG_CAN_MCP251X_MODULE)
 		.chip_select	= 0,
+#else /* !CONFIG_CAN_MCP251X & !CONFIG_CAN_MCP251X_MODULE */
+		.chip_select	= 1,
+#endif /* !CONFIG_CAN_MCP251X & !CONFIG_CAN_MCP251X_MODULE */
 		.irq		= 0,
 		.max_speed_hz	= 50000000,
 		.modalias	= "spidev",
@@ -602,7 +910,8 @@ static void thermd_alert_work_func(struct work_struct *work)
 	if (!colibri_t30_low_edge && temp <= colibri_t30_low_limit) {
 		colibri_t30_alert_func(colibri_t30_alert_data);
 		colibri_t30_low_edge = 1;
-	} else if (colibri_t30_low_edge && temp > colibri_t30_low_limit + colibri_t30_low_hysteresis) {
+	} else if (colibri_t30_low_edge && temp > colibri_t30_low_limit +
+						  colibri_t30_low_hysteresis) {
 		colibri_t30_low_edge = 0;
 	}
 
@@ -610,7 +919,7 @@ static void thermd_alert_work_func(struct work_struct *work)
 	if (thermd_alert_irq_disabled) {
 		colibri_t30_alert_func(colibri_t30_alert_data);
 		thermd_alert_irq_disabled = 0;
-		enable_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT));
+		enable_irq(gpio_to_irq(THERMD_ALERT));
 	}
 
 	/* Keep re-scheduling */
@@ -642,7 +951,8 @@ static int lm95245_set_limits(void *_data,
 {
 	struct device *lm95245_device = _data;
 	colibri_t30_low_limit = lo_limit_milli;
-	if (lm95245_device) lm95245_set_remote_os_limit(lm95245_device, hi_limit_milli);
+	if (lm95245_device) lm95245_set_remote_os_limit(lm95245_device,
+							hi_limit_milli);
 	return 0;
 }
 
@@ -659,7 +969,8 @@ static int lm95245_set_alert(void *_data,
 static int lm95245_set_shutdown_temp(void *_data, long shutdown_temp)
 {
 	struct device *lm95245_device = _data;
-	if (lm95245_device) lm95245_set_remote_critical_limit(lm95245_device, shutdown_temp);
+	if (lm95245_device) lm95245_set_remote_critical_limit(lm95245_device,
+							      shutdown_temp);
 	return 0;
 }
 
@@ -718,9 +1029,14 @@ static void lm95245_probe_callback(struct device *dev)
 	}
 #endif /* CONFIG_TEGRA_SKIN_THROTTLE */
 
-	if (request_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT), thermd_alert_irq,
+	if (request_irq(gpio_to_irq(THERMD_ALERT), thermd_alert_irq,
 			IRQF_TRIGGER_LOW, "THERMD_ALERT", NULL))
-		pr_err("%s: unable to register THERMD_ALERT interrupt\n", __func__);
+		pr_err("%s: unable to register THERMD_ALERT interrupt\n",
+		       __func__);
+
+	//initalize the local temp limit
+	if(dev)
+		lm95245_set_local_shared_os__critical_limit(dev, TCRIT_LOCAL);
 }
 
 static void colibri_t30_thermd_alert_init(void)
@@ -736,9 +1052,9 @@ static void colibri_t30_thermd_alert_init(void)
 /* UART */
 
 static struct platform_device *colibri_t30_uart_devices[] __initdata = {
-	&tegra_uarta_device, /* FF */
-	&tegra_uartb_device, /* STD */
-	&tegra_uartd_device, /* BT */
+	&tegra_uarta_device, /* Colibri FFUART */
+	&tegra_uartd_device, /* Colibri BTUART */
+	&tegra_uartb_device, /* Colibri STDUART */
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
@@ -773,7 +1089,7 @@ static void __init uart_debug_init(void)
 	case 1:
 		/* UARTB is the debug port. */
 		pr_info("Selecting UARTB as the debug console\n");
-		colibri_t30_uart_devices[1] = &debug_uartb_device;
+		colibri_t30_uart_devices[2] = &debug_uartb_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uartb");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
 			debug_uartb_device.dev.platform_data))->mapbase;
@@ -782,14 +1098,15 @@ static void __init uart_debug_init(void)
 	case 3:
 		/* UARTD is the debug port. */
 		pr_info("Selecting UARTD as the debug console\n");
-		colibri_t30_uart_devices[2] = &debug_uartd_device;
+		colibri_t30_uart_devices[1] = &debug_uartd_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uartd");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
 			debug_uartd_device.dev.platform_data))->mapbase;
 		break;
 
 	default:
-		pr_info("The debug console id %d is invalid, Assuming UARTA", debug_port_id);
+		pr_info("The debug console id %d is invalid, Assuming UARTA",
+			debug_port_id);
 		colibri_t30_uart_devices[0] = &debug_uarta_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
@@ -1020,8 +1337,6 @@ error:
 
 static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 {
-	kfree(pdev->dev.platform_data);
-	pdev->dev.platform_data = NULL;
 	platform_device_unregister(pdev);
 }
 
@@ -1127,7 +1442,6 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
 #endif
-
 	&tegra_ahub_device,
 	&tegra_dam_device0,
 	&tegra_dam_device1,
@@ -1137,11 +1451,10 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 	&spdif_dit_device,
 	&tegra_pcm_device,
 	&colibri_t30_audio_sgtl5000_device,
-
-	&tegra_cec_device,
-#if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
-	&tegra_aes_device,
+#ifdef CONFIG_ANDROID
+	&tegra_hda_device,
 #endif
+	&tegra_cec_device,
 #ifdef CONFIG_KEYBOARD_GPIO
 	&colibri_t30_keys_device,
 #endif
@@ -1161,6 +1474,13 @@ static void __init colibri_t30_init(void)
 				ARRAY_SIZE(throttle_list));
 	tegra_clk_init_from_table(colibri_t30_clk_init_table);
 	colibri_t30_pinmux_init();
+#if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
+	writel(TEGRA_SNOR_CONFIG_SNOR_CS(4), TEGRA_SNOR_CONFIG_REG);
+	writel(TEGRA_SNOR_CONFIG_GO | TEGRA_SNOR_CONFIG_SNOR_CS(4), TEGRA_SNOR_CONFIG_REG);
+	colibri_can_resource[1].start	= gpio_to_irq(TEGRA_GPIO_PS0);
+	colibri_can_resource[1].end	= gpio_to_irq(TEGRA_GPIO_PS0);
+	platform_device_register(&colibri_can_device);
+#endif /* CONFIG_CAN_SJA1000 | CONFIG_CAN_SJA1000_MODULE */
 	colibri_t30_thermd_alert_init();
 	colibri_t30_i2c_init();
 	colibri_t30_spi_init();
@@ -1182,6 +1502,18 @@ static void __init colibri_t30_init(void)
 //	colibri_t30_sensors_init();
 	colibri_t30_emc_init();
 	colibri_t30_register_spidev();
+	colibri_t20_mcp2515_can_init();
+	colibri_t30_gpio_init();
+
+#if defined(CONFIG_VIDEO_TEGRA) || defined(CONFIG_VIDEO_TEGRA_MODULE)
+	t30_get_tegra_vi01_device()->dev.platform_data = &tegra_camera_platform_data;
+#if defined(CONFIG_SOC_CAMERA_MAX9526) || defined(CONFIG_SOC_CAMERA_MAX9526_MODULE)
+	platform_device_register(&soc_camera_max9526);
+#endif
+#if defined(CONFIG_VIDEO_ADV7180) || defined(CONFIG_VIDEO_ADV7180_MODULE)
+	platform_device_register(&soc_camera_adv7180);
+#endif
+#endif /* CONFIG_VIDEO_TEGRA | CONFIG_VIDEO_TEGRA_MODULE */
 
 	tegra_release_bootloader_fb();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
@@ -1210,7 +1542,11 @@ static const char *colibri_t30_dt_board_compat[] = {
 	NULL
 };
 
+#ifdef CONFIG_ANDROID
+MACHINE_START(COLIBRI_T30, "cardhu")
+#else
 MACHINE_START(COLIBRI_T30, "Toradex Colibri T30")
+#endif
 	.boot_params	= 0x80000100,
 	.dt_compat	= colibri_t30_dt_board_compat,
 	.init_early	= tegra_init_early,

@@ -77,8 +77,9 @@ static int apalis_t30_backlight_notify(struct device *dev, int brightness)
 
 	gpio_set_value(apalis_t30_bl_enb, !!brightness);
 
-	/* unified TFT interface displays (e.g. EDT ET070080DH6) LEDCTRL pin
-	   with inverted behaviour (e.g. 0V brightest vs. 3.3V darkest) */
+	/* Unified TFT interface displays (e.g. EDT ET070080DH6) LEDCTRL pin
+	   with inverted behaviour (e.g. 0V brightest vs. 3.3V darkest)
+	   Note: brightness polarity display model specific */
 	if (brightness)	return pdata->max_brightness - brightness;
 	else return brightness;
 }
@@ -258,7 +259,6 @@ static struct tegra_dc_mode apalis_t30_panel_modes[] = {
 		.h_front_porch	= 16,		/* right_margin */
 		.v_front_porch	= 10,		/* lower_margin */
 	},
-#else /* TEGRA_FB_VGA */
 	{
 		/* 800x480@60 (e.g. EDT ET070080DH6) */
 		.pclk		= 32460000,
@@ -284,6 +284,19 @@ static struct tegra_dc_mode apalis_t30_panel_modes[] = {
 		.v_active	= 600,
 		.h_front_porch	= 16,
 		.v_front_porch	= 1,
+	},
+	{
+		/* TouchRevolution Fusion 10 aka Chunghwa Picture Tubes
+		   CLAA101NC05 10.1 inch 1024x600 single channel LVDS panel */
+		.pclk		= 48000000,
+		.h_sync_width	= 5,
+		.v_sync_width	= 5,
+		.h_back_porch	= 104,
+		.v_back_porch	= 24,
+		.h_active	= 1024,
+		.v_active	= 600,
+		.h_front_porch	= 43,
+		.v_front_porch	= 20,
 	},
 	{
 		/* 1024x768@60 */
@@ -396,6 +409,20 @@ static struct tegra_dc_mode apalis_t30_panel_modes[] = {
 		.v_front_porch	= 1,
 //high active vertical sync polarity
 	},
+#else /* TEGRA_FB_VGA */
+	{
+		/* LG LP156WF1 15.6 inch full HD dual channel LVDS panel */
+		.pclk		= 138500000,
+		.h_sync_width	= 32,
+		.v_sync_width	= 5,
+		.h_back_porch	= 80,
+		.v_back_porch	= 46,
+		.h_active	= 1920,
+		.v_active	= 1080,
+		.h_front_porch	= 48,
+		.v_front_porch	= 6,
+		//low active sync polarities, high pixel clock polarity
+	},
 	{
 		/* 1920x1080p 59.94/60hz EIA/CEA-861-B Format 16 */
 		.pclk		= 148500000,
@@ -476,8 +503,8 @@ static struct tegra_fb_data apalis_t30_fb_data = {
 	.xres		= 640,
 	.yres		= 480,
 #else /* TEGRA_FB_VGA */
-	.xres		= 800,
-	.yres		= 480,
+	.xres		= 1920,
+	.yres		= 1080,
 #endif /* TEGRA_FB_VGA */
 	.bits_per_pixel	= 16,
 	.flags		= TEGRA_FB_FLIP_ON_PROBE,
@@ -513,7 +540,7 @@ static struct tegra_dc_out apalis_t30_disp1_out = {
 
 	.align			= TEGRA_DC_ALIGN_MSB,
 	.order			= TEGRA_DC_ORDER_RED_BLUE,
-	.depth			= 18,
+	.depth			= 24,
 	.dither			= TEGRA_DC_ORDERED_DITHER,
 
 	.modes			= apalis_t30_panel_modes,

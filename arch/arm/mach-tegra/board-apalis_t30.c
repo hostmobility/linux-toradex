@@ -38,6 +38,9 @@
 #include <mach/usb_phy.h>
 #include <mach/w1.h>
 
+#include <media/soc_camera.h>
+#include <media/tegra_v4l2_camera.h>
+
 #include "board-apalis_t30.h"
 #include "board.h"
 #include "clock.h"
@@ -64,7 +67,9 @@ static struct tegra_asoc_platform_data apalis_t30_audio_sgtl5000_pdata = {
 	.gpio_int_mic_en	= -1,
 	.gpio_ext_mic_en	= -1,
 	.i2s_param[HIFI_CODEC] = {
-		.audio_port_id	= 2,
+		.audio_port_id	= 1, /* index of below registered
+					tegra_i2s_device plus one if HDA codec
+					is activated as well */
 		.i2s_mode	= TEGRA_DAIFMT_I2S,
 		.is_i2s_master	= 1,
 		.sample_size	= 16,
@@ -85,13 +90,73 @@ static struct platform_device apalis_t30_audio_sgtl5000_device = {
 	},
 };
 
-#ifdef CONFIG_TEGRA_CAMERA
 /* Camera */
+
+#ifdef CONFIG_TEGRA_CAMERA
 static struct platform_device tegra_camera = {
 	.name	= "tegra_camera",
 	.id	= -1,
 };
 #endif /* CONFIG_TEGRA_CAMERA */
+
+#if defined(CONFIG_VIDEO_TEGRA) || defined(CONFIG_VIDEO_TEGRA_MODULE)
+static void tegra_camera_disable(struct nvhost_device *ndev)
+{
+}
+
+static int tegra_camera_enable(struct nvhost_device *ndev)
+{
+	return 0;
+}
+
+static struct tegra_camera_platform_data tegra_camera_platform_data = {
+	.disable_camera	= tegra_camera_disable,
+	.enable_camera	= tegra_camera_enable,
+	.flip_h		= 0,
+	.flip_v		= 0,
+	.port		= TEGRA_CAMERA_PORT_VIP,
+};
+
+#if defined(CONFIG_SOC_CAMERA_MAX9526) || defined(CONFIG_SOC_CAMERA_MAX9526_MODULE)
+static struct i2c_board_info camera_i2c_max9526 = {
+	I2C_BOARD_INFO("max9526", 0x21),
+};
+
+static struct soc_camera_link iclink_max9526 = {
+	.board_info	= &camera_i2c_max9526,
+	.bus_id		= -1, /* This must match the .id of tegra_vi01_device */
+	.i2c_adapter_id	= 2,
+};
+
+static struct platform_device soc_camera_max9526 = {
+	.name	= "soc-camera-pdrv",
+	.id	= 0,
+	.dev	= {
+		.platform_data = &iclink_max9526,
+	},
+};
+#endif /* CONFIG_SOC_CAMERA_MAX9526 | CONFIG_SOC_CAMERA_MAX9526_MODULE */
+
+#if defined(CONFIG_VIDEO_ADV7180) || defined(CONFIG_VIDEO_ADV7180_MODULE)
+static struct i2c_board_info camera_i2c_adv7180 = {
+        I2C_BOARD_INFO("adv7180", 0x21),
+};
+
+static struct soc_camera_link iclink_adv7180 = {
+        .board_info     = &camera_i2c_adv7180,
+        .bus_id         = -1, /* This must match the .id of tegra_vi01_device */
+        .i2c_adapter_id = 2,
+};
+
+static struct platform_device soc_camera_adv7180 = {
+        .name   = "soc-camera-pdrv",
+        .id     = 1,
+        .dev    = {
+                .platform_data = &iclink_adv7180,
+        },
+};
+#endif /* CONFIG_VIDEO_ADV7180 | CONFIG_VIDEO_ADV7180_MODULE */
+#endif /* CONFIG_VIDEO_TEGRA | CONFIG_VIDEO_TEGRA_MODULE */
 
 /* CAN */
 
@@ -119,14 +184,14 @@ static struct spi_board_info can_board_info[] = {
 	},
 };
 
-static void __init apalis_t20_mcp2515_can_init(void)
+static void __init apalis_t30_mcp2515_can_init(void)
 {
 	can_board_info[0].irq = gpio_to_irq(CAN1_INT);
 	can_board_info[1].irq = gpio_to_irq(CAN2_INT);
 	spi_register_board_info(can_board_info, ARRAY_SIZE(can_board_info));
 }
 #else /* CONFIG_CAN_MCP251X | CONFIG_CAN_MCP251X_MODULE */
-#define apalis_t20_mcp2515_can_init() do {} while (0)
+#define apalis_t30_mcp2515_can_init() do {} while (0)
 #endif /* CONFIG_CAN_MCP251X | CONFIG_CAN_MCP251X_MODULE */
 
 /* CEC */
@@ -144,11 +209,8 @@ static struct tegra_clk_init_table apalis_t30_clk_init_table[] __initdata = {
 	{"dam0",	"clk_m",	12000000,	false},
 	{"dam1",	"clk_m",	12000000,	false},
 	{"dam2",	"clk_m",	12000000,	false},
-
-//required?
-	{"hda",	"pll_p",	108000000,	false},
+	{"hda",		"pll_p",	108000000,	false},
 	{"hda2codec_2x","pll_p",	48000000,	false},
-
 	{"i2c1",	"pll_p",	3200000,	false},
 	{"i2c2",	"pll_p",	3200000,	false},
 	{"i2c3",	"pll_p",	3200000,	false},
@@ -168,7 +230,36 @@ static struct tegra_clk_init_table apalis_t30_clk_init_table[] __initdata = {
 
 /* GPIO */
 
-//TODO: sysfs GPIO exports
+static struct gpio apalis_t30_gpios[] = {
+	{TEGRA_GPIO_PBB0,	GPIOF_IN,	"LVDS: Single/Dual Ch"},
+	{TEGRA_GPIO_PBB3,	GPIOF_IN,	"LVDS: 18/24 Bit Mode"},
+	{TEGRA_GPIO_PBB4,	GPIOF_IN,	"LVDS: Output Enable"},
+	{TEGRA_GPIO_PBB5,	GPIOF_IN,	"LVDS: Power Down"},
+	{TEGRA_GPIO_PBB6,	GPIOF_IN,	"LVDS: Clock Polarity"},
+	{TEGRA_GPIO_PBB7,	GPIOF_IN,	"LVDS: Colour Mapping"},
+	{TEGRA_GPIO_PCC1,	GPIOF_IN,	"LVDS: Swing Mode"},
+	{TEGRA_GPIO_PCC2,	GPIOF_IN,	"LVDS: DDRclk Disable"},
+};
+
+static void apalis_t30_gpio_init(void)
+{
+	int i = 0;
+	int length = sizeof(apalis_t30_gpios) / sizeof(struct gpio);
+	int err = 0;
+
+	for (i = 0; i < length; i++) {
+		err = gpio_request_one(apalis_t30_gpios[i].gpio,
+				       apalis_t30_gpios[i].flags,
+				       apalis_t30_gpios[i].label);
+
+		if (err) {
+			pr_warning("gpio_request(%s) failed, err = %d",
+				   apalis_t30_gpios[i].label, err);
+		} else {
+			gpio_export(apalis_t30_gpios[i].gpio, true);
+		}
+	}
+}
 
 /* I2C */
 
@@ -227,7 +318,8 @@ static struct stmpe_ts_platform_data stmpe811_ts_data = {
 	.adc_freq		= 1, /* 3.25 MHz ADC clock speed */
 	.ave_ctrl		= 3, /* 8 sample average control */
 	.fraction_z		= 7, /* 7 length fractional part in z */
-	.i_drive		= 1, /* 50 mA typical 80 mA max touchscreen drivers current limit value */
+	.i_drive		= 1, /* 50 mA typical 80 mA max touchscreen
+					drivers current limit value */
 	.mod_12b		= 1, /* 12-bit ADC */
 	.ref_sel		= 0, /* internal ADC reference */
 	.sample_time		= 4, /* ADC converstion time: 80 clocks */
@@ -259,7 +351,6 @@ static struct i2c_board_info apalis_t30_i2c_bus5_board_info[] __initdata = {
 		/* STMPE811 touch screen controller */
 		I2C_BOARD_INFO("stmpe", 0x41),
 			.flags = I2C_CLIENT_WAKE,
-			.irq = TEGRA_GPIO_TO_IRQ(TOUCH_PEN_INT),
 			.platform_data = &stmpe811_data,
 			.type = "stmpe811",
 	},
@@ -292,13 +383,16 @@ static void __init apalis_t30_i2c_init(void)
 	platform_device_register(&tegra_i2c_device4);
 	platform_device_register(&tegra_i2c_device5);
 
-	i2c_register_board_info(0, apalis_t30_i2c_bus1_board_info, ARRAY_SIZE(apalis_t30_i2c_bus1_board_info));
+	i2c_register_board_info(0, apalis_t30_i2c_bus1_board_info,
+				ARRAY_SIZE(apalis_t30_i2c_bus1_board_info));
 
 	/* enable touch interrupt GPIO */
 	gpio_request(TOUCH_PEN_INT, "TOUCH_PEN_INT");
 	gpio_direction_input(TOUCH_PEN_INT);
 
-	i2c_register_board_info(4, apalis_t30_i2c_bus5_board_info, ARRAY_SIZE(apalis_t30_i2c_bus5_board_info));
+	apalis_t30_i2c_bus5_board_info[1].irq = gpio_to_irq(TOUCH_PEN_INT);
+	i2c_register_board_info(4, apalis_t30_i2c_bus5_board_info,
+				ARRAY_SIZE(apalis_t30_i2c_bus5_board_info));
 }
 
 /* IrDA */
@@ -324,8 +418,6 @@ static struct tegra_sdhci_platform_data apalis_t30_emmc_platform_data = {
 };
 
 static struct tegra_sdhci_platform_data apalis_t30_mmccard_platform_data = {
-//GPIO tested with GPIOConfig but interrupt not working
-//even 8-bit cards work if plugged during boot
 	.cd_gpio	= MMC1_CD_N,
 	.ddr_clk_limit	= 52000000,
 	.is_8bit	= 1,
@@ -361,6 +453,17 @@ static void __init apalis_t30_sdhci_init(void)
 
 /* PCIe */
 
+/* The Apalis evaluation board needs to set the link speed to 2.5 GT/s (GEN1).
+   The default link speed setting is 5 GT/s (GEN2). 0x98 is the Link Control 2
+   PCIe Capability Register of the PEX8605 PCIe switch. The switch supports
+   link speed auto negotiation, but falsely sets the link speed to 5 GT/s. */
+static void __devinit quirk_apalis_plx_gen1(struct pci_dev *dev)
+{
+	pci_write_config_dword(dev, 0x98, 0x01);
+	mdelay(50);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLX, 0x8605, quirk_apalis_plx_gen1);
+
 static struct tegra_pci_platform_data apalis_t30_pci_platform_data = {
 	.port_status[0]		= 1,
 	.port_status[1]		= 1,
@@ -371,6 +474,20 @@ static struct tegra_pci_platform_data apalis_t30_pci_platform_data = {
 
 static void apalis_t30_pci_init(void)
 {
+	/* Reset PLX PEX 8605 PCIe Switch plus PCIe devices on Apalis Evaluation
+	   Board */
+	gpio_request(PEX_PERST_N, "PEX_PERST_N");
+	gpio_request(RESET_MOCI_N, "RESET_MOCI_N");
+	gpio_direction_output(PEX_PERST_N, 0);
+	gpio_direction_output(RESET_MOCI_N, 0);
+	/* Must be asserted for 100 ms after power and clocks are stable */
+	msleep(100);
+	gpio_set_value(PEX_PERST_N, 1);
+	/* Err_5: PEX_REFCLK_OUTpx/nx Clock Outputs is not Guaranteed Until
+	   900 us After PEX_PERST# De-assertion */
+	msleep(1);
+	gpio_set_value(RESET_MOCI_N, 1);
+
 	tegra_pci_device.dev.platform_data = &apalis_t30_pci_platform_data;
 	platform_device_register(&tegra_pci_device);
 }
@@ -668,7 +785,8 @@ static void thermd_alert_work_func(struct work_struct *work)
 	if (!apalis_t30_low_edge && temp <= apalis_t30_low_limit) {
 		apalis_t30_alert_func(apalis_t30_alert_data);
 		apalis_t30_low_edge = 1;
-	} else if (apalis_t30_low_edge && temp > apalis_t30_low_limit + apalis_t30_low_hysteresis) {
+	} else if (apalis_t30_low_edge && temp > apalis_t30_low_limit +
+						 apalis_t30_low_hysteresis) {
 		apalis_t30_low_edge = 0;
 	}
 
@@ -676,7 +794,7 @@ static void thermd_alert_work_func(struct work_struct *work)
 	if (thermd_alert_irq_disabled) {
 		apalis_t30_alert_func(apalis_t30_alert_data);
 		thermd_alert_irq_disabled = 0;
-		enable_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT_N));
+		enable_irq(gpio_to_irq(THERMD_ALERT_N));
 	}
 
 	/* Keep re-scheduling */
@@ -708,7 +826,8 @@ static int lm95245_set_limits(void *_data,
 {
 	struct device *lm95245_device = _data;
 	apalis_t30_low_limit = lo_limit_milli;
-	if (lm95245_device) lm95245_set_remote_os_limit(lm95245_device, hi_limit_milli);
+	if (lm95245_device) lm95245_set_remote_os_limit(lm95245_device,
+							hi_limit_milli);
 	return 0;
 }
 
@@ -725,7 +844,8 @@ static int lm95245_set_alert(void *_data,
 static int lm95245_set_shutdown_temp(void *_data, long shutdown_temp)
 {
 	struct device *lm95245_device = _data;
-	if (lm95245_device) lm95245_set_remote_critical_limit(lm95245_device, shutdown_temp);
+	if (lm95245_device) lm95245_set_remote_critical_limit(lm95245_device,
+							      shutdown_temp);
 	return 0;
 }
 
@@ -784,9 +904,14 @@ static void lm95245_probe_callback(struct device *dev)
 	}
 #endif /* CONFIG_TEGRA_SKIN_THROTTLE */
 
-	if (request_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT_N), thermd_alert_irq,
+	if (request_irq(gpio_to_irq(THERMD_ALERT_N), thermd_alert_irq,
 			IRQF_TRIGGER_LOW, "THERMD_ALERT_N", NULL))
-		pr_err("%s: unable to register THERMD_ALERT_N interrupt\n", __func__);
+		pr_err("%s: unable to register THERMD_ALERT_N interrupt\n",
+		       __func__);
+
+	//initalize the local temp limit
+	if(dev)
+		lm95245_set_local_shared_os__critical_limit(dev, TCRIT_LOCAL);
 }
 
 static void apalis_t30_thermd_alert_init(void)
@@ -794,7 +919,8 @@ static void apalis_t30_thermd_alert_init(void)
 	gpio_request(THERMD_ALERT_N, "THERMD_ALERT_N");
 	gpio_direction_input(THERMD_ALERT_N);
 
-	thermd_alert_workqueue = create_singlethread_workqueue("THERMD_ALERT_N");
+	thermd_alert_workqueue = create_singlethread_workqueue("THERMD_ALERT_N"
+							      );
 
 	INIT_WORK(&thermd_alert_work, thermd_alert_work_func);
 }
@@ -865,7 +991,8 @@ static void __init uart_debug_init(void)
 		break;
 
 	default:
-		pr_info("The debug console id %d is invalid, Assuming UARTA", debug_port_id);
+		pr_info("The debug console id %d is invalid, Assuming UARTA",
+			debug_port_id);
 		apalis_t30_uart_devices[0] = &debug_uarta_device;
 		debug_uart_clk = clk_get_sys("serial8250.0", "uarta");
 		debug_uart_port_base = ((struct plat_serial8250_port *)(
@@ -1102,7 +1229,6 @@ static struct platform_device *apalis_t30_devices[] __initdata = {
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
 #endif
-
 	&tegra_ahub_device,
 	&tegra_dam_device0,
 	&tegra_dam_device1,
@@ -1112,11 +1238,8 @@ static struct platform_device *apalis_t30_devices[] __initdata = {
 	&spdif_dit_device,
 	&tegra_pcm_device,
 	&apalis_t30_audio_sgtl5000_device,
-
+	&tegra_hda_device,
 	&tegra_cec_device,
-#if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
-	&tegra_aes_device,
-#endif
 #ifdef CONFIG_KEYBOARD_GPIO
 //	&apalis_t30_keys_device,
 #endif
@@ -1147,7 +1270,8 @@ static void __init apalis_t30_init(void)
 #ifdef CONFIG_W1_MASTER_TEGRA
 	tegra_w1_device.dev.platform_data = &apalis_t30_w1_platform_data;
 #endif
-	platform_add_devices(apalis_t30_devices, ARRAY_SIZE(apalis_t30_devices));
+	platform_add_devices(apalis_t30_devices, ARRAY_SIZE(apalis_t30_devices)
+			    );
 	tegra_ram_console_debug_init();
 	tegra_io_dpd_init();
 	apalis_t30_sdhci_init();
@@ -1159,13 +1283,24 @@ static void __init apalis_t30_init(void)
 	apalis_t30_emc_init();
 	apalis_t30_register_spidev();
 
+#if defined(CONFIG_VIDEO_TEGRA) || defined(CONFIG_VIDEO_TEGRA_MODULE)
+	t30_get_tegra_vi01_device()->dev.platform_data = &tegra_camera_platform_data;
+#if defined(CONFIG_SOC_CAMERA_MAX9526) || defined(CONFIG_SOC_CAMERA_MAX9526_MODULE)
+	platform_device_register(&soc_camera_max9526);
+#endif
+#if defined(CONFIG_VIDEO_ADV7180) || defined(CONFIG_VIDEO_ADV7180_MODULE)
+	platform_device_register(&soc_camera_adv7180);
+#endif
+#endif /* CONFIG_VIDEO_TEGRA | CONFIG_VIDEO_TEGRA_MODULE */
+
 	tegra_release_bootloader_fb();
 	apalis_t30_pci_init();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
 	tegra_wdt_recovery_init();
 #endif
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
-	apalis_t20_mcp2515_can_init();
+	apalis_t30_mcp2515_can_init();
+	apalis_t30_gpio_init();
 }
 
 static void __init apalis_t30_reserve(void)

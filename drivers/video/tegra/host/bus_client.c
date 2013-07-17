@@ -611,6 +611,7 @@ fail:
 	nvhost_free_channel(ch);
 	return err;
 }
+EXPORT_SYMBOL(nvhost_client_device_init);
 
 int nvhost_client_device_suspend(struct nvhost_device *dev)
 {
@@ -658,3 +659,17 @@ fail:
 
 	return -ENXIO;
 }
+EXPORT_SYMBOL(nvhost_client_device_get_resources);
+
+void nvhost_client_device_put_resources(struct nvhost_device *dev)
+{
+	struct resource *r;
+
+	r = nvhost_get_resource(dev, IORESOURCE_MEM, 0);
+	BUG_ON(!r);
+
+	iounmap(dev->aperture);
+
+	release_mem_region(r->start, resource_size(r));
+}
+EXPORT_SYMBOL(nvhost_client_device_put_resources);

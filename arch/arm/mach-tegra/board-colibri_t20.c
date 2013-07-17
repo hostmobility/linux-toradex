@@ -1047,7 +1047,7 @@ static void thermd_alert_work_func(struct work_struct *work)
 	/* Avoid unbalanced enable for IRQ 367 */
 	if (thermd_alert_irq_disabled) {
 		thermd_alert_irq_disabled = 0;
-		enable_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT));
+		enable_irq(gpio_to_irq(THERMD_ALERT));
 	}
 }
 
@@ -1067,7 +1067,7 @@ static void lm95245_probe_callback(struct device *dev)
 
 	lm95245_set_remote_os_limit(lm95245_device, colibri_t20_throttle_temp);
 
-	if (request_irq(TEGRA_GPIO_TO_IRQ(THERMD_ALERT), thermd_alert_irq,
+	if (request_irq(gpio_to_irq(THERMD_ALERT), thermd_alert_irq,
 			IRQF_TRIGGER_LOW, "THERMD_ALERT", NULL))
 		pr_err("%s: unable to register THERMD_ALERT interrupt\n", __func__);
 }
@@ -1450,8 +1450,6 @@ error:
 
 static void tegra_usb_otg_host_unregister(struct platform_device *pdev)
 {
-	kfree(pdev->dev.platform_data);
-	pdev->dev.platform_data = NULL;
 	platform_device_unregister(pdev);
 }
 
