@@ -121,6 +121,7 @@ struct tegra_sdhci_host {
 	bool is_rail_enabled;
 	struct clk *emc_clk;
 	unsigned int emc_max_clk;
+	struct device_attribute sd_detect_attr;
 };
 
 static u32 tegra_sdhci_readl(struct sdhci_host *host, int reg)
@@ -952,13 +953,65 @@ static struct sdhci_pltfm_data sdhci_tegra_pdata = {
 	.ops  = &tegra_sdhci_ops,
 };
 
+static ssize_t write_sd_detect_mode (struct device *dev, 
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long value;
+	struct sdhci_host *sdhost = platform_get_drvdata(to_platform_device(dev));
+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhost);
+	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
+	struct platform_device *pdev = to_platform_device(mmc_dev(sdhost->mmc));
+	struct tegra_sdhci_platform_data *plat;
+
+
+	if (strict_strtoul (buf, 10, &value) < 0){
+		return -EINVAL;
+	}
+
+	plat = pdev->dev.platform_data;
+
+	tegra_host->card_present = value;
+
+	if (tegra_host->card_present) {
+		if (!tegra_host->is_rail_enabled) {
+			if (tegra_host->vdd_slot_reg)
+				regulator_enable(tegra_host->vdd_slot_reg);
+			if (tegra_host->vdd_io_reg)
+				regulator_enable(tegra_host->vdd_io_reg);
+			tegra_host->is_rail_enabled = 1;
+		}
+	} else {
+		if (tegra_host->is_rail_enabled) {
+			if (tegra_host->vdd_io_reg)
+				regulator_disable(tegra_host->vdd_io_reg);
+			if (tegra_host->vdd_slot_reg)
+				regulator_disable(tegra_host->vdd_slot_reg);
+			tegra_host->is_rail_enabled = 0;
+                }
+	}
+
+	tasklet_schedule(&sdhost->card_tasklet);			
+
+	return count;
+}
+
+static int create_name_attr(struct tegra_sdhci_host *tegra_host,
+                                       struct device *dev){
+
+    sysfs_attr_init(&tegra_host->sd_detect_attr.attr);
+    tegra_host->sd_detect_attr.attr.name = "sd_detect";
+    tegra_host->sd_detect_attr.attr.mode = S_IWUGO;
+    tegra_host->sd_detect_attr.store = write_sd_detect_mode;
+    return device_create_file(dev, &tegra_host->sd_detect_attr);
+}
+
 static int __devinit sdhci_tegra_probe(struct platform_device *pdev)
 {
 	struct sdhci_pltfm_host *pltfm_host;
 	struct tegra_sdhci_platform_data *plat;
 	struct sdhci_host *host;
 	struct tegra_sdhci_host *tegra_host;
-	struct clk *clk;
+	struct clk *clk;	
 	int rc;
 
 	host = sdhci_pltfm_init(pdev, &sdhci_tegra_pdata);
@@ -967,7 +1020,7 @@ static int __devinit sdhci_tegra_probe(struct platform_device *pdev)
 
 	pltfm_host = sdhci_priv(host);
 
-	plat = pdev->dev.platform_data;
+	plat = pdev->dev.platform_data;	
 
 	if (plat == NULL) {
 		dev_err(mmc_dev(host->mmc), "missing platform data\n");
@@ -990,6 +1043,10 @@ static int __devinit sdhci_tegra_probe(struct platform_device *pdev)
 			plat->mmc_data.embedded_sdio->funcs,
 			plat->mmc_data.embedded_sdio->num_funcs);
 #endif
+
+	rc = create_name_attr(tegra_host, &pdev->dev);
+	if (rc)
+		dev_err(&pdev->dev, "Failed to create sd_detect attribute (%d)\n", rc);
 
 	if (gpio_is_valid(plat->power_gpio)) {
 		rc = gpio_request(plat->power_gpio, "sdhci_power");
@@ -1192,12 +1249,14 @@ static int __devexit sdhci_tegra_remove(struct platform_device *pdev)
 	struct sdhci_host *host = platform_get_drvdata(pdev);
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 	struct tegra_sdhci_host *tegra_host = pltfm_host->priv;
-	struct tegra_sdhci_platform_data *plat;
+	struct tegra_sdhci_platform_data *plat;	
 	int dead = (readl(host->ioaddr + SDHCI_INT_STATUS) == 0xffffffff);
 
 	sdhci_remove_host(host, dead);
 
-	plat = pdev->dev.platform_data;
+	plat = pdev->dev.platform_data;	
+
+	device_remove_file(&pdev->dev, &tegra_host->sd_detect_attr);
 
 	disable_irq_wake(gpio_to_irq(plat->cd_gpio));
 
