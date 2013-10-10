@@ -377,9 +377,11 @@ static int l3g4200d_enable(struct l3g4200d_data *gyro)
 
                 err = l3g4200d_device_power_on(gyro);
                 if (err < 0) {
+                    if (gyro->regulator){
                         regulator_disable(gyro->regulator);
-                        gyro->hw_initialized = false;
-                        goto err0;
+                    }
+                    gyro->hw_initialized = false;
+                    goto err0;
                 }
 
                 /* do not report noise at IC power-up
