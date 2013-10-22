@@ -33,6 +33,12 @@
 #define DRIVER_NAME "adv7180"
 
 #define ADV7180_INPUT_CONTROL_REG			0x00
+#define ADV7180_INPUT_CONTROL_COMPOSITE_IN1		0x00
+#define ADV7180_INPUT_CONTROL_COMPOSITE_IN2		0x01
+#define ADV7180_INPUT_CONTROL_COMPOSITE_IN3		0x02
+#define ADV7180_INPUT_CONTROL_COMPOSITE_IN4		0x03
+#define ADV7180_INPUT_CONTROL_COMPOSITE_IN5		0x04
+#define ADV7180_INPUT_CONTROL_COMPOSITE_IN6		0x05
 #define ADV7180_INPUT_CONTROL_AD_PAL_BG_NTSC_J_SECAM	0x00
 #define ADV7180_INPUT_CONTROL_AD_PAL_BG_NTSC_M_SECAM	0x10
 #define ADV7180_INPUT_CONTROL_AD_PAL_N_NTSC_J_SECAM	0x20
@@ -99,6 +105,7 @@ struct adv7180_state {
 	int			irq;
 	v4l2_std_id		curr_norm;
 	bool			autodetect;
+	int			active_input;
 };
 
 static v4l2_std_id adv7180_std_to_v4l2(u8 status1)
@@ -226,14 +233,18 @@ static int adv7180_s_std(struct v4l2_subdev *sd, v4l2_std_id std)
 	if (std == V4L2_STD_ALL) {
 		ret = i2c_smbus_write_byte_data(client,
 			ADV7180_INPUT_CONTROL_REG,
-			ADV7180_INPUT_CONTROL_AD_PAL_BG_NTSC_J_SECAM);
+			ADV7180_INPUT_CONTROL_AD_PAL_BG_NTSC_J_SECAM |
+					(ADV7180_INPUT_CONTROL_COMPOSITE_IN1 +
+					 state->active_input));
 		if (ret < 0)
 			goto out;
 
 		__adv7180_status(client, NULL, &state->curr_norm);
 		state->autodetect = true;
 	} else {
-		ret = v4l2_std_to_adv7180(std);
+		ret = v4l2_std_to_adv7180(std) |
+				(ADV7180_INPUT_CONTROL_COMPOSITE_IN1 +
+				 state->active_input);
 		if (ret < 0)
 			goto out;
 
@@ -305,6 +316,10 @@ static int adv7180_try_fmt(struct v4l2_subdev *sd,
 	mf->code = V4L2_MBUS_FMT_YUYV8_2X8;
 	mf->colorspace = V4L2_COLORSPACE_SRGB;
 
+	// PAL
+	mf->width = 720;
+	mf->height = 576;
+
 	return 0;
 }
 
@@ -375,6 +390,36 @@ static irqreturn_t adv7180_irq(int irq, void *devid)
 	return IRQ_HANDLED;
 }
 
+static int vidioc_s_input(struct file *file, void *priv, unsigned int i) {
+	struct soc_camera_device *icd = file->private_data;
+	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
+	struct adv7180_state *state = to_state(sd);
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	u8 val;
+
+	if (i < 6) {
+		state->active_input = i;
+		val = i2c_smbus_read_byte_data(client,
+				ADV7180_INPUT_CONTROL_REG);
+		val &= 0xf0;
+		val |= (ADV7180_INPUT_CONTROL_COMPOSITE_IN1 +
+			state->active_input);
+		return i2c_smbus_write_byte_data(client,
+				ADV7180_INPUT_CONTROL_REG, val);
+	}
+	return -EINVAL;
+}
+
+static int vidioc_g_input(struct file *file, void *priv, unsigned int *i) {
+	struct soc_camera_device *icd = file->private_data;
+	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
+	struct adv7180_state *state = to_state(sd);
+
+	*i = state->active_input;
+
+	return 0;
+}
+
 /*
  * Generic i2c probe
  * concerning the addresses: i2c wants 7 bit (without the r/w bit), so '>>1'
@@ -388,6 +433,7 @@ static __devinit int adv7180_probe(struct i2c_client *client,
 	struct v4l2_subdev *sd;
 	u8 ident;
 	int ret;
+	struct v4l2_ioctl_ops *ops;
 
 	/* Check if the adapter supports the needed features */
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
@@ -410,6 +456,7 @@ static __devinit int adv7180_probe(struct i2c_client *client,
 	INIT_WORK(&state->work, adv7180_work);
 	mutex_init(&state->mutex);
 	state->autodetect = true;
+	state->active_input = 0; // input 1
 	sd = &state->sd;
 	v4l2_i2c_subdev_init(sd, client, &adv7180_subdev_ops);
 	icd->ops = &adv7180_ops;
@@ -417,7 +464,9 @@ static __devinit int adv7180_probe(struct i2c_client *client,
 	/* Initialize adv7180 */
 	/* Enable autodetection */
 	ret = i2c_smbus_write_byte_data(client, ADV7180_INPUT_CONTROL_REG,
-		ADV7180_INPUT_CONTROL_AD_PAL_BG_NTSC_J_SECAM);
+		ADV7180_INPUT_CONTROL_AD_PAL_BG_NTSC_J_SECAM |
+				(ADV7180_INPUT_CONTROL_COMPOSITE_IN1 +
+				 state->active_input));
 	if (ret < 0)
 		goto err_unreg_subdev;
 
@@ -478,6 +527,15 @@ static __devinit int adv7180_probe(struct i2c_client *client,
 			goto err_unreg_subdev;
 	}
 
+	/*
+	 * this is the only way to support more than one input as soc_camera
+	 * assumes in its own vidioc_s(g)_input implementation that only one
+	 * input is present we have to override that with our own handlers.
+	 */
+	ops = (struct v4l2_ioctl_ops*)icd->vdev->ioctl_ops;
+	ops->vidioc_s_input = &vidioc_s_input;
+	ops->vidioc_g_input = &vidioc_g_input;
+
 	return 0;
 
 err_unreg_subdev:
@@ -517,7 +575,7 @@ static const struct i2c_device_id adv7180_id[] = {
 	{},
 };
 
-MODULE_DEVICE_TABLE(i2c, adv7180_id);
+//MODULE_DEVICE_TABLE(i2c, adv7180_id);
 
 static struct i2c_driver adv7180_driver = {
 	.driver = {
@@ -545,4 +603,3 @@ module_exit(adv7180_exit);
 MODULE_DESCRIPTION("Analog Devices ADV7180 video decoder driver");
 MODULE_AUTHOR("Mocean Laboratories");
 MODULE_LICENSE("GPL v2");
-

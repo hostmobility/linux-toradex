@@ -119,7 +119,7 @@ static struct tegra_camera_platform_data tegra_camera_platform_data = {
 
 #if defined(CONFIG_SOC_CAMERA_MAX9526) || defined(CONFIG_SOC_CAMERA_MAX9526_MODULE)
 static struct i2c_board_info camera_i2c_max9526 = {
-	I2C_BOARD_INFO("max9526", 0x21),
+	I2C_BOARD_INFO("max9526", 0x20),
 };
 
 static struct soc_camera_link iclink_max9526 = {
@@ -553,6 +553,7 @@ static struct platform_device tegra_rtc_device = {
 
 /* SATA */
 
+#ifdef CONFIG_SATA_AHCI_TEGRA
 static struct gpio_led apalis_gpio_leds[] = {
 	[0] = {
 		.name                   = "SATA1_ACT_N",
@@ -575,7 +576,6 @@ static struct platform_device apalis_led_gpio_device = {
 	},
 };
 
-#ifdef CONFIG_SATA_AHCI_TEGRA
 static void apalis_t30_sata_init(void)
 {
 	platform_device_register(&tegra_sata_device);

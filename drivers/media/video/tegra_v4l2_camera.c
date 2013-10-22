@@ -37,18 +37,13 @@
 #define TEGRA_CAM_DRV_NAME "vi"
 #define TEGRA_CAM_VERSION_CODE KERNEL_VERSION(0, 0, 5)
 
-static unsigned int internal_sync = 0;
-module_param(internal_sync, int, 0644);
-MODULE_PARM_DESC(internal_sync, "enable internal vsync and hsync decoded " \
-		"from data");
-
-#define TEGRA_SYNCPT_VI_WAIT_TIMEOUT                    25
+#define TEGRA_SYNCPT_VI_WAIT_TIMEOUT                    50
 #define TEGRA_SYNCPT_CSI_WAIT_TIMEOUT                   200
 
 #define TEGRA_SYNCPT_RETRY_COUNT			10
 
 #define TEGRA_VIP_H_ACTIVE_START			0x8F //0x98
-#define TEGRA_VIP_V_ACTIVE_START			0x12 //0x10
+#define TEGRA_VIP_V_ACTIVE_START			0x16 //0x10
 
 /* SYNCPTs 12-17 are reserved for VI. */
 #define TEGRA_VI_SYNCPT_VI                              NVSYNCPT_VI_ISP_2
@@ -555,9 +550,7 @@ static void tegra_camera_capture_setup_vip(struct tegra_camera_dev *pcdev,
 	TC_VI_REG_WT(pcdev, TEGRA_VI_VI_INPUT_CONTROL,
 //		(1 << 27) | /* field detect */
 		(0 << 28) |  /* 1 == top field is even field, 00 == odd */
-		((internal_sync == 1) << 25) |	/* 1 == hsync/vsync decoded
-						   internally from data
-						   (BT.656) */
+//		(1 << 25) | /* hsync/vsync decoded from data (BT.656) */
 		(yuv_input_format << 8) |
 		(1 << 1) | /* VIP_INPUT_ENABLE */
 		(input_format << 2));
@@ -568,7 +561,7 @@ static void tegra_camera_capture_setup_vip(struct tegra_camera_dev *pcdev,
 	/* VIP H_ACTIVE and V_ACTIVE */
 	TC_VI_REG_WT(pcdev, TEGRA_VI_VIP_H_ACTIVE,
 		(icd->user_width << 16) |
-		(TEGRA_VIP_H_ACTIVE_START - ((internal_sync == 1)?1:0)));
+		TEGRA_VIP_H_ACTIVE_START);
 	TC_VI_REG_WT(pcdev, TEGRA_VI_VIP_V_ACTIVE,
 		( ( IS_INTERLACED ? (icd->user_height/2) : (icd->user_height) ) << 16) |
 		TEGRA_VIP_V_ACTIVE_START);
@@ -931,7 +924,7 @@ static int tegra_camera_capture_frame(struct tegra_camera_dev *pcdev)
 	struct tegra_buffer *buf;
 	int retry = TEGRA_SYNCPT_RETRY_COUNT;
 	int port = pcdev->pdata->port;
-	int err = 0;
+	int err;
 
 	if (!pcdev->active)
 		return 0;
@@ -939,45 +932,51 @@ static int tegra_camera_capture_frame(struct tegra_camera_dev *pcdev)
 	vb = pcdev->active;
 	buf = to_tegra_vb(vb);
 
-	while (retry--) {
+	while (retry) {
 		err = tegra_camera_capture_start(pcdev, buf);
-		if (err == 0) {
+		if (err == 0)
 			err = tegra_camera_capture_stop(pcdev);
-			if (err == 0) break;
+
+		if (err != 0) {
+			retry--;
+
+			/* Stop streaming. */
+			if (port == TEGRA_CAMERA_PORT_CSI_A) {
+				TC_VI_REG_WT(pcdev,
+					     TEGRA_CSI_PIXEL_STREAM_PPA_COMMAND,
+					     0x0000f002);
+				/* Clear status registers. */
+				TC_VI_REG_WT(pcdev,
+					     TEGRA_CSI_CSI_PIXEL_PARSER_STATUS,
+					     0xffffffff);
+				TC_VI_REG_WT(pcdev,
+					     TEGRA_CSI_CSI_CIL_STATUS,
+					     0xffffffff);
+			} else if (port == TEGRA_CAMERA_PORT_CSI_B) {
+				TC_VI_REG_WT(pcdev,
+					     TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND,
+					     0x0000f002);
+				/* Clear status registers. */
+				TC_VI_REG_WT(pcdev,
+					     TEGRA_CSI_CSI_PIXEL_PARSER_STATUS,
+					     0xffffffff);
+				TC_VI_REG_WT(pcdev,
+					     TEGRA_CSI_CSI_CIL_STATUS,
+					     0xffffffff);
+			} else {
+				TC_VI_REG_WT(pcdev,
+					     TEGRA_VI_CAMERA_CONTROL,
+					     0x00000005);
+			}
+
+
+			tegra_camera_incr_syncpts(pcdev);
+			tegra_camera_save_syncpts(pcdev);
+
+			continue;
 		}
 
-		/* Stop streaming. */
-		if (port == TEGRA_CAMERA_PORT_CSI_A) {
-			TC_VI_REG_WT(pcdev,
-				     TEGRA_CSI_PIXEL_STREAM_PPA_COMMAND,
-				     0x0000f002);
-			/* Clear status registers. */
-			TC_VI_REG_WT(pcdev,
-				     TEGRA_CSI_CSI_PIXEL_PARSER_STATUS,
-				     0xffffffff);
-			TC_VI_REG_WT(pcdev,
-				     TEGRA_CSI_CSI_CIL_STATUS,
-				     0xffffffff);
-		} else if (port == TEGRA_CAMERA_PORT_CSI_B) {
-			TC_VI_REG_WT(pcdev,
-				     TEGRA_CSI_PIXEL_STREAM_PPB_COMMAND,
-				     0x0000f002);
-			/* Clear status registers. */
-			TC_VI_REG_WT(pcdev,
-				     TEGRA_CSI_CSI_PIXEL_PARSER_STATUS,
-				     0xffffffff);
-			TC_VI_REG_WT(pcdev,
-				     TEGRA_CSI_CSI_CIL_STATUS,
-				     0xffffffff);
-		} else {
-			TC_VI_REG_WT(pcdev,
-				     TEGRA_VI_CAMERA_CONTROL,
-				     0x00000005);
-		}
-
-		tegra_camera_incr_syncpts(pcdev);
-		tegra_camera_save_syncpts(pcdev);
-		continue;
+		break;
 	}
 
 	spin_lock_irq(&pcdev->videobuf_queue_lock);
@@ -999,7 +998,7 @@ static int tegra_camera_capture_frame(struct tegra_camera_dev *pcdev)
 	vb->v4l2_buf.field = pcdev->field;
 	vb->v4l2_buf.sequence = pcdev->sequence++;
 
-	vb2_buffer_done(vb, (err != 0) ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE);
+	vb2_buffer_done(vb, err < 0 ? VB2_BUF_STATE_ERROR : VB2_BUF_STATE_DONE);
 
 	pcdev->num_frames++;
 
