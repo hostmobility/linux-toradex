@@ -1348,8 +1348,38 @@ static struct tegra_usb_platform_data tegra_ehci2_ulpi_link_pdata = {
 	},
 };
 
+static void modem_link_platform_open(void)
+{
+	int modem_vbus_gpio = USBH_PEN;
+	printk( KERN_INFO "Modem link platform open");
+
+	gpio_request(modem_vbus_gpio, "modem_vbus_gpio");
+	gpio_direction_output(modem_vbus_gpio, 1);
+}
+
+static void modem_link_platform_post_phy_on(void)
+{
+	printk( KERN_INFO "Modem link platform on");
+	/* enable VBUS */
+	gpio_set_value(USBH_PEN, 1);
+}
+
+static void modem_link_platform_pre_phy_off(void)
+{
+	printk( KERN_INFO "Modem link platform off");
+	/* disable VBUS */
+	gpio_set_value(USBH_PEN, 0);
+}
+
+static struct tegra_usb_phy_platform_ops modem_link_plat_ops = {
+	.open = modem_link_platform_open,
+	.post_phy_on = modem_link_platform_post_phy_on,
+	.pre_phy_off = modem_link_platform_pre_phy_off,
+};
+
 static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 	.has_hostpc	= false,
+	.ops 		= &modem_link_plat_ops, 
 	.op_mode	= TEGRA_USB_OPMODE_HOST,
 	.phy_intf	= TEGRA_USB_PHY_INTF_UTMI,
 	.port_otg	= false,
@@ -1366,7 +1396,7 @@ static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 		.hot_plug			= true,
 		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= false,
-		.vbus_gpio			= USBH_PEN,
+		.vbus_gpio			= -1,
 		.vbus_gpio_inverted		= 0,
 		.vbus_reg			= NULL,
 	},
