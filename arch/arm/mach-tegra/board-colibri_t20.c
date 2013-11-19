@@ -63,18 +63,18 @@
 #include "wakeups-t2.h"
 
 /* Legacy defines from previous tegra_nor.h (changed) */
-#define __BITMASK0(len)				((1 << (len)) - 1)
-#define __BITMASK(start, len)		(__BITMASK0(len) << (start))
-#define REG_BIT(bit)				(1 << (bit))
-#define REG_FIELD(val, start, len)	(((val) & __BITMASK0(len)) << (start))
-#define REG_FIELD_MASK(start, len)	(~(__BITMASK((start), (len))))
-#define REG_GET_FIELD(val, start, len)	(((val) >> (start)) & __BITMASK0(len))
-#define TEGRA_GMI_PHYS				0x70009000
-#define TEGRA_GMI_BASE				IO_TO_VIRT(TEGRA_GMI_PHYS)
-#define CONFIG_REG					(TEGRA_GMI_BASE + 0x00)
-#define STATUS_REG					(TEGRA_GMI_BASE + 0x04)
-#define CONFIG_SNOR_CS(val) 		REG_FIELD((val), 4, 3)
-#define CONFIG_GO					REG_BIT(31)
+#define __BITMASK0(len)					((1 << (len)) - 1)
+#define __BITMASK(start, len)			(__BITMASK0(len) << (start))
+#define REG_BIT(bit)					(1 << (bit))
+#define REG_FIELD(val, start, len)		(((val) & __BITMASK0(len)) << (start))
+#define TEGRA_GMI_PHYS					0x70009000
+#define TEGRA_GMI_BASE					IO_TO_VIRT(TEGRA_GMI_PHYS)
+#define SNOR_CONFIG_REG					(TEGRA_GMI_BASE + 0x00)
+#define SNOR_STATUS_REG					(TEGRA_GMI_BASE + 0x04)
+#define SNOR_CONFIG_SNOR_CS(val) 		REG_FIELD((val), 4, 3)
+#define SNOR_CONFIG_GO					REG_BIT(31)
+#define SNOR_CONFIG_MUX					REG_BIT(28)
+#define SNOR_CONFIG_ADV_POL				REG_BIT(22)
 
 /* We define a no export flag. We dont want to export the gpio 
 for a NC pin By: Mirza */
@@ -130,7 +130,11 @@ static struct resource colibri_can_resource[] = {
 	[0] =   {
 		.start	= TEGRA_CAN_BASE,		/* address */
 		.end	= TEGRA_CAN_BASE + TEGRA_CAN_SIZE,/* data */
+#ifndef CONFIG_GMI_MUX
 		.flags	= IORESOURCE_MEM,
+#else
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
+#endif /* !CONFIG_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -160,7 +164,11 @@ static struct resource colibri_can_resource2[] = {
 	[0] =   {
 		.start	= TEGRA_CAN2_BASE, 	/* address */
 		.end	= TEGRA_CAN2_BASE + TEGRA_CAN2_SIZE, /* data */
+#ifndef CONFIG_GMI_MUX
 		.flags	= IORESOURCE_MEM,
+#else
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
+#endif /* !CONFIG_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -192,7 +200,11 @@ static struct resource colibri_can_resource3[] = {
 	[0] =   {
 		.start	= TEGRA_CAN3_BASE, 	/* address */
 		.end	= TEGRA_CAN3_BASE + TEGRA_CAN3_SIZE, /* data */
+#ifndef CONFIG_GMI_MUX
 		.flags	= IORESOURCE_MEM,
+#else
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
+#endif /* !CONFIG_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -222,7 +234,11 @@ static struct resource colibri_can_resource4[] = {
 	[0] =   {
 		.start	= TEGRA_CAN4_BASE, 	/* address */
 		.end	= TEGRA_CAN4_BASE + TEGRA_CAN4_SIZE, /* data */
+#ifndef CONFIG_GMI_MUX
 		.flags	= IORESOURCE_MEM,
+#else
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
+#endif /* !CONFIG_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -252,7 +268,11 @@ static struct resource colibri_can_resource5[] = {
 	[0] =   {
 		.start	= TEGRA_CAN5_BASE, 	/* address */
 		.end	= TEGRA_CAN5_BASE + TEGRA_CAN5_SIZE, /* data */
+#ifndef CONFIG_GMI_MUX
 		.flags	= IORESOURCE_MEM,
+#else
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
+#endif /* !CONFIG_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -281,7 +301,11 @@ static struct resource colibri_can_resource6[] = {
 	[0] =   {
 		.start	= TEGRA_CAN6_BASE, 	/* address */
 		.end	= TEGRA_CAN6_BASE + TEGRA_CAN6_SIZE, /* data */
+#ifndef CONFIG_GMI_MUX
 		.flags	= IORESOURCE_MEM,
+#else
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
+#endif /* !CONFIG_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -410,8 +434,9 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
 	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
 
-	/* PXA300 Pins. Are not connected on T20.*/
+#ifndef CONFIG_GMI_MUX
 	{TEGRA_GPIO_PK0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P150 - MM_PXA300_CMD"},	
+#endif /* !CONFIG_GMI_MUX */
 
 	/* Compact flash - These pins are not connected on T20*/
 	{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P29 - CF-READY"},
@@ -1577,8 +1602,17 @@ static void __init colibri_t20_init(void)
 {
 
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
-	writel(CONFIG_SNOR_CS(CS_PIN), CONFIG_REG);
-	writel(CONFIG_GO | CONFIG_SNOR_CS(CS_PIN), CONFIG_REG);
+
+#ifdef CONFIG_MUXED_GMI
+	writel(CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL, 
+		SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(CS_PIN) | SNOR_CONFIG_MUX | 
+		SNOR_CONFIG_ADV_POL, SNOR_CONFIG_REG);
+else
+	writel(SNOR_CONFIG_SNOR_CS(CS_PIN), SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(CS_PIN), SNOR_CONFIG_REG);
+#endif /* CONFIG_MUXED_GMI */
+
 	tegra_gpio_enable(TEGRA_CAN_INT);
 	tegra_gpio_enable(TEGRA_CAN2_INT);
 	gpio_request_one(TEGRA_CAN_INT, GPIOF_DIR_IN, "CAN1-INT");

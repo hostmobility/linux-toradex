@@ -7,7 +7,7 @@
 /* Host Mobility MX-4 MAP*/
 #define GMI_CS_BASE_TEGRA 0xd0000000 /* Nor base addr*/
 
-#define CS_PIN				4
+#define SNOR_CS_PIN				4
 
 /* In 16bit mode the external address pin A[0] correlates to the internal memory address bit 1,
    external address pin A[1] to internal memory address bit 2, and so on. Found in Colibri_T20_Datasheet 5.6.1*/
@@ -48,15 +48,15 @@
 #endif /* CONFIG_HM_GTT_CAN */
 
 #define TEGRA_EXT_UARTA_BASE 		(GMI_CS_BASE_TEGRA)
-#define TEGRA_EXT_UARTA_INT		TEGRA_GPIO_PT2
+#define TEGRA_EXT_UARTA_INT			TEGRA_GPIO_PT2
 
 #define TEGRA_EXT_UARTB_BASE 		(GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x80))
-#define TEGRA_EXT_UARTB_INT		TEGRA_GPIO_PBB2
+#define TEGRA_EXT_UARTB_INT			TEGRA_GPIO_PBB2
 
 #define TEGRA_EXT_UARTC_BASE 		(GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(0x100))
-#define TEGRA_EXT_UARTC_INT		TEGRA_GPIO_PK5
+#define TEGRA_EXT_UARTC_INT			TEGRA_GPIO_PK5
 
-#define GPIO_WAKEUP_PIN			TEGRA_GPIO_PC7
+#define GPIO_WAKEUP_PIN				TEGRA_GPIO_PC7
 
 /* End Host Mobility MX-4 MAP*/
 #endif
