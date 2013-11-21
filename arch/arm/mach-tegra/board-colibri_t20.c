@@ -73,6 +73,7 @@
 #define SNOR_STATUS_REG					(TEGRA_GMI_BASE + 0x04)
 #define SNOR_CONFIG_SNOR_CS(val) 		REG_FIELD((val), 4, 3)
 #define SNOR_CONFIG_GO					REG_BIT(31)
+#define SNOR_CONFIG_32BIT				REG_BIT(30)
 #define SNOR_CONFIG_MUX					REG_BIT(28)
 #define SNOR_CONFIG_ADV_POL				REG_BIT(22)
 
@@ -130,11 +131,11 @@ static struct resource colibri_can_resource[] = {
 	[0] =   {
 		.start	= TEGRA_CAN_BASE,		/* address */
 		.end	= TEGRA_CAN_BASE + TEGRA_CAN_SIZE,/* data */
-#ifndef CONFIG_GMI_MUX
+#ifndef CONFIG_HM_GMI_MUX
 		.flags	= IORESOURCE_MEM,
 #else
-		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
-#endif /* !CONFIG_GMI_MUX*/
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_32BIT,
+#endif /* !CONFIG_HM_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -163,12 +164,12 @@ static struct platform_device colibri_can_device = {
 static struct resource colibri_can_resource2[] = {
 	[0] =   {
 		.start	= TEGRA_CAN2_BASE, 	/* address */
-		.end	= TEGRA_CAN2_BASE + TEGRA_CAN2_SIZE, /* data */
-#ifndef CONFIG_GMI_MUX
+		.end	= TEGRA_CAN2_BASE + TEGRA_CAN_SIZE, /* data */
+#ifndef CONFIG_HM_GMI_MUX
 		.flags	= IORESOURCE_MEM,
 #else
-		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
-#endif /* !CONFIG_GMI_MUX*/
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_32BIT,
+#endif /* !CONFIG_HM_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -199,12 +200,12 @@ static struct platform_device colibri_can_device2 = {
 static struct resource colibri_can_resource3[] = {
 	[0] =   {
 		.start	= TEGRA_CAN3_BASE, 	/* address */
-		.end	= TEGRA_CAN3_BASE + TEGRA_CAN3_SIZE, /* data */
-#ifndef CONFIG_GMI_MUX
+		.end	= TEGRA_CAN3_BASE + TEGRA_CAN_SIZE, /* data */
+#ifndef CONFIG_HM_GMI_MUX
 		.flags	= IORESOURCE_MEM,
 #else
-		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
-#endif /* !CONFIG_GMI_MUX*/
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_32BIT,
+#endif /* !CONFIG_HM_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -233,12 +234,12 @@ static struct platform_device colibri_can_device3 = {
 static struct resource colibri_can_resource4[] = {
 	[0] =   {
 		.start	= TEGRA_CAN4_BASE, 	/* address */
-		.end	= TEGRA_CAN4_BASE + TEGRA_CAN4_SIZE, /* data */
-#ifndef CONFIG_GMI_MUX
+		.end	= TEGRA_CAN4_BASE + TEGRA_CAN_SIZE, /* data */
+#ifndef CONFIG_HM_GMI_MUX
 		.flags	= IORESOURCE_MEM,
 #else
-		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
-#endif /* !CONFIG_GMI_MUX*/
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_32BIT,
+#endif /* !CONFIG_HM_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -267,12 +268,12 @@ static struct platform_device colibri_can_device4 = {
 static struct resource colibri_can_resource5[] = {
 	[0] =   {
 		.start	= TEGRA_CAN5_BASE, 	/* address */
-		.end	= TEGRA_CAN5_BASE + TEGRA_CAN5_SIZE, /* data */
-#ifndef CONFIG_GMI_MUX
+		.end	= TEGRA_CAN5_BASE + TEGRA_CAN_SIZE, /* data */
+#ifndef CONFIG_HM_GMI_MUX
 		.flags	= IORESOURCE_MEM,
 #else
-		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
-#endif /* !CONFIG_GMI_MUX*/
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_32BIT,
+#endif /* !CONFIG_HM_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -300,12 +301,12 @@ static struct platform_device colibri_can_device5 = {
 static struct resource colibri_can_resource6[] = {
 	[0] =   {
 		.start	= TEGRA_CAN6_BASE, 	/* address */
-		.end	= TEGRA_CAN6_BASE + TEGRA_CAN6_SIZE, /* data */
-#ifndef CONFIG_GMI_MUX
+		.end	= TEGRA_CAN6_BASE + TEGRA_CAN_SIZE, /* data */
+#ifndef CONFIG_HM_GMI_MUX
 		.flags	= IORESOURCE_MEM,
 #else
-		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_16BIT,
-#endif /* !CONFIG_GMI_MUX*/
+		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_32BIT,
+#endif /* !CONFIG_HM_GMI_MUX*/
 	},
 	[1] =   {
 		/* interrupt assigned during initialisation */
@@ -389,8 +390,7 @@ static struct gpio colibri_t20_gpios[] = {
 	//Might conflict with ADDRESS14	
 	{TEGRA_GPIO_PP5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P122 - NC"},
 	//Might conflict with ADDRESS15
-	{TEGRA_GPIO_PP6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P124 - NC"},
-	{TEGRA_GPIO_PP7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P188 - NC"},
+	{TEGRA_GPIO_PP6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P124 - NC"},	
 	{TEGRA_GPIO_PJ0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P126 - NC"},
 	{TEGRA_GPIO_PJ2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P128 - NC"},
 	{TEGRA_GPIO_PI3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P130 - NC"},
@@ -402,8 +402,6 @@ static struct gpio colibri_t20_gpios[] = {
 	//Pin 136, 138, 140, 142 Muxed to PM2 et al in pinmux (SPI2). Currently not used
 	{TEGRA_GPIO_PX3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P136 - NC"},
 	{TEGRA_GPIO_PX2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P138 - NC"},
-	{TEGRA_GPIO_PX1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P140 - NC"},
-	{TEGRA_GPIO_PX0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P142 - NC"},
 	{TEGRA_GPIO_PB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P154 - NC"},
 	{TEGRA_GPIO_PN5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P158 - NC"},
 	{TEGRA_GPIO_PN4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P160 - NC"},
@@ -414,11 +412,16 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PAA5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P168 - NC"},
 	{TEGRA_GPIO_PAA6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P170 - NC"},
 	{TEGRA_GPIO_PAA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P172 - NC"},
+
+#ifndef CONFIG_HM_GMI_MUX
+	{TEGRA_GPIO_PP7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P188 - NC"},
 	{TEGRA_GPIO_PA3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P184 - NC"},
 	{TEGRA_GPIO_PA2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P186 - NC"},
 	{TEGRA_GPIO_PA5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P144 - NC"},
 	{TEGRA_GPIO_PA4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P146 - NC"},
-
+	{TEGRA_GPIO_PX1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P140 - NC"},
+	{TEGRA_GPIO_PX0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P142 - NC"},
+#endif
 	/* Digital inputs */
 	// P45 is used for CF in PXA. Consider change.
 
@@ -434,9 +437,9 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
 	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
 
-#ifndef CONFIG_GMI_MUX
+#ifndef CONFIG_HM_GMI_MUX
 	{TEGRA_GPIO_PK0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P150 - MM_PXA300_CMD"},	
-#endif /* !CONFIG_GMI_MUX */
+#endif /* !CONFIG_HM_GMI_MUX */
 
 	/* Compact flash - These pins are not connected on T20*/
 	{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P29 - CF-READY"},
@@ -1141,7 +1144,11 @@ static struct plat_serial8250_port extern_uart_platform_data[] = {
 		.irqflags 	= IRQF_TRIGGER_RISING,
 		.flags		= SERIAL_FLAGS,
 		.iotype		= UPIO_MEM,
+#ifndef CONFIG_HM_GMI_MUX
 		.regshift	= 5,
+#else
+		.regshift	= 18,
+#endif /* !CONFIG_HM_GMI_MUX */
 		.uartclk	= SERIAL_CLK,
 	},
 	{
@@ -1603,15 +1610,16 @@ static void __init colibri_t20_init(void)
 
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
 
-#ifdef CONFIG_MUXED_GMI
-	writel(CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL, 
+#ifdef CONFIG_HM_GMI_MUX
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL 
+		| SNOR_CONFIG_32BIT, 
 		SNOR_CONFIG_REG);
-	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(CS_PIN) | SNOR_CONFIG_MUX | 
-		SNOR_CONFIG_ADV_POL, SNOR_CONFIG_REG);
-else
-	writel(SNOR_CONFIG_SNOR_CS(CS_PIN), SNOR_CONFIG_REG);
-	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(CS_PIN), SNOR_CONFIG_REG);
-#endif /* CONFIG_MUXED_GMI */
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | 
+		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);		
+#else
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+#endif /* CONFIG_HM_GMI_MUX */
 
 	tegra_gpio_enable(TEGRA_CAN_INT);
 	tegra_gpio_enable(TEGRA_CAN2_INT);

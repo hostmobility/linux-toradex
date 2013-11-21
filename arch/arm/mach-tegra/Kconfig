@@ -121,6 +121,13 @@ config HM_GTT_CAN
     help
       Support for additional CAN busses on Host Mobility's MX4 GTT board.
 
+config HM_GMI_MUX
+	bool "MX-4 multiplexed GMI bus"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000 && HM_EXT_8250_UART
+	default n
+	help
+		Select this if you want a multiplexed GMI bus on MX-4 board
+
 comment "Tegra board type"
 
 config MACH_COLIBRI_T20
