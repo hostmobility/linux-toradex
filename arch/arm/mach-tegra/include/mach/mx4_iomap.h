@@ -17,7 +17,11 @@
 #define PXA_ADDR_TO_T20_ADDR(x) (x << 2)
 #endif /* !CONFIG_HM_GMI_MUX */
 
+#ifndef CONFIG_HM_GMI_MUX
+#define TEGRA_CAN_SIZE				0x3f
+#else
 #define TEGRA_CAN_SIZE				0xff
+#endif /* !CONFIG_HM_GMI_MUX */
 
 #ifdef CONFIG_HM_GTT_CAN
 	#ifndef CONFIG_HM_GMI_MUX
