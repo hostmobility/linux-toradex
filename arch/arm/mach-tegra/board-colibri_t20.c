@@ -376,10 +376,13 @@ static struct tegra_clk_init_table colibri_t20_clk_init_table[] __initdata = {
 
 static struct gpio colibri_t20_gpios[] = {
 	/* Not connected pins */
+
+#ifndef CONFIG_HM_GMI_MUX
 	//Might conflict with Volume up key
 	{TEGRA_GPIO_PBB4,	(GPIOF_IN | GPIOF_NO_EXPORT),	"P22 - NC"},
 	//Might conflict with Volume down key
 	{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P24 - NC"},
+#endif
 	{TEGRA_GPIO_PL7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P65 - NC"},
 	{TEGRA_GPIO_PK4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P106 - NC"},
 	{TEGRA_GPIO_PK1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P152 - NC"},
