@@ -383,10 +383,17 @@ static struct gpio colibri_t20_gpios[] = {
 	//Might conflict with Volume down key
 	{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P24 - NC"},
 #endif
+
 	{TEGRA_GPIO_PL7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P65 - NC"},
-	{TEGRA_GPIO_PK4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P106 - NC"},
+	//Used as ACC int
+	//{TEGRA_GPIO_PK4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P106 - NC"},
 	{TEGRA_GPIO_PK1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P152 - NC"},
+
+#ifndef CONFIG_HM_GMI_MUX
+	// Used as ACC int
 	{TEGRA_GPIO_PU5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P116 - NC"}, // Wake up
+#endif
+
 	{TEGRA_GPIO_PU6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P118 - NC"}, //Wake up
 	// Used by BL_ON (see board-colibri_t20-panel.c)
 	//{TEGRA_GPIO_PP4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P120 - NC"},
@@ -596,8 +603,13 @@ static int colibri_l3g4200d_init(void){ return 0; }
 static struct mxc_mma845x_platform_data mma845x_data = {
 	.gpio_pin_get = NULL,
 	.gpio_pin_put = NULL,
-	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), 
-	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4),
+#ifndef CONFIG_HM_GMI_MUX
+	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), //P63
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4), //P106
+#else
+	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4), //P106
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5), //P116
+#endif
 };
 #endif
 
