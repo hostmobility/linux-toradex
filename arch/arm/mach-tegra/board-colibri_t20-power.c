@@ -215,9 +215,10 @@ static struct tps6586x_platform_data tps_platform = {
 	.num_subdevs	= ARRAY_SIZE(tps_devs),
 	.subdevs	= tps_devs,
 	.gpio_base	= TPS6586X_GPIO_BASE,
-	/* full PMIC power off decreases power consumption
-	   but reset won't force a re-boot anymore */
-	.use_power_off	= true,
+
+	/* Do not use full power off. This will increase current 
+	consumption but we will be able to force re-boot with reset. */
+	.use_power_off	= false,
 };
 
 static struct i2c_board_info __initdata colibri_t20_regulators[] = {
