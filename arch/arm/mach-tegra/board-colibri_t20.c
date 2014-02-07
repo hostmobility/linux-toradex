@@ -376,14 +376,24 @@ static struct tegra_clk_init_table colibri_t20_clk_init_table[] __initdata = {
 
 static struct gpio colibri_t20_gpios[] = {
 	/* Not connected pins */
+
+#ifndef CONFIG_HM_GMI_MUX
 	//Might conflict with Volume up key
 	{TEGRA_GPIO_PBB4,	(GPIOF_IN | GPIOF_NO_EXPORT),	"P22 - NC"},
 	//Might conflict with Volume down key
 	{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P24 - NC"},
+#endif
+
 	{TEGRA_GPIO_PL7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P65 - NC"},
-	{TEGRA_GPIO_PK4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P106 - NC"},
+	//Used as ACC int
+	//{TEGRA_GPIO_PK4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P106 - NC"},
 	{TEGRA_GPIO_PK1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P152 - NC"},
+
+#ifndef CONFIG_HM_GMI_MUX
+	// Used as ACC int
 	{TEGRA_GPIO_PU5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P116 - NC"}, // Wake up
+#endif
+
 	{TEGRA_GPIO_PU6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P118 - NC"}, //Wake up
 	// Used by BL_ON (see board-colibri_t20-panel.c)
 	//{TEGRA_GPIO_PP4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P120 - NC"},
@@ -426,12 +436,21 @@ static struct gpio colibri_t20_gpios[] = {
 	// P45 is used for CF in PXA. Consider change.
 
 #ifdef CONFIG_HM_DIGITAL_INPUTS
-	{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P29 - DIGITAL-IN-1"},
-	{TEGRA_GPIO_PC7,	(GPIOF_IN | GPIOF_ACT_LOW),		"P43 - DIGITAL-IN-2"},
-	{TEGRA_GPIO_PB6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P55 - DIGITAL-IN-3"},
-	{TEGRA_GPIO_PB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P59 - DIGITAL-IN-4"},
-	{TEGRA_GPIO_PZ0,	(GPIOF_IN | GPIOF_ACT_LOW),		"P23 - DIGITAL-IN-5"},
-	{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
+	#ifndef CONFIG_HM_GMI_MUX
+		{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P29 - DIGITAL-IN-1"},
+		{TEGRA_GPIO_PC7,	(GPIOF_IN | GPIOF_ACT_LOW),		"P43 - DIGITAL-IN-2"},
+		{TEGRA_GPIO_PB6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P55 - DIGITAL-IN-3"},
+		{TEGRA_GPIO_PB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P59 - DIGITAL-IN-4"},
+		{TEGRA_GPIO_PZ0,	(GPIOF_IN | GPIOF_ACT_LOW),		"P23 - DIGITAL-IN-5"},
+		{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
+	#else
+		{TEGRA_GPIO_PU2,	(GPIOF_IN | GPIOF_ACT_LOW),		"P110 - DIGITAL-IN-1"},
+		{TEGRA_GPIO_PC7,	(GPIOF_IN | GPIOF_ACT_LOW),		"P43 - DIGITAL-IN-2"},
+		{TEGRA_GPIO_PV3,	(GPIOF_IN | GPIOF_ACT_LOW),		"P45 - DIGITAL-IN-3"},
+		{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_ACT_LOW),		"P24 - DIGITAL-IN-4"},
+		{TEGRA_GPIO_PBB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P22 - DIGITAL-IN-5"},
+		{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
+	#endif
 #endif /* CONFIG_HM_DIGITAL_INPUTS */
 	//{TEGRA_GPIO_PY6,	(GPIOF_IN | GPIOF_NO_EXPORT),	"P37 - WAKE-UP-CPU"},
 	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
@@ -471,8 +490,13 @@ static struct gpio colibri_t20_gpios[] = {
 
 	/* Gyro Interrupts */
 	/* Our gyro driver does not support interrupts though */
+#ifndef CONFIG_HM_GMI_MUX
  	{TEGRA_GPIO_PA0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P73 - GYRO-INT1"},
  	{TEGRA_GPIO_PA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P67 - GYRO-INT2"},
+#else
+ 	{TEGRA_GPIO_PA0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P73 - GYRO-INT1"},
+ 	{TEGRA_GPIO_PAA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P172 - GYRO-INT2"},
+#endif
 
 	/* These are enabled in respective driver. Only have them here for reference */
 
@@ -579,8 +603,13 @@ static int colibri_l3g4200d_init(void){ return 0; }
 static struct mxc_mma845x_platform_data mma845x_data = {
 	.gpio_pin_get = NULL,
 	.gpio_pin_put = NULL,
-	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), 
-	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4),
+#ifndef CONFIG_HM_GMI_MUX
+	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PB7), //P63
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4), //P106
+#else
+	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4), //P106
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5), //P116
+#endif
 };
 #endif
 
