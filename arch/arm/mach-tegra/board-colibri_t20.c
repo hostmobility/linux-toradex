@@ -450,6 +450,7 @@ static struct gpio colibri_t20_gpios[] = {
 		{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_ACT_LOW),		"P24 - DIGITAL-IN-4"},
 		{TEGRA_GPIO_PBB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P22 - DIGITAL-IN-5"},
 		{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
+		{TEGRA_GPIO_PB6,	(GPIOF_IN),		                "P55 - CAN-WAKEUP"},
 	#endif
 #endif /* CONFIG_HM_DIGITAL_INPUTS */
 	//{TEGRA_GPIO_PY6,	(GPIOF_IN | GPIOF_NO_EXPORT),	"P37 - WAKE-UP-CPU"},
@@ -560,6 +561,22 @@ static void colibri_t20_gpio_init(void)
 	}
 	else {
 		pr_info("Setting wake type to rising\n");
+	}	
+
+    /* Enable wake up on CAN. */
+    err = enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PB6));
+	if (err) {
+		pr_err("Failed to enable wakeup for irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
+	}
+	else {
+		pr_info("Enabling gpio wakeup on irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
+	}
+	err = tegra_pm_irq_set_wake_type(gpio_to_irq(TEGRA_GPIO_PB6), IRQF_TRIGGER_FALLING);
+	if (err) {
+		pr_err("Failed to set wake type for irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
+	}
+	else {
+		pr_info("Setting wake type to falling\n");
 	}	
 }
 
