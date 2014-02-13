@@ -123,11 +123,6 @@ static void tegra_mx4_custom_resume(void)
 	printk( KERN_INFO "Entering custom mx4 resume rutine!");
 
 	for (i = 0; i < length; i++) {		
-		err = gpio_request(gpios_to_handle[i].gpio, "function tri-stated");
-		if (err) {
-			pr_warning("gpio_request(%d) failed, err = %d",
-				   gpios_to_handle[i].gpio, err);
-		}
 		tegra_gpio_disable(gpios_to_handle[i].gpio);
 		gpio_free(gpios_to_handle[i].gpio);
 	}
