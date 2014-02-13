@@ -112,17 +112,6 @@ static int tegra_mx4_custom_suspend(void)
 		}
 		tegra_gpio_enable(gpios_to_handle[i].gpio);	
 	}
-#if 0
-	/* tri-stating GMI_WR_N on SODIMM pin 99 nPWE */
-	gpio_request(TEGRA_GPIO_PT5, "no GMI_WR_N on 99");
-	gpio_direction_output(TEGRA_GPIO_PT5, 1);
-
-	/* tri-stating GMI_WR_N on SODIMM pin 93 RDnWR */
-	gpio_request(TEGRA_GPIO_PT6, "GMI_WR_N on 93 RDnWR");
-	gpio_direction_output(TEGRA_GPIO_PT6, 1);
-
-	writel(CONFIG_GO | POWER_DOWN, CONFIG_REG);	
-#endif
 	return 0;
 }
 
@@ -142,15 +131,7 @@ static void tegra_mx4_custom_resume(void)
 		tegra_gpio_disable(gpios_to_handle[i].gpio);
 		gpio_free(gpios_to_handle[i].gpio);
 	}
-#if 0
-	/* not tri-stating GMI_WR_N on SODIMM pin 99 nPWE */
-	gpio_request(TEGRA_GPIO_PT5, "no GMI_WR_N on 99");
-	gpio_direction_output(TEGRA_GPIO_PT5, 1);
 
-	/* not tri-stating GMI_WR_N on SODIMM pin 93 RDnWR */
-	gpio_request(TEGRA_GPIO_PT6, "GMI_WR_N on 93 RDnWR");
-	gpio_direction_output(TEGRA_GPIO_PT6, 1);		
-#endif
 }
 
 static struct syscore_ops tegra_mx4_custom_syscore_ops = {
