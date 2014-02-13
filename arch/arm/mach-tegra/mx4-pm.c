@@ -101,9 +101,11 @@ static int tegra_mx4_custom_suspend(void)
 {
 	int length = sizeof(gpios_to_handle) / sizeof(struct gpio);
 	int err = 0, i;
+	unsigned long flags;
 
 	printk( KERN_INFO "Entering custom mx4 suspend rutine!");
 
+	local_irq_save(flags);
 	for (i = 0; i < length; i++) {
 		err = gpio_request_one(gpios_to_handle[i].gpio, gpios_to_handle[i].flags, "function tri-stated");
 		if (err) {
@@ -112,14 +114,18 @@ static int tegra_mx4_custom_suspend(void)
 		}
 		tegra_gpio_enable(gpios_to_handle[i].gpio);	
 	}
+	local_irq_restore(flags);
 	return 0;
 }
 
 static void tegra_mx4_custom_resume(void)
 {
 	int length = sizeof(gpios_to_handle) / sizeof(struct gpio);
-	int i, err = 0;
+	int i;
+	unsigned long flags;
 
+
+	local_irq_save(flags);
 	printk( KERN_INFO "Entering custom mx4 resume rutine!");
 
 	for (i = 0; i < length; i++) {		
@@ -127,6 +133,7 @@ static void tegra_mx4_custom_resume(void)
 		gpio_free(gpios_to_handle[i].gpio);
 	}
 
+	local_irq_restore(flags);
 }
 
 static struct syscore_ops tegra_mx4_custom_syscore_ops = {
