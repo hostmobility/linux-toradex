@@ -101,9 +101,11 @@ static int tegra_mx4_custom_suspend(void)
 {
 	int length = sizeof(gpios_to_handle) / sizeof(struct gpio);
 	int err = 0, i;
+	unsigned long flags;
 
 	printk( KERN_INFO "Entering custom mx4 suspend rutine!");
 
+	local_irq_save(flags);
 	for (i = 0; i < length; i++) {
 		err = gpio_request_one(gpios_to_handle[i].gpio, gpios_to_handle[i].flags, "function tri-stated");
 		if (err) {
@@ -112,45 +114,26 @@ static int tegra_mx4_custom_suspend(void)
 		}
 		tegra_gpio_enable(gpios_to_handle[i].gpio);	
 	}
-#if 0
-	/* tri-stating GMI_WR_N on SODIMM pin 99 nPWE */
-	gpio_request(TEGRA_GPIO_PT5, "no GMI_WR_N on 99");
-	gpio_direction_output(TEGRA_GPIO_PT5, 1);
-
-	/* tri-stating GMI_WR_N on SODIMM pin 93 RDnWR */
-	gpio_request(TEGRA_GPIO_PT6, "GMI_WR_N on 93 RDnWR");
-	gpio_direction_output(TEGRA_GPIO_PT6, 1);
-
-	writel(CONFIG_GO | POWER_DOWN, CONFIG_REG);	
-#endif
+	local_irq_restore(flags);
 	return 0;
 }
 
 static void tegra_mx4_custom_resume(void)
 {
 	int length = sizeof(gpios_to_handle) / sizeof(struct gpio);
-	int i, err = 0;
+	int i;
+	unsigned long flags;
 
+
+	local_irq_save(flags);
 	printk( KERN_INFO "Entering custom mx4 resume rutine!");
 
 	for (i = 0; i < length; i++) {		
-		err = gpio_request(gpios_to_handle[i].gpio, "function tri-stated");
-		if (err) {
-			pr_warning("gpio_request(%d) failed, err = %d",
-				   gpios_to_handle[i].gpio, err);
-		}
 		tegra_gpio_disable(gpios_to_handle[i].gpio);
 		gpio_free(gpios_to_handle[i].gpio);
 	}
-#if 0
-	/* not tri-stating GMI_WR_N on SODIMM pin 99 nPWE */
-	gpio_request(TEGRA_GPIO_PT5, "no GMI_WR_N on 99");
-	gpio_direction_output(TEGRA_GPIO_PT5, 1);
 
-	/* not tri-stating GMI_WR_N on SODIMM pin 93 RDnWR */
-	gpio_request(TEGRA_GPIO_PT6, "GMI_WR_N on 93 RDnWR");
-	gpio_direction_output(TEGRA_GPIO_PT6, 1);		
-#endif
+	local_irq_restore(flags);
 }
 
 static struct syscore_ops tegra_mx4_custom_syscore_ops = {
