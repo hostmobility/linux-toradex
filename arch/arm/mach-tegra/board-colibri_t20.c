@@ -450,7 +450,6 @@ static struct gpio colibri_t20_gpios[] = {
 		{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_ACT_LOW),		"P24 - DIGITAL-IN-4"},
 		{TEGRA_GPIO_PBB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P22 - DIGITAL-IN-5"},
 		{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
-		{TEGRA_GPIO_PB6,	(GPIOF_IN),		                "P55 - CAN-WAKEUP"},
 	#endif
 #endif /* CONFIG_HM_DIGITAL_INPUTS */
 	//{TEGRA_GPIO_PY6,	(GPIOF_IN | GPIOF_NO_EXPORT),	"P37 - WAKE-UP-CPU"},
@@ -498,6 +497,20 @@ static struct gpio colibri_t20_gpios[] = {
  	{TEGRA_GPIO_PA0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P73 - GYRO-INT1"},
  	{TEGRA_GPIO_PAA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P172 - GYRO-INT2"},
 #endif
+
+    /* CAN wake up. */
+#ifdef CONFIG_HM_GMI_MUX /* GPIO_PB6 might be used for digital in. */
+    /* CAN wakeup pin. */
+    {TEGRA_GPIO_PB6,	(GPIOF_IN),		                "P55 - CAN-WAKEUP"},
+
+    /* Enable wakeup on each interface. */
+    {TEGRA_GPIO_PH2,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P169 - CAN0-WAKEUP"},
+    {TEGRA_GPIO_PH3,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P171 - CAN1-WAKEUP"},
+    {TEGRA_GPIO_PH4,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P173 - CAN2-WAKEUP"},
+    {TEGRA_GPIO_PH5,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P175 - CAN3-WAKEUP"},
+    {TEGRA_GPIO_PH6,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P177 - CAN4-WAKEUP"},
+    {TEGRA_GPIO_PH7,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P179 - CAN5-WAKEUP"},
+#endif /* CONFIG_HM_GMI_MUX */
 
 	/* These are enabled in respective driver. Only have them here for reference */
 
