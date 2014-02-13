@@ -27,6 +27,7 @@ obj-y                                   += devices.o
 obj-y                                   += delay.o
 obj-y                                   += powergate.o
 obj-y                                   += pm.o
+obj-y                                   += mx4-pm.o
 obj-$(CONFIG_TEGRA_WDT_RECOVERY)        += wdt-recovery.o
 obj-$(CONFIG_PM_SLEEP)                  += pm-irq.o
 obj-y                                   += gic.o
