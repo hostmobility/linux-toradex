@@ -498,6 +498,20 @@ static struct gpio colibri_t20_gpios[] = {
  	{TEGRA_GPIO_PAA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P172 - GYRO-INT2"},
 #endif
 
+    /* CAN wake up. */
+#ifdef CONFIG_HM_GMI_MUX /* GPIO_PB6 might be used for digital in. */
+    /* CAN wakeup pin. */
+    {TEGRA_GPIO_PB6,	(GPIOF_IN),		                "P55 - CAN-WAKEUP"},
+
+    /* Enable wakeup on each interface. */
+    {TEGRA_GPIO_PH2,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P169 - CAN0-WAKEUP"},
+    {TEGRA_GPIO_PH3,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P171 - CAN1-WAKEUP"},
+    {TEGRA_GPIO_PH4,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P173 - CAN2-WAKEUP"},
+    {TEGRA_GPIO_PH5,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P175 - CAN3-WAKEUP"},
+    {TEGRA_GPIO_PH6,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P177 - CAN4-WAKEUP"},
+    {TEGRA_GPIO_PH7,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P179 - CAN5-WAKEUP"},
+#endif /* CONFIG_HM_GMI_MUX */
+
 	/* These are enabled in respective driver. Only have them here for reference */
 
 	/* MMC Interface*/ 
@@ -560,6 +574,22 @@ static void colibri_t20_gpio_init(void)
 	}
 	else {
 		pr_info("Setting wake type to rising\n");
+	}	
+
+    /* Enable wake up on CAN. */
+    err = enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PB6));
+	if (err) {
+		pr_err("Failed to enable wakeup for irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
+	}
+	else {
+		pr_info("Enabling gpio wakeup on irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
+	}
+	err = tegra_pm_irq_set_wake_type(gpio_to_irq(TEGRA_GPIO_PB6), IRQF_TRIGGER_FALLING);
+	if (err) {
+		pr_err("Failed to set wake type for irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
+	}
+	else {
+		pr_info("Setting wake type to falling\n");
 	}	
 }
 
