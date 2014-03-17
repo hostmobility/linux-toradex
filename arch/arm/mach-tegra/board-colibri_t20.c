@@ -499,7 +499,7 @@ static struct gpio colibri_t20_gpios[] = {
 #endif
 
     /* CAN wake up. */
-#ifdef CONFIG_HM_GMI_MUX /* GPIO_PB6 might be used for digital in. */
+#ifdef CONFIG_HM_WAKE_ON_CAN /* GPIO_PB6 might be used for digital in. */
     /* CAN wakeup pin. */
     {TEGRA_GPIO_PB6,	(GPIOF_IN),		                "P55 - CAN-WAKEUP"},
 
@@ -510,7 +510,7 @@ static struct gpio colibri_t20_gpios[] = {
     {TEGRA_GPIO_PH5,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P175 - CAN3-WAKEUP"},
     {TEGRA_GPIO_PH6,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P177 - CAN4-WAKEUP"},
     {TEGRA_GPIO_PH7,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW),"P179 - CAN5-WAKEUP"},
-#endif /* CONFIG_HM_GMI_MUX */
+#endif /* HM_WAKE_ON_CAN */
 
 	/* These are enabled in respective driver. Only have them here for reference */
 
@@ -576,6 +576,7 @@ static void colibri_t20_gpio_init(void)
 		pr_info("Setting wake type to rising\n");
 	}	
 
+#ifdef CONFIG_HM_WAKE_ON_CAN
     /* Enable wake up on CAN. */
     err = enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PB6));
 	if (err) {
@@ -591,6 +592,7 @@ static void colibri_t20_gpio_init(void)
 	else {
 		pr_info("Setting wake type to falling\n");
 	}	
+#endif /* HM_WAKE_ON_CAN */
 }
 
 
