@@ -128,6 +128,13 @@ config HM_GMI_MUX
 	help
 		Select this if you want a multiplexed GMI bus on MX-4 board
 
+config HM_WAKE_ON_CAN
+	bool "MX-4 wake on CAN feature"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+	default n
+	help
+		Select this if you want to enable wake on CAN feature
+
 comment "Tegra board type"
 
 config MACH_COLIBRI_T20
