@@ -760,10 +760,11 @@ static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 };
 
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
-	.cd_gpio	= MMC_CD,
-	.is_8bit	= 0,
-	.power_gpio	= -1,
-	.wp_gpio	= -1,
+	.cd_gpio		= MMC_CD,
+	.cd_gpio_wake   = 0,
+	.is_8bit		= 0,
+	.power_gpio		= -1,
+	.wp_gpio		= -1,
 };
 
 int __init colibri_t20_sdhci_init(void)
