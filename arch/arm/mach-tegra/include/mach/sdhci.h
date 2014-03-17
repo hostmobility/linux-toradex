@@ -30,6 +30,7 @@
 
 struct tegra_sdhci_platform_data {
 	int cd_gpio;
+	int cd_gpio_wake;
 	int wp_gpio;
 	int power_gpio;
 	int is_8bit;
