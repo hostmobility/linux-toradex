@@ -352,6 +352,7 @@ struct rndis_function_config {
 	u32     vendorID;
 	char	manufacturer[256];
 	bool	wceis;
+	bool 	wcomp;
 };
 
 static int rndis_function_init(struct android_usb_function *f, struct usb_composite_dev *cdev)
@@ -399,6 +400,17 @@ static int rndis_function_bind_config(struct android_usb_function *f,
 						USB_CLASS_WIRELESS_CONTROLLER;
 		rndis_control_intf.bInterfaceSubClass =	 0x01;
 		rndis_control_intf.bInterfaceProtocol =	 0x03;
+	}
+
+	if(rndis->wcomp){
+		/* USB\Class_EF&SubClass_04&Prot_01; Auto-detected by Windows.
+		   Fails to auto detect on linux */
+		rndis_iad_descriptor.bFunctionClass = USB_CLASS_MISC;
+		rndis_iad_descriptor.bFunctionSubClass = 0x04;
+		rndis_iad_descriptor.bFunctionProtocol = 0x01;
+		rndis_control_intf.bInterfaceClass = USB_CLASS_MISC;;
+		rndis_control_intf.bInterfaceSubClass =	 0x04;
+		rndis_control_intf.bInterfaceProtocol =	 0x01;
 	}
 
 	return rndis_bind_config_vendor(c, rndis->ethaddr, rndis->vendorID,
@@ -460,6 +472,31 @@ static ssize_t rndis_wceis_store(struct device *dev,
 static DEVICE_ATTR(wceis, S_IRUGO | S_IWUSR, rndis_wceis_show,
 					     rndis_wceis_store);
 
+static ssize_t rndis_wcomp_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+	return sprintf(buf, "%d\n", config->wcomp);
+}
+
+static ssize_t rndis_wcomp_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct rndis_function_config *config = f->config;
+	int value;
+
+	if (sscanf(buf, "%d", &value) == 1) {
+		config->wcomp = value;
+		return size;
+	}
+	return -EINVAL;
+}
+
+static DEVICE_ATTR(wcomp, S_IRUGO | S_IWUSR, rndis_wcomp_show,
+					     rndis_wcomp_store);
+
 static ssize_t rndis_ethaddr_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -515,6 +552,7 @@ static DEVICE_ATTR(vendorID, S_IRUGO | S_IWUSR, rndis_vendorID_show,
 static struct device_attribute *rndis_function_attributes[] = {
 	&dev_attr_manufacturer,
 	&dev_attr_wceis,
+	&dev_attr_wcomp,
 	&dev_attr_ethaddr,
 	&dev_attr_vendorID,
 	NULL
