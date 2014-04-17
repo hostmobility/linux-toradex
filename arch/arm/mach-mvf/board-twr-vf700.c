@@ -101,6 +101,8 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	/*I2C0*/
 	MVF600_PAD36_PTB14__I2C0_SCL,
 	MVF600_PAD37_PTB15__I2C0_SDA,
+	
+	MVF600_PAD38_PTB16_USER_BTN1,
 
 #if 0
 	/*CAN1*/
@@ -252,6 +254,12 @@ static struct imxuart_platform_data mvf_uart1_pdata = {
 	.dma_req_tx = DMA_MUX03_UART1_TX,
 };
 
+static struct imxuart_platform_data mvf_uart0_pdata = {
+	.flags = IMXUART_FIFO | IMXUART_EDMA,
+	.dma_req_rx = DMA_MUX03_UART0_RX,
+	.dma_req_tx = DMA_MUX03_UART0_TX,
+};
+
 static inline void mvf_vf700_init_uart(void)
 {
 	mvf_add_imx_uart(1, &mvf_uart1_pdata);
@@ -322,7 +330,7 @@ static struct spi_mvf_chip at26df081a_chip_info = {
 
 static struct mtd_partition s25fl256s_partitions[] = {
 	{
-		.name = "s25fl256s",
+		.name = "Flash_JFFS2",
 		.size = (1024 * 64 * 256),
 		.offset = 0x00000000,
 		.mask_flags = 0,
@@ -333,7 +341,7 @@ static struct flash_platform_data s25fl256s_spi_flash_data = {
 	.name = "Spansion s25fl128s SPI Flash chip",
 	.parts = s25fl256s_partitions,
 	.nr_parts = ARRAY_SIZE(s25fl256s_partitions),
-	.type = "s25fl128s",
+	.type = "s25fl128s1",
 };
 #endif
 

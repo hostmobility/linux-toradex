@@ -1057,6 +1057,11 @@ static struct clk ipg_clk = {
 	.get_rate = _clk_ipg_get_rate,
 };
 
+static struct clk scu_clk = {
+	__INIT_CLK_DEBUG(scu_clk)
+	.parent = &periph_clk,
+};
+
 static int _clk_enet_set_parent(struct clk *clk, struct clk *parent)
 {
 	int mux;
@@ -1232,6 +1237,15 @@ static struct clk dspi_clk[] = {
 	.parent = &ipg_clk,
 	.enable_reg = MXC_CCM_CCGR0,
 	.enable_shift = MXC_CCM_CCGRx_CG12_OFFSET,
+	.enable = _clk_enable,
+	.disable = _clk_disable,
+	},
+	{
+	__INIT_CLK_DEBUG(dspi1_clk)
+	.id = 1,
+	.parent = &ipg_clk,
+	.enable_reg = MXC_CCM_CCGR0,
+	.enable_shift = MXC_CCM_CCGRx_CG13_OFFSET,
 	.enable = _clk_enable,
 	.disable = _clk_disable,
 	},
@@ -2040,12 +2054,14 @@ static struct clk_lookup lookups[] = {
 	_REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk), /* arm core clk */
 	_REGISTER_CLOCK(NULL, "periph_clk", periph_clk), /* platform bus clk */
 	_REGISTER_CLOCK(NULL, "ipg_clk", ipg_clk),
+	_REGISTER_CLOCK(NULL, "scu_clk", scu_clk),
 	_REGISTER_CLOCK(NULL, "audio ext clk", audio_external_clk),
 	_REGISTER_CLOCK(NULL, "mvf-uart.0", uart_clk[0]),
 	_REGISTER_CLOCK(NULL, "mvf-uart.1", uart_clk[0]),
 	_REGISTER_CLOCK(NULL, "mvf-uart.2", uart_clk[0]),
 	_REGISTER_CLOCK(NULL, "mvf-uart.3", uart_clk[0]),
 	_REGISTER_CLOCK("mvf-dspi.0", NULL, dspi_clk[0]),
+	_REGISTER_CLOCK("mvf-dspi.1", NULL, dspi_clk[1]),
 	_REGISTER_CLOCK("pit", NULL, pit_clk),
 	_REGISTER_CLOCK("fec.0", NULL, enet_clk[0]),
 	_REGISTER_CLOCK("fec.1", NULL, enet_clk[1]),
@@ -2117,9 +2133,14 @@ int __init mvf_clocks_init(unsigned long ckil, unsigned long osc,
 
 	clk_enable(&pll3_usb_otg_main_clk);
 
+#ifdef CONFIG_MXC_USE_PIT
 	base = MVF_IO_ADDRESS(MVF_PIT_BASE_ADDR);
 
 	pit_timer_init(&pit_clk, base, MVF_INT_PIT);
+#else
+	base = MVF_IO_ADDRESS(MVF_SCUGIC_BASE_ADDR + 0x200);
+	global_timer_init(&scu_clk, base, MVF_INT_GLOBAL_TIMER);
+#endif
 
 	/*clk_set_parent(&enet_clk, &pll5_enet_main_clk);*/
 

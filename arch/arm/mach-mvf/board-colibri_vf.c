@@ -42,6 +42,8 @@
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/input/fusion_F0710A.h>
+#include <linux/can/platform/mcp251x.h>
 #include <sound/pcm.h>
 
 #include <mach/common.h>
@@ -59,6 +61,7 @@
 #include <asm/mach/time.h>
 
 #include "devices-mvf.h"
+#include "regs-pm.h"
 #include "usb.h"
 #include "crm_regs.h"
 
@@ -101,6 +104,9 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	MVF600_PAD85_PTD6__DSPI1_SIN,
 	MVF600_PAD86_PTD7__DSPI1_SOUT,
 	MVF600_PAD87_PTD8__DSPI1_SCK,
+
+	/* GPIO for CAN Interrupt */
+	MVF600_PAD43_PTB21__CAN_INT,
 
 	/* FEC1: Ethernet */
 	MVF600_PAD0_PTA6__RMII_CLKOUT,
@@ -182,6 +188,8 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	MVF600_PAD30_PTB8_FTM1CH0, //PWM<B>
 	MVF600_PAD31_PTB9_FTM1CH1, //PWM<D> multiplexed MVF600_PAD51_PTC6_VID6
 
+	/* Wake-Up GPIO */
+	MVF600_PAD41_PTB19__GPIO,
 #if 0
 	/* NAND */
 	MVF600_PAD71_PTD23_NF_IO7,
@@ -207,7 +215,6 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 //MVF600_PAD39_PTB17_GPIO,
 //MVF600_PAD40_PTB18_GPIO,	/* IOMUXC_CCM_AUD_EXT_CLK_SELECT_INPUT 2
 //				   Selecting Pad: PTB18 for Mode: ALT2. */
-//MVF600_PAD41_PTB19_GPIO,
 //MVF600_PAD43_PTB21_GPIO,	/* CAN_INT */
 //MVF600_PAD44_PTB22_GPIO,
 //MVF600_PAD63_PTD31_GPIO,
@@ -352,6 +359,25 @@ struct platform_device *__init colibri_add_touchdev(
 			pdata, sizeof(*pdata));
 }
 
+/*
+ * Fusion touch screen GPIOs (using Toradex display/touch adapater)
+ * Iris X16-38, SODIMM pin 28 (PWM B), pen down interrupt
+ * Iris X16-39, SODIMM pin 30 (PWM C), reset
+ */
+static int colibri_mux_fusion(void)
+{
+	mxc_iomux_v3_setup_pad(MVF600_PAD30_PTB8_INT);
+	mxc_iomux_v3_setup_pad(MVF600_PAD23_PTB1_RESET);
+
+	return 0;
+}
+
+static struct fusion_f0710a_init_data colibri_fusion_pdata = {
+	.pinmux_fusion_pins = &colibri_mux_fusion,
+	.gpio_int = 30, 	/* SO-DIMM 28: Pen down interrupt */
+	.gpio_reset = 23,	/* SO-DIMM 30: Reset interrupt */
+};
+
 static struct fec_platform_data fec_data __initdata = {
 	.phy = PHY_INTERFACE_MODE_RMII,
 };
@@ -367,7 +393,43 @@ static const struct spi_mvf_master mvf_vf600_spi_data __initconst = {
 	.cs_control = NULL,
 };
 
+static struct spi_mvf_chip spidev_chip_info = {
+	.mode = SPI_MODE_0,
+	.bits_per_word = 8,
+	.void_write_data = 0,
+	.dbr = 0,
+	.pbr = 0,
+	.br = 0,
+	.pcssck = 0,
+	.pasc = 0,
+	.pdt = 0,
+	.cssck = 0,
+	.asc = 0,
+	.dt = 0,
+};
+
+#if defined(CONFIG_CAN_MCP251X)
+#define CAN_INTERRUPT_GPIO	43	/* active low interrupt (MCP2515 nINT) */
+
+static struct mcp251x_platform_data mcp251x_pdata = {
+	.board_specific_setup	= NULL,
+	.oscillator_frequency	= 16000000,
+	.power_enable		= NULL,
+	.transceiver_enable	= NULL
+};
+#endif
+
 static struct spi_board_info mvf_spi_board_info[] __initdata = {
+#if defined(CONFIG_CAN_MCP251X)
+	{
+		.bus_num	= 1,
+		.chip_select	= 0,
+		.max_speed_hz	= 10000000,
+		.modalias	= "mcp2515",
+		.platform_data	= &mcp251x_pdata,
+		.controller_data = &spidev_chip_info,
+	},
+#elif defined(CONFIG_SPI_SPIDEV)
 	{
 		.bus_num	= 1,		/* DSPI1: Colibri SSP */
 		.chip_select	= 0,
@@ -376,11 +438,16 @@ static struct spi_board_info mvf_spi_board_info[] __initdata = {
 		.modalias	= "spidev",
 		.mode		= SPI_MODE_0,
 		.platform_data	= NULL,
+		.controller_data = &spidev_chip_info,
 	},
+#endif
 };
 
 static void spi_device_init(void)
 {
+#if defined(CONFIG_CAN_MCP251X)
+	mvf_spi_board_info[0].irq = gpio_to_irq(CAN_INTERRUPT_GPIO);
+#endif
 	spi_register_board_info(mvf_spi_board_info,
 				ARRAY_SIZE(mvf_spi_board_info));
 }
@@ -472,36 +539,42 @@ static struct i2c_board_info mxc_i2c0_board_info[] __initdata = {
 		I2C_BOARD_INFO("rtc-ds1307", 0x68),
 			.type = "m41t00",
 	},
+	{
+		/* TouchRevolution Fusion 7 and 10 multi-touch controller */
+		I2C_BOARD_INFO("fusion_F0710A", 0x10),
+		.platform_data = &colibri_fusion_pdata,
+	},
 };
 
 static struct mxc_nand_platform_data mvf_data __initdata = {
 	.width = 1,
 };
 
-#if 0
 /* PWM LEDs */
 static struct led_pwm tegra_leds_pwm[] = {
+#if 0
 	{
 		.name		= "PWM<A>",
 		.pwm_id		= 1,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
 	},
+#endif
 	{
 		.name		= "PWM<B>",
-		.pwm_id		= 1,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 19600,
-	},
-	{
-		.name		= "PWM<C>",
 		.pwm_id		= 2,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
 	},
 	{
-		.name		= "PWM<D>",
+		.name		= "PWM<C>",
 		.pwm_id		= 3,
+		.max_brightness	= 255,
+		.pwm_period_ns	= 19600,
+	},
+	{
+		.name		= "PWM<D>",
+		.pwm_id		= 4,
 		.max_brightness	= 255,
 		.pwm_period_ns	= 19600,
 	},
@@ -511,7 +584,6 @@ static struct led_pwm_platform_data tegra_leds_pwm_data = {
 	.num_leds	= ARRAY_SIZE(tegra_leds_pwm),
 	.leds		= tegra_leds_pwm,
 };
-#endif
 
 static struct imx_asrc_platform_data imx_asrc_data = {
 	.channel_bits = 4,
@@ -538,6 +610,22 @@ static void __init mvf_init_adc(void)
 	mvf_add_adc(1);
 }
 
+static void mvf_power_off(void)
+{
+	void __iomem *gpc_base = MVF_GPC_BASE;
+	u32 gpc_pgcr;
+
+	/*
+	 * Power gate Power Domain 1
+	 */
+	gpc_pgcr = __raw_readl(gpc_base + GPC_PGCR_OFFSET);
+	gpc_pgcr |= GPC_PGCR_PG_PD1;
+	__raw_writel(gpc_pgcr, gpc_base + GPC_PGCR_OFFSET);
+
+	/* Set low power mode */
+	mvf_cpu_lp_set(STOP_MODE);
+}
+
 /*!
  * Board specific initialization.
  */
@@ -562,11 +650,12 @@ static void __init mvf_board_init(void)
 	mvf_add_sdhci_esdhc_imx(1, &mvfa5_sd1_data);
 
 	mvf_add_imx_i2c(0, &mvf600_i2c_data);
+
 	i2c_register_board_info(0, mxc_i2c0_board_info,
 			ARRAY_SIZE(mxc_i2c0_board_info));
 
-//	mvf_add_dspi(0, &mvf_vf600_spi_data);
-//	spi_device_init();
+	mvf_add_dspi(1, &mvf_vf600_spi_data);
+	spi_device_init();
 
 	mvfa5_add_dcu(0, &mvf_dcu_pdata);
 	mvf_add_mxc_pwm(0);
@@ -578,17 +667,16 @@ static void __init mvf_board_init(void)
 
 	mvf_add_nand(&mvf_data);
 
-#if 0
-	mvf_add_mxc_pwm(0);
-//	mvf_add_mxc_pwm(1);
-//	mvf_add_mxc_pwm(2);
-//	mvf_add_mxc_pwm(3);
+	mvf_add_mxc_pwm(1);
+	mvf_add_mxc_pwm(2);
+	mvf_add_mxc_pwm(3);
 	mvf_add_pwm_leds(&tegra_leds_pwm_data);
-#endif
 
 	imx_asrc_data.asrc_core_clk = clk_get(NULL, "asrc_clk");
 	imx_asrc_data.asrc_audio_clk = clk_get(NULL, "asrc_serial_clk");
 	mvf_add_asrc(&imx_asrc_data);
+
+	pm_power_off = mvf_power_off;
 }
 
 static void __init colibri_vf50_init(void)

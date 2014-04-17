@@ -54,8 +54,6 @@
 #if defined(CONFIG_SPI_MVF_DSPI_EDMA)
 #define SPI_DSPI_EDMA
 #define EDMA_BUFSIZE_KMALLOC	(DSPI_FIFO_SIZE * 4)
-#define DSPI_DMA_RX_TCD		DMA_MUX_DSPI0_RX
-#define DSPI_DMA_TX_TCD		DMA_MUX_DSPI0_TX
 #endif
 
 struct DSPI_MCR {
@@ -207,7 +205,8 @@ static inline void set_16bit_transfer_mode(struct spi_mvf_data *spi_mvf)
 	writel(temp, spi_mvf->base + SPI_CTAR(spi_mvf->cs));
 }
 
-static unsigned char hz_to_spi_baud(int pbr, int dbr, int speed_hz)
+static unsigned char hz_to_spi_baud(struct spi_mvf_data *spi_mvf,
+		int pbr, int dbr, int speed_hz)
 {
 	 /* Valid baud rate pre-scaler values */
 	int pbr_tbl[4] = {2, 3, 5, 7};
@@ -215,14 +214,14 @@ static unsigned char hz_to_spi_baud(int pbr, int dbr, int speed_hz)
 			16,	32,	64,	128,
 			256,	512,	1024,	2048,
 			4096,	8192,	16384,	32768 };
-	int temp, index = 0;
+	int temp, pclk, index = 0;
 
 	 /* table indexes out of range, go slow */
 	if ((pbr < 0) || (pbr > 3) || (dbr < 0) || (dbr > 1))
 		return 15;
 
-	/* cpu core clk need to check */
-	temp = ((((66000000 / 2) / pbr_tbl[pbr]) * (1 + dbr)) / speed_hz);
+	pclk = clk_get_rate(clk_get_parent(spi_mvf->clk));
+	temp = (((pclk / pbr_tbl[pbr]) * (1 + dbr)) / speed_hz);
 
 	while (temp > brs[index])
 		if (index++ >= 15)
@@ -309,7 +308,7 @@ static int write(struct spi_mvf_data *spi_mvf)
 	if (tx_count > 0) {
 		mcf_edma_set_tcd_params(spi_mvf->tx_chan,
 			spi_mvf->edma_tx_buf_pa,
-			0x4002c034,
+			(u32)(spi_mvf->base + SPI_PUSHR),
 			MCF_EDMA_TCD_ATTR_SSIZE_32BIT
 			| MCF_EDMA_TCD_ATTR_DSIZE_32BIT,
 			4,		/* soff */
@@ -324,7 +323,7 @@ static int write(struct spi_mvf_data *spi_mvf)
 			0);		/* enable sg */
 
 		mcf_edma_set_tcd_params(spi_mvf->rx_chan,
-			0x4002c038,
+			(u32)(spi_mvf->base + SPI_POPR),
 			spi_mvf->edma_rx_buf_pa,
 			MCF_EDMA_TCD_ATTR_SSIZE_32BIT
 			| MCF_EDMA_TCD_ATTR_DSIZE_32BIT,
@@ -572,7 +571,7 @@ static void pump_transfers(unsigned long data)
 
 	if (transfer->speed_hz)
 		writel((chip->ctar_val & ~0xf) |
-			hz_to_spi_baud(chip->ctar.pbr, chip->ctar.dbr,
+			hz_to_spi_baud(spi_mvf, chip->ctar.pbr, chip->ctar.dbr,
 			transfer->speed_hz),
 			spi_mvf->base + SPI_CTAR(spi_mvf->cs));
 
@@ -659,6 +658,7 @@ static int transfer(struct spi_device *spi, struct spi_message *msg)
 
 static int setup(struct spi_device *spi)
 {
+	struct spi_mvf_data *spi_mvf = spi_master_get_devdata(spi->master);
 	struct chip_data *chip;
 	struct spi_mvf_chip *chip_info
 		= (struct spi_mvf_chip *)spi->controller_data;
@@ -702,8 +702,8 @@ static int setup(struct spi_device *spi)
 	chip->void_write_data = chip_info->void_write_data;
 
 	if (spi->max_speed_hz != 0)
-		chip_info->br = hz_to_spi_baud(chip_info->pbr, chip_info->dbr,
-				spi->max_speed_hz);
+		chip_info->br = hz_to_spi_baud(spi_mvf, chip_info->pbr,
+				chip_info->dbr, spi->max_speed_hz);
 
 	chip->ctar.cpha = (spi->mode & SPI_CPHA) ? 1 : 0;
 	chip->ctar.cpol = (spi->mode & SPI_CPOL) ? 1 : 0;
@@ -825,6 +825,9 @@ static int spi_mvf_probe(struct platform_device *pdev)
 	struct spi_mvf_data *spi_mvf;
 	struct resource *res;
 	int ret = 0;
+#if defined(SPI_DSPI_EDMA)
+	int rx_channel, tx_channel;
+#endif
 	int i;
 
 	platform_info = dev_get_platdata(&pdev->dev);
@@ -843,6 +846,7 @@ static int spi_mvf_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&spi_mvf->queue);
 	spin_lock_init(&spi_mvf->lock);
 
+	master->mode_bits = SPI_CPHA | SPI_CPOL | SPI_LSB_FIRST;
 	master->bus_num = platform_info->bus_num;
 	master->num_chipselect = platform_info->num_chipselect;
 	master->cleanup = cleanup;
@@ -869,7 +873,7 @@ static int spi_mvf_probe(struct platform_device *pdev)
 
 	spi_mvf->base = ioremap(res->start, resource_size(res));
 	if (!spi_mvf->base) {
-		ret = EINVAL;
+		ret = -EINVAL;
 		goto out_error_release_mem;
 	}
 
@@ -904,6 +908,7 @@ static int spi_mvf_probe(struct platform_device *pdev)
 	spi_mvf->clk = clk_get(&pdev->dev, "dspi_clk");
 	if (IS_ERR(spi_mvf->clk)) {
 		dev_err(&pdev->dev, "unable to get clock\n");
+		ret = -EINVAL;
 		goto out_error_irq_alloc;
 	}
 	clk_enable(spi_mvf->clk);
@@ -929,7 +934,23 @@ static int spi_mvf_probe(struct platform_device *pdev)
 			spi_mvf->edma_tx_buf, spi_mvf->edma_tx_buf_pa,
 			spi_mvf->edma_rx_buf, spi_mvf->edma_rx_buf_pa);
 
-	spi_mvf->tx_chan = mcf_edma_request_channel(DSPI_DMA_TX_TCD,
+	/* TODO: move this to platform data */
+	switch (pdev->id) {
+	case 0:
+		rx_channel = DMA_MUX_DSPI0_RX;
+		tx_channel = DMA_MUX_DSPI0_TX;
+		break;
+	case 1:
+		rx_channel = DMA_MUX_DSPI1_RX;
+		tx_channel = DMA_MUX_DSPI1_TX;
+		break;
+	default:
+		dev_err(&pdev->dev, "unknown device id, no eDMA channels\n");
+		ret = -EINVAL;
+		goto out_error_queue_alloc;
+	}
+
+	spi_mvf->tx_chan = mcf_edma_request_channel(tx_channel,
 		edma_tx_handler, NULL, 0x00, pdev, NULL, DRIVER_NAME);
 	if (spi_mvf->tx_chan < 0) {
 		dev_err(&pdev->dev, "eDMA transmit channel request\n");
@@ -942,7 +963,7 @@ static int spi_mvf_probe(struct platform_device *pdev)
  * by SPI communicate machnisim, i.e, is half duplex mode, that is
  * whether read or write, we need write data out to get we wanted.
  */
-	spi_mvf->rx_chan = mcf_edma_request_channel(DSPI_DMA_RX_TCD,
+	spi_mvf->rx_chan = mcf_edma_request_channel(rx_channel,
 		edma_rx_handler, NULL, 0x06, pdev, NULL, DRIVER_NAME);
 	if (spi_mvf->rx_chan < 0) {
 		dev_err(&pdev->dev, "eDAM receive channel request\n");
