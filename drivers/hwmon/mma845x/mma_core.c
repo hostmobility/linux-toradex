@@ -228,6 +228,9 @@ static int IntServiceThread(void *data)
 	    ret = down_interruptible(&chip_ready);
 	} while (ret == -EINTR);
 
+	if(IsSuspended)
+		continue;
+
 	if (!poll_mode) {
 		ret = pChip->GetIntSrc();
 	} 
