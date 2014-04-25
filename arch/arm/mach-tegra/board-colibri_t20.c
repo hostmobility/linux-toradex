@@ -59,7 +59,7 @@
 //#include "../../../drivers/mtd/maps/tegra_nor.h"
 #include <linux/platform_data/tegra_nor.h>
 #include "pm.h"
-#include "pm-irq.h" 
+#include "pm-irq.h"
 #include "wakeups-t2.h"
 
 /* Legacy defines from previous tegra_nor.h (changed) */
@@ -77,11 +77,11 @@
 #define SNOR_CONFIG_MUX					REG_BIT(28)
 #define SNOR_CONFIG_ADV_POL				REG_BIT(22)
 
-/* We define a no export flag. We dont want to export the gpio 
+/* We define a no export flag. We dont want to export the gpio
 for a NC pin By: Mirza */
 #define GPIOF_NO_EXPORT		(1 << 6)
 
-/* Active LOW flag - Supplement to gpio.h flags in line with the 
+/* Active LOW flag - Supplement to gpio.h flags in line with the
    GPIOF_NO_EXPORT flag */
 #define GPIOF_ACT_LOW		(1 << 7)
 
@@ -345,8 +345,8 @@ static struct tegra_clk_init_table colibri_t20_clk_init_table[] __initdata = {
 	{"pwm",		"clk_m",	0,		false},
 	{"spdif_out",	"pll_a_out0",	0,		false},
 
-	/* uarta disabled by "Disabling clocks left on by bootloader" stage, 
-	   uarte will be used for debug console */ 
+	/* uarta disabled by "Disabling clocks left on by bootloader" stage,
+	   uarte will be used for debug console */
 	{"uarte",	"pll_p",	216000000,	true},
 
 //required otherwise uses pll_p_out4 as parent and changing its rate to 72 MHz
@@ -397,17 +397,17 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PU6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P118 - NC"}, //Wake up
 	// Used by BL_ON (see board-colibri_t20-panel.c)
 	//{TEGRA_GPIO_PP4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P120 - NC"},
-	//Might conflict with ADDRESS14	
+	//Might conflict with ADDRESS14
 	{TEGRA_GPIO_PP5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P122 - NC"},
 	//Might conflict with ADDRESS15
-	{TEGRA_GPIO_PP6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P124 - NC"},	
+	{TEGRA_GPIO_PP6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P124 - NC"},
 	{TEGRA_GPIO_PJ0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P126 - NC"},
 	{TEGRA_GPIO_PJ2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P128 - NC"},
 	{TEGRA_GPIO_PI3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P130 - NC"},
 	{TEGRA_GPIO_PI6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P132 - NC"},
     /* GMI_IORDY multiplexed GMI_WAIT/GMI_IORDY in pinmux - not used */
 	//{TEGRA_GPIO_PI7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P95 - NC"},
-	{TEGRA_GPIO_PI5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P95 - NC"},	
+	{TEGRA_GPIO_PI5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P95 - NC"},
 	{TEGRA_GPIO_PX4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P134 - NC"},
 	//Pin 136, 138, 140, 142 Muxed to PM2 et al in pinmux (SPI2). Currently not used
 	{TEGRA_GPIO_PX3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P136 - NC"},
@@ -457,7 +457,7 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
 
 #ifndef CONFIG_HM_GMI_MUX
-	{TEGRA_GPIO_PK0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P150 - MM_PXA300_CMD"},	
+	{TEGRA_GPIO_PK0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P150 - MM_PXA300_CMD"},
 #endif /* !CONFIG_HM_GMI_MUX */
 
 	/* Compact flash - These pins are not connected on T20*/
@@ -472,19 +472,19 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PX5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P100 - CF-nPSKTSEL"},
 
 	{TEGRA_GPIO_PX6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P102 - CF-nPWAIT/MM_PXA300_DAT3"},
-	
-	{TEGRA_GPIO_PX7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P104 - CF-nIOIS16/MM_PXA300_DAT2"}, 
+
+	{TEGRA_GPIO_PX7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P104 - CF-nIOIS16/MM_PXA300_DAT2"},
 
 	/* Extern UART Interrupts*/
 #ifdef CONFIG_HM_EXT_8250_UART
-	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"}, 
+	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"},
 	{TEGRA_GPIO_PBB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P133 - UART-INTB"},
-	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},	
+	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},
 #endif /* CONFIG_HM_EXT_8250_UART */
 
 /* Wakeup of external ethernet interface */
 #ifdef CONFIG_HM_EXT_AX88772B
-	{TEGRA_GPIO_PAA2,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW | GPIOF_ACT_LOW),		"P51 - OPT1-WAKE"}, 
+	{TEGRA_GPIO_PAA2,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW | GPIOF_ACT_LOW),		"P51 - OPT1-WAKE"},
 	{TEGRA_GPIO_PAA3,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW | GPIOF_ACT_LOW),		"P53 - OPT2-WAKE"},
 #endif /* CONFIG_HM_EXT_AX88772B */
 
@@ -514,7 +514,7 @@ static struct gpio colibri_t20_gpios[] = {
 
 	/* These are enabled in respective driver. Only have them here for reference */
 
-	/* MMC Interface*/ 
+	/* MMC Interface*/
 	//{TEGRA_GPIO_PT0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P96 - MMC-CLK"},
 	//{TEGRA_GPIO_PD5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P98 - MMC-CMD"},
 	//{TEGRA_GPIO_PL0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P101 - MMC-DAT0"},
@@ -523,15 +523,15 @@ static struct gpio colibri_t20_gpios[] = {
 	//{TEGRA_GPIO_PL3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P97 - MMC-DAT3"},
 
 	/* MM CARD DETECT*/
-	//{TEGRA_GPIO_PT4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P71 - MM_CD"},	
+	//{TEGRA_GPIO_PT4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P71 - MM_CD"},
 
 	/* Accelometer Interrupts */
  	//{TEGRA_GPIO_PB7,	GPIOF_IN,		"P63 - ACC-INT1"},
  	//{TEGRA_GPIO_PK4,	GPIOF_IN,		"P131 - ACC-INT2"},
 
 	/* CAN Interrupts*/
-	//{TEGRA_GPIO_PB5,	GPIOF_IN,		"P28 - CAN1-INT"}, 
-	//{TEGRA_GPIO_PA6,	GPIOF_IN,		"P30 - CAN2-INT"},	 
+	//{TEGRA_GPIO_PB5,	GPIOF_IN,		"P28 - CAN1-INT"},
+	//{TEGRA_GPIO_PA6,	GPIOF_IN,		"P30 - CAN2-INT"},
 };
 
 static void colibri_t20_gpio_init(void)
@@ -556,7 +556,7 @@ static void colibri_t20_gpio_init(void)
 			}
 			if(colibri_t20_gpios[i].flags & GPIOF_ACT_LOW) {
 				gpio_sysfs_set_active_low(colibri_t20_gpios[i].gpio, true);
-			}			
+			}
 		}
 	}
 
@@ -574,7 +574,7 @@ static void colibri_t20_gpio_init(void)
 	}
 	else {
 		pr_info("Setting wake type to rising\n");
-	}	
+	}
 
 #ifdef CONFIG_HM_WAKE_ON_CAN
     /* Enable wake up on CAN. */
@@ -591,7 +591,7 @@ static void colibri_t20_gpio_init(void)
 	}
 	else {
 		pr_info("Setting wake type to falling\n");
-	}	
+	}
 #endif /* HM_WAKE_ON_CAN */
 }
 
@@ -648,7 +648,7 @@ static struct mxc_mma845x_platform_data mma845x_data = {
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
 //#ifdef CONFIG_SENSORS_L3G4200D
-#if 0	
+#if 0
 {
         I2C_BOARD_INFO(L3G4200D_NAME, 0x68),
         .platform_data = &colibri_gyro_pdata,
@@ -656,7 +656,7 @@ static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
     },
 #endif
 
-#ifdef CONFIG_MXC_MMA845X	
+#ifdef CONFIG_MXC_MMA845X
 	{
 		I2C_BOARD_INFO("mma845x", 0x1C),
 			.platform_data = (void *)&mma845x_data,
@@ -769,7 +769,7 @@ static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
 
 int __init colibri_t20_sdhci_init(void)
 {
-	tegra_sdhci_device2.dev.platform_data = 
+	tegra_sdhci_device2.dev.platform_data =
 			&colibri_t20_sdhci_mmc_platform_data;
 
 	tegra_sdhci_device4.dev.platform_data =
@@ -954,9 +954,9 @@ static struct gpio_led status_leds[] = {
 
 static struct gpio_led_platform_data status_led_data = {
 	.num_leds	= ARRAY_SIZE(status_leds),
-	.leds		= status_leds	
+	.leds		= status_leds
 };
- 
+
 static struct platform_device status_led_dev = {
 	.name		= "leds-gpio",
 	.id		= -1,
@@ -1214,7 +1214,7 @@ static struct plat_serial8250_port extern_uart_platform_data[] = {
 		.uartclk	= SERIAL_CLK,
 	},
 	{
-		.flags = 0	
+		.flags = 0
 	},
 };
 
@@ -1245,19 +1245,19 @@ static struct platform_device *colibri_t20_uart_devices[] __initdata = {
 
 */
 	&tegra_uarte_device,
-#ifdef CONFIG_MACH_HM_MX4		
+#ifdef CONFIG_MACH_HM_MX4
 	&tegra_uarta_device,
 #endif /* CONFIG_MACH_HM_MX4 */
-	&tegra_uartb_device, 
-	&tegra_uartc_device, 	
-	&tegra_uartd_device, 
+	&tegra_uartb_device,
+	&tegra_uartc_device,
+	&tegra_uartd_device,
 #ifdef CONFIG_HM_EXT_8250_UART
 	&extern_uart,
 #endif /* CONFIG_HM_EXT_8250_UART */
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
-	[0] = {.name = "pll_p"},	
+	[0] = {.name = "pll_p"},
 	[1] = {.name = "pll_m"},
 	[2] = {.name = "pll_p"},
 	[3] = {.name = "pll_p"},
@@ -1315,10 +1315,10 @@ static void __init colibri_t20_uart_init(void)
 	}
 	colibri_t20_uart_pdata.parent_clk_list = uart_parent_clk;
 	colibri_t20_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
-	tegra_uarte_device.dev.platform_data = &colibri_t20_uart_pdata;	
+	tegra_uarte_device.dev.platform_data = &colibri_t20_uart_pdata;
 	tegra_uarta_device.dev.platform_data = &colibri_t20_uart_pdata;
 	tegra_uartb_device.dev.platform_data = &colibri_t20_uart_pdata;
-	tegra_uartc_device.dev.platform_data = &colibri_t20_uart_pdata;	
+	tegra_uartc_device.dev.platform_data = &colibri_t20_uart_pdata;
 	tegra_uartd_device.dev.platform_data = &colibri_t20_uart_pdata;
 
 	/* Register low speed only if it is selected */
@@ -1473,7 +1473,7 @@ static struct tegra_usb_phy_platform_ops modem_link_plat_ops = {
 
 static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 	.has_hostpc	= false,
-	.ops 		= &modem_link_plat_ops, 
+	.ops 		= &modem_link_plat_ops,
 	.op_mode	= TEGRA_USB_OPMODE_HOST,
 	.phy_intf	= TEGRA_USB_PHY_INTF_UTMI,
 	.port_otg	= false,
@@ -1673,11 +1673,11 @@ static void __init colibri_t20_init(void)
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
 
 #ifdef CONFIG_HM_GMI_MUX
-	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL 
-		| SNOR_CONFIG_32BIT, 
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL
+		| SNOR_CONFIG_32BIT,
 		SNOR_CONFIG_REG);
-	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | 
-		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);		
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX |
+		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);
 #else
 	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
 	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
@@ -1773,7 +1773,7 @@ static void __init colibri_t20_init(void)
 #endif
 #ifdef CONFIG_MACH_HM_MX4
 	pr_info("Host Mobility MX4\n");
-#endif	
+#endif
 }
 
 int __init tegra_colibri_t20_protected_aperture_init(void)
