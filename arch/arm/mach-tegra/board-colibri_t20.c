@@ -1409,8 +1409,7 @@ static void ulpi_link_platform_post_phy_on(void)
 
 static void ulpi_link_platform_pre_phy_off(void)
 {
-	/* disable VBUS */
-	gpio_set_value(LAN_V_BUS, 0);
+	return;
 }
 
 static struct tegra_usb_phy_platform_ops ulpi_link_plat_ops = {
