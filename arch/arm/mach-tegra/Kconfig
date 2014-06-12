@@ -159,6 +159,13 @@ config MACH_HM_MX4_GTT
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 GTT board
 
+config MACH_HM_MX4_VCC
+       bool "Host Mobility MX4 VCC"
+       depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+       select HM_GTT_CAN
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 VCC board
+
 config MACH_HM_VCB
         bool "Host Mobility VCB"
         depends on ARCH_TEGRA_2x_SOC

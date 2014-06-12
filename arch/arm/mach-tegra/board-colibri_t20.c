@@ -146,8 +146,13 @@ static struct resource colibri_can_resource[] = {
 static struct sja1000_platform_data colibri_can_platdata = {
 	.osc_freq	= 24000000,
 	.ocr		= (OCR_MODE_NORMAL | OCR_TX0_PUSHPULL),
+#ifdef CONFIG_MACH_HM_MX4_VCC
+	.cdr		= CDR_CLKOUT_MASK |  /* Set CLKOUT to Fosc */
+			  CDR_CBP, /* CAN input comparator bypass */
+#else
 	.cdr		= CDR_CLK_OFF | /* Clock off (CLKOUT pin) */
 			  CDR_CBP, /* CAN input comparator bypass */
+#endif /* CONFIG_MACH_HM_MX4_VCC */
 };
 
 static struct platform_device colibri_can_device = {
@@ -453,7 +458,11 @@ static struct gpio colibri_t20_gpios[] = {
 	#endif
 #endif /* CONFIG_HM_DIGITAL_INPUTS */
 	//{TEGRA_GPIO_PY6,	(GPIOF_IN | GPIOF_NO_EXPORT),	"P37 - WAKE-UP-CPU"},
+#ifdef CONFIG_MACH_HM_MX4_VCC
+	{TEGRA_GPIO_PW2,	(GPIOF_IN ),                	"P129 - MODEM-WAKEUP"},
+#else
 	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
+#endif /* CONFIG_MACH_HM_MX4_VCC */
 	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
 
 #ifndef CONFIG_HM_GMI_MUX
@@ -479,7 +488,11 @@ static struct gpio colibri_t20_gpios[] = {
 #ifdef CONFIG_HM_EXT_8250_UART
 	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"},
 	{TEGRA_GPIO_PBB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P133 - UART-INTB"},
+#ifdef CONFIG_MACH_HM_MX4_VCC
+	{TEGRA_GPIO_PU3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P112 - UART-INTC"},
+#else
 	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},
+#endif /* CONFIG_MACH_HM_MX4_VCC */
 #endif /* CONFIG_HM_EXT_8250_UART */
 
 /* Wakeup of external ethernet interface */
@@ -585,7 +598,7 @@ static void colibri_t20_gpio_init(void)
 	else {
 		pr_info("Enabling gpio wakeup on irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
 	}
-	err = tegra_pm_irq_set_wake_type(gpio_to_irq(TEGRA_GPIO_PB6), IRQF_TRIGGER_FALLING);
+	err = tegra_pm_irq_set_wake_type(gpio_to_irq(TEGRA_GPIO_PB6), IRQF_TRIGGER_FALLING | IRQF_TRIGGER_LOW);
 	if (err) {
 		pr_err("Failed to set wake type for irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
 	}
@@ -751,6 +764,7 @@ static void colibri_t20_i2c_init(void)
 /* MMC/SD */
 
 #ifndef CONFIG_MACH_HM_VCB
+#ifndef CONFIG_MACH_HM_MX4_VCC 
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 	/* We dont have a card detect pin for wifi. I is always connected. */
 	.is_8bit	= 0,
@@ -758,6 +772,7 @@ static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 	.power_gpio	= -1,
 	.wp_gpio	= -1,
 };
+#endif /* !CONFIG_MACH_HM_MX4_VCC */
 
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
 	.cd_gpio		= MMC_CD,
@@ -769,11 +784,16 @@ static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
 
 int __init colibri_t20_sdhci_init(void)
 {
+#ifdef CONFIG_MACH_HM_MX4_VCC
+	tegra_sdhci_device4.dev.platform_data =
+			&colibri_t20_sdhci_mmc_platform_data;
+#else
 	tegra_sdhci_device2.dev.platform_data =
 			&colibri_t20_sdhci_mmc_platform_data;
 
 	tegra_sdhci_device4.dev.platform_data =
 			&colibri_t20_sdhci_wifi_platform_data;
+#endif /* CONFIG_MACH_HM_MX4_VCC */
 
 	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device4);
@@ -1489,7 +1509,11 @@ static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 		.hot_plug			= true,
 		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= false,
-		.vbus_gpio			= -1,
+#ifdef CONFIG_MACH_HM_MX4_VCC
+		.vbus_gpio			= TEGRA_GPIO_PC0,
+#else
+        .vbus_gpio = -1,
+#endif
 		.vbus_gpio_inverted		= 0,
 		.vbus_reg			= NULL,
 	},

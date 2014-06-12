@@ -72,7 +72,11 @@
 #else
 	#define UARTA_OFFSET				0x000
 	#define UARTB_OFFSET				0x000
-	#define UARTC_OFFSET				0x80000
+#ifndef CONFIG_MACH_HM_MX4_VCC
+	#define UARTC_OFFSET				0x80000 /* MA19 */
+#else
+	#define UARTC_OFFSET				0x2000000 /* MA25 */
+#endif /* !CONFIG_MACH_HM_MX4_VCC */
 #endif /* !CONFIG_HM_GMI_MUX*/
 
 #define TEGRA_EXT_UARTA_BASE 		(GMI_CS_BASE_TEGRA + PXA_ADDR_TO_T20_ADDR(UARTA_OFFSET))
