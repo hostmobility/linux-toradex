@@ -1798,13 +1798,23 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (!memcmp(buf, default_asix_mac, ETH_ALEN)) {
 		if (g_usr_mac && (g_usr_mac < 3)) {
 			/* Get user set MAC address */
+#if 0
 			if (g_usr_mac == 2) {
 				/* 0x100000 offset for 2nd Ethernet MAC */
 				g_mac_addr[3] += 0x10;
+                devwarn(dev, "asix mac: %s", g_mac_addr);
 				if (g_mac_addr[3] < 0x10)
 					devwarn(dev, "MAC address byte 3 (0x%02x) wrap around", g_mac_addr[3]);
 			}
-			memcpy(buf, g_mac_addr, ETH_ALEN);
+#endif
+#if 1
+            if (g_usr_mac == 2) {
+                __setup("asix_mac2=", setup_asix_mac);
+                g_usr_mac = 2; /* setup_asix_mac resets g_usr_mac */
+            }
+#endif
+
+            memcpy(buf, g_mac_addr, ETH_ALEN);
 			g_usr_mac++;
 		} else devwarn(dev, "using default ASIX MAC");
 	}

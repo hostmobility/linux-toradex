@@ -413,7 +413,9 @@ static struct gpio colibri_t20_gpios[] = {
     /* GMI_IORDY multiplexed GMI_WAIT/GMI_IORDY in pinmux - not used */
 	//{TEGRA_GPIO_PI7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P95 - NC"},
 	{TEGRA_GPIO_PI5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P95 - NC"},
+#ifndef CONFIG_MACH_HM_MX4_VCC /* In VCC used for UARTC addressing. */
 	{TEGRA_GPIO_PX4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P134 - NC"},
+#endif /* CONFIG_MACH_HM_MX4_VCC */
 	//Pin 136, 138, 140, 142 Muxed to PM2 et al in pinmux (SPI2). Currently not used
 	{TEGRA_GPIO_PX3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P136 - NC"},
 	{TEGRA_GPIO_PX2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P138 - NC"},
