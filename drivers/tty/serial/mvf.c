@@ -84,22 +84,22 @@ struct imx_port {
 	unsigned int		format_9bits:1; /* 9bits data format */
 	unsigned short		trcv_delay; /* transceiver delay */
 	unsigned char		ma_addr; /* Match address */
-	struct clk		*clk;
+	struct clk			*clk;
 
 	unsigned int		tx_fifo_size, rx_fifo_size;
 
 	/* DMA fields */
-	int			enable_dma;
+	int					enable_dma;
 	unsigned long		dma_tx_ch; /* configured eDMA channel */
 	struct imx_dma_data	dma_data;
 	struct dma_chan		*dma_chan_rx, *dma_chan_tx;
 	struct scatterlist	rx_sgl, tx_sgl;
-	void			*rx_buf;
+	void				*rx_buf;
 	unsigned char		*tx_buf;
 	unsigned int		rx_bytes, tx_bytes;
-	struct work_struct	tsk_rx, tsk_dma_tx;
+	struct work_struct	tsk_dma_tx;
 	unsigned int		dma_tx_nents;
-	bool			dma_is_rxing, dma_is_txing;
+	bool				dma_is_rxing, dma_is_txing;
 	wait_queue_head_t	dma_wait;
 };
 
@@ -226,21 +226,21 @@ static void tx_uart_dmarun(struct imx_port *sport)
 	if (sport->dma_tx_nents == 0)
 		return;
 
-	mcf_edma_set_tcd_params(sport->dma_tx_ch,
-			(u32)sg_phys(&sport->tx_sgl),
-			(u32)(sport->port.mapbase + MXC_UARTDR),
+	mcf_edma_set_tcd_params(sport->dma_tx_ch, /* channel number */
+			(u32)sg_phys(&sport->tx_sgl), /* source */
+			(u32)(sport->port.mapbase + MXC_UARTDR), /* dest */
 			MCF_EDMA_TCD_ATTR_SSIZE_8BIT |
-			MCF_EDMA_TCD_ATTR_DSIZE_8BIT,
-			1,
-			1,
-			0,
-			sport->tx_bytes,
-			0,
-			0,
-			0,
+			MCF_EDMA_TCD_ATTR_DSIZE_8BIT, /* attr */
+			1, /* soff */
+			1, /* nbytes */
+			0, /* slast */
+			sport->tx_bytes, /* citer */
+			0, /* biter */
+			0, /* doff */
+			0, /* dlast_sga */
 			1, /* major_int */
 			1, /* disable_req */
-			0
+			0  /* enabled sg */
 			);
 	sport->dma_is_txing = 1;
 	mcf_edma_enable_transfer(sport->dma_tx_ch);
@@ -304,7 +304,7 @@ static void dma_tx_work(struct work_struct *w)
 	{
 		if (sport->port.state->port.tty)
 		{
-		uart_write_wakeup(&sport->port);
+			uart_write_wakeup(&sport->port);
 		}
 	}
 
@@ -359,25 +359,13 @@ static irqreturn_t imx_txint(int irq, void *dev_id)
 	{
 		if (sport->port.state->port.tty)
 		{
-		uart_write_wakeup(&sport->port);
+			uart_write_wakeup(&sport->port);
 		}
 	}
 
 out:
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 	return IRQ_HANDLED;
-}
-
-static void rx_work(struct work_struct *w)
-{
-	struct imx_port *sport = container_of(w, struct imx_port, tsk_rx);
-	struct tty_struct *tty = sport->port.state->port.tty;
-
-	/* check if tty is valid, since the process might be gone... */
-	if (sport->rx_bytes && tty) {
-		tty_flip_buffer_push(tty);
-		sport->rx_bytes = 0;
-	}
 }
 
 static irqreturn_t imx_rxint(int irq, void *dev_id)
@@ -447,8 +435,11 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
 out:
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
-	//TODO: Check tsk_rx, seems to be edma related.
-	schedule_work(&sport->tsk_rx);
+	if (sport->rx_bytes) {
+		tty_flip_buffer_push(tty);
+		sport->rx_bytes = 0;
+	}
+
 	return IRQ_HANDLED;
 }
 
@@ -552,6 +543,10 @@ static int imx_setup_watermark(struct imx_port *sport, unsigned int mode)
 			MXC_UARTCR2_RIE | MXC_UARTCR2_RE);
 	writeb(cr2, sport->port.membase + MXC_UARTCR2);
 
+	/* Clear pending receive interrupt if needed */
+	while (readb(sport->port.membase + MXC_UARTSR1) & MXC_UARTSR1_RDRF)
+		val = readb(sport->port.membase + MXC_UARTDR);
+
 	val = TXTL;
 	writeb(val, sport->port.membase + MXC_UARTTWFIFO);
 	val = RXTL;
@@ -614,9 +609,7 @@ static int imx_startup(struct uart_port *port)
 		temp |= MXC_UARTCR5_TDMAS;
 		writeb(temp, sport->port.membase + MXC_UARTCR5);
 
-		sport->port.flags |= UPF_LOW_LATENCY;
 		INIT_WORK(&sport->tsk_dma_tx, dma_tx_work);
-		INIT_WORK(&sport->tsk_rx, rx_work);
 		init_waitqueue_head(&sport->dma_wait);
 
 	}
@@ -645,10 +638,10 @@ static void imx_shutdown(struct uart_port *port)
 
 	if (sport->enable_dma) {
 		/* We have to wait for the DMA to finish. */
-		if (sport->dma_tx_ch) {
+		if (sport->dma_tx_ch >= 0) {
 			mcf_edma_stop_transfer(sport->dma_tx_ch);
 			mcf_edma_free_channel(sport->dma_tx_ch, sport);
-			sport->dma_tx_ch = 0;
+			sport->dma_tx_ch = -1;
 		}
 	}
 

@@ -75,8 +75,10 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	MVF600_PAD15_PTA25__SDHC1_CMD,
 	MVF600_PAD16_PTA26__SDHC1_DAT0,
 	MVF600_PAD17_PTA27__SDHC1_DAT1,
+#ifndef CONFIG_UART4_SUPPORT
 	MVF600_PAD18_PTA28__SDHC1_DAT2,
 	MVF600_PAD19_PTA29__SDHC1_DAT3,
+#endif
 	/* set PTB20 as GPIO for sdhc card detecting */
 	MVF600_PAD42_PTB20__SDHC1_SW_CD,
 
@@ -107,6 +109,20 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 
 	/* GPIO for CAN Interrupt */
 	MVF600_PAD43_PTB21__CAN_INT,
+
+	/* FEC0: Ethernet */
+#ifdef CONFIG_FEC0
+	MVF600_PAD2_PTA9__RMII_CLKOUT,
+	MVF600_PAD45_PTC0__RMII0_MDC,
+	MVF600_PAD46_PTC1__RMII0_MDIO,
+	MVF600_PAD47_PTC2__RMII0_CRS_DV,
+	MVF600_PAD48_PTC3__RMII0_RXD1,
+	MVF600_PAD49_PTC4__RMII0_RXD0,
+	MVF600_PAD50_PTC5__RMII0_RXER,
+	MVF600_PAD51_PTC6__RMII0_TXD1,
+	MVF600_PAD52_PTC7__RMII0_TXD0,
+	MVF600_PAD53_PTC8__RMII0_TXEN,
+#endif
 
 	/* FEC1: Ethernet */
 	MVF600_PAD0_PTA6__RMII_CLKOUT,
@@ -155,7 +171,9 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	MVF600_PAD131_PTE26_DCU0_B5,
 	MVF600_PAD132_PTE27_DCU0_B6,
 	MVF600_PAD133_PTE28_DCU0_B7,
+#ifndef CONFIG_FEC0
 	MVF600_PAD45_PTC0_BL_ON,
+#endif
 
 	/* UART1: UART_C */
 	MVF600_PAD26_PTB4_UART1_TX,
@@ -177,16 +195,34 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	MVF600_PAD81_PTD2_UART2_RTS,
 	MVF600_PAD82_PTD3_UART2_CTS,
 
+	/* UART3/4 */
+#ifdef CONFIG_UART3_SUPPORT
+	MVF600_PAD10_UART3_TX, /* SODIMM 23 */
+	MVF600_PAD11_UART3_RX, /* SODIMM 31 */
+#endif
+#ifdef CONFIG_UART4_SUPPORT
+	MVF600_PAD18_UART4_TX, /* SODIMM 51 */
+	MVF600_PAD19_UART4_RX, /* SODIMM 53 */
+#endif
+
 	/* USB */
 	MVF600_PAD83_PTD4__USBH_PEN,
 	MVF600_PAD102_PTC29__USBC_DET, /* multiplexed USB0_VBUS_DET */
 	MVF600_PAD108_PTE3__USB_OC,
 
 	/* PWM */
+#ifndef CONFIG_FEC0
 	MVF600_PAD22_PTB0_FTM0CH0, //PWM<A> multiplexed MVF600_PAD52_PTC7_VID7
+#else
+	MVF600_PAD22_PTB0_GPIO,
+#endif
 	MVF600_PAD23_PTB1_FTM0CH1, //PWM<c>
 	MVF600_PAD30_PTB8_FTM1CH0, //PWM<B>
+#ifndef CONFIG_FEC0
 	MVF600_PAD31_PTB9_FTM1CH1, //PWM<D> multiplexed MVF600_PAD51_PTC6_VID6
+#else
+	MVF600_PAD31_PTB9_GPIO,
+#endif
 
 	/* Wake-Up GPIO */
 	MVF600_PAD41_PTB19__GPIO,
@@ -267,10 +303,22 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 //IOMUXC_VIDEO_IN0_IPP_IND_DE_SELECT_INPUT: PTB5, PTB8 or PTB10 as ALT5
 };
 
-static iomux_v3_cfg_t colibri_vf50_pads[] = {
+static iomux_v3_cfg_t colibri_vf50_v10_pads[] = {
 	/* Touchscreen */
 	MVF600_PAD4_PTA11,
 	MVF600_PAD5_PTA12,
+	MVF600_PAD6_PTA16_ADC1_SE0,
+	MVF600_PAD8_PTA18_ADC0_SE0,
+	MVF600_PAD9_PTA19_ADC0_SE1,
+	MVF600_PAD12_PTA22,
+	MVF600_PAD13_PTA23,
+	MVF600_PAD24_PTB2_ADC1_SE2,
+};
+
+static iomux_v3_cfg_t colibri_vf50_v11_pads[] = {
+	/* Touchscreen */
+	MVF600_PAD4_PTA11,
+	MVF600_PAD93_PTB23,
 	MVF600_PAD6_PTA16_ADC1_SE0,
 	MVF600_PAD8_PTA18_ADC0_SE0,
 	MVF600_PAD9_PTA19_ADC0_SE1,
@@ -318,11 +366,33 @@ static struct imxuart_platform_data mvf_uart2_pdata = {
 	.dma_req_tx = DMA_MUX03_UART2_TX,
 };
 
+#ifdef CONFIG_UART3_SUPPORT
+static struct imxuart_platform_data mvf_uart3_pdata = {
+	.flags = IMXUART_FIFO | IMXUART_EDMA,
+	.dma_req_rx = DMA_MUX03_UART3_RX,
+	.dma_req_tx = DMA_MUX03_UART3_TX,
+};
+#endif
+
+#ifdef CONFIG_UART4_SUPPORT
+static struct imxuart_platform_data mvf_uart4_pdata = {
+	.flags = IMXUART_FIFO | IMXUART_EDMA,
+	.dma_req_rx = DMA_MUX12_UART4_RX + 64,
+	.dma_req_tx = DMA_MUX12_UART4_TX + 64,
+};
+#endif
+
 static inline void mvf_vf700_init_uart(void)
 {
 	mvf_add_imx_uart(0, &mvf_uart0_pdata);
 	mvf_add_imx_uart(1, &mvf_uart1_pdata);
 	mvf_add_imx_uart(2, &mvf_uart2_pdata);
+#ifdef CONFIG_UART3_SUPPORT
+	mvf_add_imx_uart(3, &mvf_uart3_pdata);
+#endif
+#ifdef CONFIG_UART4_SUPPORT
+	mvf_add_imx_uart(4, &mvf_uart4_pdata);
+#endif
 }
 
 static int colibri_ts_mux_pen_interrupt(struct platform_device *pdev)
@@ -345,11 +415,15 @@ static int colibri_ts_mux_adc(struct platform_device *pdev)
 	return 0;
 }
 
-
 static struct colibri_ts_platform_data colibri_ts_pdata = {
 	.mux_pen_interrupt = &colibri_ts_mux_pen_interrupt,
 	.mux_adc = &colibri_ts_mux_adc,
-	.gpio_pen = 8, /* PAD8 */
+	.gpio_xp = 13,
+	.gpio_xm = 93,
+	.gpio_yp = 12,
+	.gpio_ym = 4,
+	.gpio_pen_detect = 8, /* PAD8 */
+	.gpio_pen_detect_pullup = 9,
 };
 
 struct platform_device *__init colibri_add_touchdev(
@@ -647,7 +721,9 @@ static void __init mvf_board_init(void)
 
 	mvf700_add_caam();
 
+#ifndef CONFIG_UART4_SUPPORT
 	mvf_add_sdhci_esdhc_imx(1, &mvfa5_sd1_data);
+#endif
 
 	mvf_add_imx_i2c(0, &mvf600_i2c_data);
 
@@ -681,8 +757,18 @@ static void __init mvf_board_init(void)
 
 static void __init colibri_vf50_init(void)
 {
-	mxc_iomux_v3_setup_multiple_pads(colibri_vf50_pads,
-					ARRAY_SIZE(colibri_vf50_pads));
+	printk("System REV: %x\n", system_rev);
+	if (system_rev < 0x011a) {
+		/* Use GPIO 5 for XM... */
+		colibri_ts_pdata.gpio_xm = 5;
+		mxc_iomux_v3_setup_multiple_pads(colibri_vf50_v10_pads,
+					ARRAY_SIZE(colibri_vf50_v10_pads));
+
+	} else {
+		/* Leave default GPIO 93 for XM... */
+		mxc_iomux_v3_setup_multiple_pads(colibri_vf50_v11_pads,
+					ARRAY_SIZE(colibri_vf50_v11_pads));
+	}
 
 	mvf_board_init();
 

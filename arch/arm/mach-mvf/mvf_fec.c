@@ -35,13 +35,13 @@ static int fec_get_mac_addr(unsigned char *mac)
 	unsigned int value;
 
 	value = readl(MVF_IO_ADDRESS(MVF_FEC_BASE_ADDR) + ENET_PALR);
-	mac[2] = value & 0xff;
-	mac[3] = (value >> 8) & 0xff;
-	mac[4] = (value >> 16) & 0xff;
-	mac[5] = (value >> 24) & 0xff;
+	mac[3] = value & 0xff;
+	mac[2] = (value >> 8) & 0xff;
+	mac[1] = (value >> 16) & 0xff;
+	mac[0] = (value >> 24) & 0xff;
 	value = readl(MVF_IO_ADDRESS(MVF_FEC_BASE_ADDR) + ENET_PAUR);
-	mac[0] = (value >> 16) & 0xff;
-	mac[1] = (value >> 24) & 0xff;
+	mac[5] = (value >> 16) & 0xff;
+	mac[4] = (value >> 24) & 0xff;
 
 	return 0;
 }
@@ -53,9 +53,19 @@ void __init mvf_init_fec(struct fec_platform_data fec_data)
 		memcpy(fec_data.mac, default_mac, ETH_ALEN);
 
 #if !defined(CONFIG_COLIBRI_VF)
-	mvf_add_fec(0, &fec_data);
+#ifdef CONFIG_FEC0
+	mvf_add_fec(0, &mvf_fec_data[0], &fec_data);
 #endif
 #ifdef CONFIG_FEC1
-	mvf_add_fec(1, &fec_data);
+	mvf_add_fec(1, &mvf_fec_data[1], &fec_data);
+#endif
+#else
+	/* Inverse device ID */
+#ifdef CONFIG_FEC1
+	mvf_add_fec(0, &mvf_fec_data[1], &fec_data);
+#endif
+#ifdef CONFIG_FEC0
+	mvf_add_fec(1, &mvf_fec_data[0], &fec_data);
+#endif
 #endif
 }
