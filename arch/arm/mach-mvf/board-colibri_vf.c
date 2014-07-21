@@ -65,7 +65,7 @@
 #include "usb.h"
 #include "crm_regs.h"
 
-#define MVF600_SD1_CD  42
+#define MVF600_SD1_CD  68
 
 #define colibri_vf50_bl_enb	45	/* BL_ON */
 
@@ -80,7 +80,7 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	MVF600_PAD19_PTA29__SDHC1_DAT3,
 #endif
 	/* set PTB20 as GPIO for sdhc card detecting */
-	MVF600_PAD42_PTB20__SDHC1_SW_CD,
+	MVF600_PAD68_PTD26__SDHC1_SW_CD,
 
 	/*
 	 * I2C0: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board)

@@ -104,8 +104,13 @@ typedef enum iomux_config {
 #define MVF600_PAD134_PTA7__SDHC1_SW_CD			\
 		IOMUX_PAD(0x0218, 0x0218, 0, 0x0000, 0, \
 				MVF600_GPIO_GENERAL_CTRL | PAD_CTL_IBE_ENABLE)
+
 #define MVF600_PAD42_PTB20__SDHC1_SW_CD                 \
                 IOMUX_PAD(0x00a8, 0x00a8, 0, 0x0000, 0, \
+                                MVF600_GPIO_GENERAL_CTRL | PAD_CTL_IBE_ENABLE)
+
+#define MVF600_PAD68_PTD26__SDHC1_SW_CD                 \
+                IOMUX_PAD(0x0110, 0x0110, 0, 0x0000, 0, \
                                 MVF600_GPIO_GENERAL_CTRL | PAD_CTL_IBE_ENABLE)
 
 /*GPIO Wake-Up*/
