@@ -44,6 +44,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/input/fusion_F0710A.h>
 #include <linux/can/platform/mcp251x.h>
+#include <linux/mma845x.h>
 #include <sound/pcm.h>
 
 #include <mach/common.h>
@@ -66,6 +67,8 @@
 #include "crm_regs.h"
 
 #define MVF600_SD1_CD  68
+
+#define ACCL_INT1 63
 
 #define colibri_vf50_bl_enb	45	/* BL_ON */
 
@@ -115,6 +118,9 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 
 	/* GPIO for SPI PIC interrupt */
 	MVF600_PAD20_PTA30__SPI_INT,
+
+	/* ACC-INT1 */
+	MVF600_PAD63_PTD31__ACC_INT1,
 
 	/* FEC0: Ethernet */
 #ifdef CONFIG_FEC0
@@ -626,6 +632,14 @@ static struct imxi2c_platform_data mvf600_i2c_data = {
 	.bitrate = 100000,
 };
 
+#ifdef CONFIG_MXC_MMA845X
+static struct mxc_mma845x_platform_data mma845x_data = {
+	.gpio_pin_get = NULL,
+	.gpio_pin_put = NULL,
+	.int2 =-EINVAL, // ACCL_INT2 is gpio for MMA845X INT2
+};
+#endif /* CONFIG_MXC_MMA845X */
+
 static struct i2c_board_info mxc_i2c0_board_info[] __initdata = {
 	{
 		/* M41T0M6 real time clock on Iris carrier board */
@@ -637,6 +651,12 @@ static struct i2c_board_info mxc_i2c0_board_info[] __initdata = {
 		I2C_BOARD_INFO("fusion_F0710A", 0x10),
 		.platform_data = &colibri_fusion_pdata,
 	},
+#ifdef CONFIG_MXC_MMA845X
+	{
+		I2C_BOARD_INFO("mma845x", 0x1C),
+		.platform_data = (void *)&mma845x_data,
+	},
+#endif /* CONFIG_MXC_MMA845X */
 };
 
 static struct mxc_nand_platform_data mvf_data __initdata = {
@@ -754,6 +774,10 @@ static void __init mvf_board_init(void)
 #ifndef CONFIG_UART4_SUPPORT
 	mvf_add_sdhci_esdhc_imx(1, &mvfa5_sd1_data);
 #endif
+
+#ifdef CONFIG_MXC_MMA845X
+	mma845x_data.int1 = gpio_to_irq(ACCL_INT1), // ACCL_INT1 is gpio for MMA845X INT1
+#endif /* CONFIG_MXC_MMA845X */
 
 	mvf_add_imx_i2c(0, &mvf600_i2c_data);
 

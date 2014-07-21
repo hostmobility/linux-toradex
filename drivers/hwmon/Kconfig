@@ -1428,4 +1428,9 @@ config MXC_MMA8451
 	depends on I2C
 	default y
 
+ config MXC_MMA845X
+	tristate "Freescale  MMA845X  Accelerometer sensor"
+	depends on I2C && SYSFS
+	default n
+
 endif # HWMON
