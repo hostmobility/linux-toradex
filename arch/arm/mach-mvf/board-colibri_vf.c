@@ -113,6 +113,9 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	/* GPIO for CAN Interrupt */
 	MVF600_PAD43_PTB21__CAN_INT,
 
+	/* GPIO for SPI PIC interrupt */
+	MVF600_PAD20_PTA30__SPI_INT,
+
 	/* FEC0: Ethernet */
 #ifdef CONFIG_FEC0
 	MVF600_PAD2_PTA9__RMII_CLKOUT,
@@ -466,12 +469,12 @@ static int mvf_vf600_spi_cs[] = {
 static const struct spi_mvf_master mvf_vf600_spi_data __initconst = {
 	.bus_num = 1,
 	.chipselect = mvf_vf600_spi_cs,
-	.num_chipselect = ARRAY_SIZE(mvf_vf600_spi_cs),
+	.num_chipselect = 2,
 	.cs_control = NULL,
 };
 
 static struct spi_mvf_chip spidev_chip_info = {
-	.mode = SPI_MODE_0,
+	.mode = SPI_MODE_1,
 	.bits_per_word = 8,
 	.void_write_data = 0,
 	.dbr = 0,
@@ -496,25 +499,35 @@ static struct mcp251x_platform_data mcp251x_pdata = {
 };
 #endif
 
+#define PIC_INTERRUPT_GPIO 	20
+
 static struct spi_board_info mvf_spi_board_info[] __initdata = {
-#if defined(CONFIG_CAN_MCP251X)
-	{
-		.bus_num	= 1,
-		.chip_select	= 0,
-		.max_speed_hz	= 10000000,
-		.modalias	= "mcp2515",
-		.platform_data	= &mcp251x_pdata,
-		.controller_data = &spidev_chip_info,
-	},
-#elif defined(CONFIG_SPI_SPIDEV)
 	{
 		.bus_num	= 1,		/* DSPI1: Colibri SSP */
 		.chip_select	= 0,
-		.irq		= 0,
-		.max_speed_hz	= 50000000,
-		.modalias	= "spidev",
-		.mode		= SPI_MODE_0,
+		.max_speed_hz	= 5000000,
+		.modalias	= "mx4_io_spi",
+		.mode		= SPI_MODE_1,
 		.platform_data	= NULL,
+		.controller_data = &spidev_chip_info,
+	},
+	{
+		.bus_num	= 1,		/* DSPI1: Colibri SSP */
+		.chip_select	= 1,
+		.max_speed_hz	= 5000000,
+		.modalias	= "spidev",
+		.mode		= SPI_MODE_1,
+		.platform_data	= NULL,
+		.controller_data = &spidev_chip_info,
+	},
+#if defined(CONFIG_CAN_MCP251X)
+#error "Will this really work??"
+	{
+		.bus_num	= 1,
+		.chip_select	= 1,
+		.max_speed_hz	= 10000000,
+		.modalias	= "mcp2515",
+		.platform_data	= &mcp251x_pdata,
 		.controller_data = &spidev_chip_info,
 	},
 #endif
@@ -522,9 +535,12 @@ static struct spi_board_info mvf_spi_board_info[] __initdata = {
 
 static void spi_device_init(void)
 {
+	mvf_spi_board_info[0].irq = gpio_to_irq(PIC_INTERRUPT_GPIO);
+
 #if defined(CONFIG_CAN_MCP251X)
-	mvf_spi_board_info[0].irq = gpio_to_irq(CAN_INTERRUPT_GPIO);
+	mvf_spi_board_info[2].irq = gpio_to_irq(CAN_INTERRUPT_GPIO);
 #endif
+
 	spi_register_board_info(mvf_spi_board_info,
 				ARRAY_SIZE(mvf_spi_board_info));
 }
