@@ -116,7 +116,7 @@ config HM_EXT_AX88772B
 
 config HM_GTT_CAN
     bool "MX4 GTT additional CAN"
-	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && MACH_HM_MX4_GTT && CAN_SJA1000
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && (MACH_HM_MX4_GTT || MACH_HM_MX4_VCC) && CAN_SJA1000
     default n
     help
       Support for additional CAN busses on Host Mobility's MX4 GTT board.
