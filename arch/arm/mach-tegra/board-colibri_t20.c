@@ -766,7 +766,6 @@ static void colibri_t20_i2c_init(void)
 /* MMC/SD */
 
 #ifndef CONFIG_MACH_HM_VCB
-#ifndef CONFIG_MACH_HM_MX4_VCC 
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 	/* We dont have a card detect pin for wifi. I is always connected. */
 	.is_8bit	= 0,
@@ -774,7 +773,6 @@ static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 	.power_gpio	= -1,
 	.wp_gpio	= -1,
 };
-#endif /* !CONFIG_MACH_HM_MX4_VCC */
 
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
 	.cd_gpio		= MMC_CD,
@@ -789,6 +787,9 @@ int __init colibri_t20_sdhci_init(void)
 #ifdef CONFIG_MACH_HM_MX4_VCC
 	tegra_sdhci_device4.dev.platform_data =
 			&colibri_t20_sdhci_mmc_platform_data;
+
+	tegra_sdhci_device2.dev.platform_data =
+			&colibri_t20_sdhci_wifi_platform_data;
 #else
 	tegra_sdhci_device2.dev.platform_data =
 			&colibri_t20_sdhci_mmc_platform_data;
