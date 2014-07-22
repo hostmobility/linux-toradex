@@ -198,8 +198,6 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 //MVF600_PAD21_PTA31_UART0_DSR,
 	MVF600_PAD32_PTB10_UART0_TX,
 	MVF600_PAD33_PTB11_UART0_RX,
-	MVF600_PAD34_PTB12_UART0_RTS,
-	MVF600_PAD35_PTB13_UART0_CTS,
 
 	/* UART2: UART_B */
 	MVF600_PAD79_PTD0_UART2_TX,
@@ -236,8 +234,13 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 	MVF600_PAD31_PTB9_GPIO,
 #endif
 
-	/* Wake-Up GPIO */
-	MVF600_PAD41_PTB19__GPIO,
+	MVF600_PAD42_PTB20__GPIO, /* DIGITAL-IN-2 (wakeup)*/
+	MVF600_PAD41_PTB19__GPIO, /* DIGITAL-IN-3 (wakeup)*/
+	MVF600_PAD25_PTB03__GPIO, /* DIGITAL-IN-4 */
+	MVF600_PAD104_PTC31__GPIO, /* DIGITAL-IN-5 */
+	MVF600_PAD35_PTB13__GPIO, /* DIGITAL-IN-6 conflicts with
+								 MVF600_PAD35_PTB13_UART0_CTS*/
+
 #if 0
 	/* NAND */
 	MVF600_PAD71_PTD23_NF_IO7,
@@ -314,6 +317,35 @@ static iomux_v3_cfg_t mvf600_pads[] = {
 
 //IOMUXC_VIDEO_IN0_IPP_IND_DE_SELECT_INPUT: PTB5, PTB8 or PTB10 as ALT5
 };
+
+static struct gpio mvf_gpios[] = {
+	{42,	(GPIOF_IN),	"DIGITAL-IN-2"},
+	{41,	(GPIOF_IN),	"DIGITAL-IN-3"},
+	{24,	(GPIOF_IN),	"DIGITAL-IN-4"},
+	{22,	(GPIOF_IN),	"DIGITAL-IN-5"},
+	{35,	(GPIOF_IN),	"DIGITAL-IN-6"},
+};
+
+static void mvf_gpio_init(void)
+{
+	int i = 0;
+	int length = sizeof(mvf_gpios) / sizeof(struct gpio);
+	int err = 0;
+
+	for (i = 0; i < length; i++) {
+		err = gpio_request_one(mvf_gpios[i].gpio,
+				       mvf_gpios[i].flags,
+				       mvf_gpios[i].label);
+
+		if (err) {
+			pr_warning("gpio_request(%s) failed, err = %d",
+				   mvf_gpios[i].label, err);
+		} else {
+			gpio_sysfs_set_active_low(mvf_gpios[i].gpio, 1);
+			gpio_export(mvf_gpios[i].gpio, true);
+		}
+	}
+}
 
 static iomux_v3_cfg_t colibri_vf50_v10_pads[] = {
 	/* Touchscreen */
@@ -757,6 +789,9 @@ static void __init mvf_board_init(void)
 {
 	mxc_iomux_v3_setup_multiple_pads(mvf600_pads,
 					ARRAY_SIZE(mvf600_pads));
+
+	mvf_gpio_init();
+
 	mvf_vf700_init_uart();
 
 #ifdef CONFIG_FEC
