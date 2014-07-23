@@ -38,7 +38,7 @@
 #define DRIVER_NAME	"mvf-dcu"
 
 static struct fb_videomode __devinitdata mvf_dcu_default_mode = {
-#if !defined(CONFIG_COLIBRI_VF)
+#if !defined(CONFIG_COLIBRI_VF) && !defined(CONFIG_MX4_VF)
 	.xres		= 480,
 	.yres		= 272,
 	.left_margin	= 2,
@@ -49,7 +49,7 @@ static struct fb_videomode __devinitdata mvf_dcu_default_mode = {
 	.vsync_len	= 2,
 	.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 	.vmode		= FB_VMODE_NONINTERLACED,
-#else /* !CONFIG_COLIBRI_VF */
+#else /* !CONFIG_COLIBRI_VF && !CONFIG_MX4_VF */
 	.refresh	= 60,
 	.xres		= 640,
 	.yres		= 480,
@@ -63,7 +63,7 @@ static struct fb_videomode __devinitdata mvf_dcu_default_mode = {
 	.vsync_len	= 2,
 	.sync		= 0,
 	.vmode		= FB_VMODE_NONINTERLACED,
-#endif /* !CONFIG_COLIBRI_VF */
+#endif /* !CONFIG_COLIBRI_VF && !CONFIG_MX4_VF */
 };
 
 static struct fb_videomode __devinitdata mvf_dcu_mode_db[] = {
@@ -1226,7 +1226,7 @@ static int __devinit mvf_dcu_probe(struct platform_device *pdev)
 		goto failed_get_resource;
 	}
 
-#if !defined(CONFIG_COLIBRI_VF)
+#if !defined(CONFIG_COLIBRI_VF) && !defined(CONFIG_MX4_VF)
 	gpio_request_one(DCU_LCD_ENABLE_PIN, GPIOF_OUT_INIT_LOW, "DCU");
 	msleep(2);
 	gpio_set_value(DCU_LCD_ENABLE_PIN, 1);

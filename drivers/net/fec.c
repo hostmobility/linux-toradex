@@ -692,14 +692,14 @@ static void __inline__ fec_get_mac(struct net_device *ndev)
 	memcpy(ndev->dev_addr, iap, ETH_ALEN);
 
 	/* Adjust MAC if using macaddr */
-#if CONFIG_COLIBRI_VF
+#if defined(CONFIG_COLIBRI_VF) || defined(CONFIG_MX4_VF)
 	/* Add 0x100000 to the first MAC address to get the second */
 	if (iap == macaddr)
 		 ndev->dev_addr[3] = macaddr[3] + (fep->pdev->id * 0x10);
 #else
 	if (iap == macaddr)
 		 ndev->dev_addr[ETH_ALEN-1] = macaddr[ETH_ALEN-1] + fep->pdev->id;
-#endif /* !CONFIG_COLIBRI_VF */
+#endif /* !CONFIG_COLIBRI_VF || CONFIG_MX4_VF */
 }
 
 /* ------------------------------------------------------------------------- */
@@ -882,7 +882,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
 				platform_get_device_id(fep->pdev);
 	int err = -ENXIO, i;
 
-#if !defined(CONFIG_COLIBRI_VF)
+#if !defined(CONFIG_COLIBRI_VF) && !defined(CONFIG_MX4_VF)
 	/*
 	 * The dual fec interfaces are not equivalent with enet-mac.
 	 * Here are the differences:
@@ -904,7 +904,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
 		fep->mii_bus = fec0_mii_bus;
 		return 0;
 	}
-#endif /* !CONFIG_COLIBRI_VF */
+#endif /* !CONFIG_COLIBRI_VF && !CONFIG_MX4_VF */
 
 	fep->mii_timeout = 0;
 
@@ -948,11 +948,11 @@ static int fec_enet_mii_init(struct platform_device *pdev)
 	if (mdiobus_register(fep->mii_bus))
 		goto err_out_free_mdio_irq;
 
-#if !defined(CONFIG_COLIBRI_VF)
+#if !defined(CONFIG_COLIBRI_VF) && !defined(CONFIG_MX4_VF)
 	/* save fec0 mii_bus */
 	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC)
 		fec0_mii_bus = fep->mii_bus;
-#endif /* !CONFIG_COLIBRI_VF */
+#endif /* !CONFIG_COLIBRI_VF && !CONFIG_MX4_VF */
 
 	return 0;
 

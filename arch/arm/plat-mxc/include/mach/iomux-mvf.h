@@ -69,12 +69,12 @@ typedef enum iomux_config {
 //lowest drive!
 #define MVF600_HIGH_DRV		PAD_CTL_DSE_150ohm
 
-#if defined(CONFIG_COLIBRI_VF)
+#if defined(CONFIG_COLIBRI_VF) || defined(CONFIG_MX4_VF)
 #define MVF600_DCU_PAD_CTRL	(PAD_CTL_DSE_37ohm | PAD_CTL_SRE_FAST | \
 				 PAD_CTL_SPEED_HIGH | PAD_CTL_OBE_ENABLE)
 #else
 #define MVF600_DCU_PAD_CTRL	(MVF600_HIGH_DRV | PAD_CTL_OBE_ENABLE)
-#endif
+#endif /* CONFIG_COLIBRI_VF || CONFIG_MX4_VF */
 
 #define MVF600_UART_PAD_CTRL	(PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED | \
 				PAD_CTL_DSE_25ohm)

@@ -52,7 +52,7 @@ void __init mvf_init_fec(struct fec_platform_data fec_data)
 	if (!is_valid_ether_addr(fec_data.mac))
 		memcpy(fec_data.mac, default_mac, ETH_ALEN);
 
-#if !defined(CONFIG_COLIBRI_VF)
+#if !defined(CONFIG_COLIBRI_VF) && !defined(CONFIG_MX4_VF)
 #ifdef CONFIG_FEC0
 	mvf_add_fec(0, &mvf_fec_data[0], &fec_data);
 #endif
