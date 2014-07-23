@@ -41,13 +41,13 @@ config MACH_COLIBRI_VF61
 
 config UART3_SUPPORT
 	bool "Support alternative pinmux for UART3"
-	depends on MACH_COLIBRI_VF50 || MACH_COLIBRI_VF61
+	depends on MACH_COLIBRI_VF50 || MACH_COLIBRI_VF61 || MACH_MX4_VF50 || MACH_MX4_VF61
 	help
 	  Include support for UART3 on SODIMM 23/31.
 
 config UART4_SUPPORT
 	bool "Support alternative pinmux for UART4"
-	depends on MACH_COLIBRI_VF50 || MACH_COLIBRI_VF61
+	depends on MACH_COLIBRI_VF50 || MACH_COLIBRI_VF61 || MACH_MX4_VF50 || MACH_MX4_VF61
 	help
 	  Include support for UART4 on SODIMM 51/53.
 

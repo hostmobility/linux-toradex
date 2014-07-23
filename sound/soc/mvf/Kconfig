@@ -31,7 +31,7 @@ config SND_SOC_MVF_SGTL5000
 
 config SND_SOC_MVF_COLIBRI_VF61
 	tristate "SoC AC97 Audio support for Colibri VF61"
-	depends on MACH_COLIBRI_VF61
+	depends on MACH_COLIBRI_VF61 || MACH_MX4_VF61
 	select SND_MVF_AC97
 	select SND_SOC_WM9712
 	help
