@@ -50,7 +50,7 @@ KERN_INFO "    http://www.asix.com.tw\n";
 
 static char g_mac_addr[2][ETH_ALEN];
 static int g_usr_mac = 0;
-static int g_usr_mac2 = -1; /* If asix_mac2 not configured. */
+static int g_mac_alloc[2];
 
 /* configuration of maximum bulk in size */
 static int bsize = AX88772B_MAX_BULKIN_16K;
@@ -69,7 +69,7 @@ static void ax88772_link_reset (struct work_struct *work);
 static int ax88772a_phy_powerup (struct usbnet *dev);
 
 /* Retrieve user set MAC address */
-static int __init setup_asix_mac(char *macstr)
+static int setup_mac(char *macstr, int mac_nr) 
 {
 	int i, j;
 	unsigned char result, value;
@@ -92,17 +92,22 @@ static int __init setup_asix_mac(char *macstr)
 		}
 
 		macstr++;
-		g_mac_addr[g_usr_mac][i] = result;
+		g_mac_addr[mac_nr][i] = result;
 	}
 
 	g_usr_mac = 1;
 
 	return 0;
 }
+static int __init setup_asix_mac(char *macstr)
+{
+    g_mac_alloc[0] = setup_mac(macstr, 0);
+    return g_mac_alloc[0];
+}
 static int __init setup_asix_mac2(char *macstr) 
 {
-    g_usr_mac2 = setup_asix_mac(macstr);
-    return g_usr_mac2;
+    g_mac_alloc[1] = setup_mac(macstr, 1);
+    return g_mac_alloc[1];
 }
 
 __setup("asix_mac=", setup_asix_mac);
@@ -1805,14 +1810,22 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (!memcmp(buf, default_asix_mac, ETH_ALEN)) {
 		if (g_usr_mac && (g_usr_mac < 3)) {
 			/* Get user set MAC address */
-            memcpy(buf, g_mac_addr[g_usr_mac-1], ETH_ALEN);
-            if(g_usr_mac == 2 && g_usr_mac2) {
-                /* No asix_mac2 configured. Use default asix mac. */
+            if (!g_mac_alloc[0]) {
+                g_mac_alloc[0] = 1;
+                memcpy(buf, g_mac_addr[0], ETH_ALEN);
+                g_usr_mac++;
+            }
+            else if (!g_mac_alloc[1]) {
+                g_mac_alloc[1] = 1;
+                memcpy(buf, g_mac_addr[1], ETH_ALEN);
+                g_usr_mac++;
+            }
+            else {
+                /* No user configured mac free. Use default asix mac. */
                 memcpy(buf, default_asix_mac, ETH_ALEN);
             }
 
-			g_usr_mac++;
-		} else devwarn(dev, "using default ASIX MAC");
+		} else devwarn(dev, "using default ASIX MAC, %d", g_usr_mac);
 	}
 	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
 
@@ -2001,18 +2014,16 @@ static void ax88772b_unbind(struct usbnet *dev, struct usb_interface *intf)
 
 	if (ax772b_data) {
 		/* Check for user set MAC address */
-		if (!memcmp(dev->net->dev_addr, g_mac_addr[g_usr_mac-1], ETH_ALEN)) {
+		if (!memcmp(dev->net->dev_addr, g_mac_addr[0], ETH_ALEN))
+        {
 			/* Release user set MAC address */
+            g_mac_alloc[0] = 0;
+            g_usr_mac--;
+        }
+        if (!memcmp(dev->net->dev_addr, g_mac_addr[1], ETH_ALEN)) {
+			/* Release user set MAC address */
+            g_mac_alloc[1] = 0;
 			g_usr_mac--;
-
-#if 0
-			if (g_usr_mac == 2) {
-				/* 0x100000 offset for 2nd Ethernet MAC */
-				g_mac_addr[g_usr_mac-1][3] -= 0x10;
-				if (g_mac_addr[g_usr_mac-1][3] > 0xf0)
-					devwarn(dev, "MAC address byte 3 (0x%02x) wrap around", g_mac_addr[g_usr_mac-1][3]);
-			}
-#endif
 		}
 
 		flush_workqueue (ax772b_data->ax_work);
