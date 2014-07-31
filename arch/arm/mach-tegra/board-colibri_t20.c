@@ -822,14 +822,9 @@ static void colibri_t20_i2c_init(void)
 	i2c_register_board_info(4, colibri_t20_i2c_bus4_board_info, ARRAY_SIZE(colibri_t20_i2c_bus4_board_info));
 }
 
-/* Keys
-   Note: active-low means pull-ups required on carrier board resp. via pin-muxing
-   Note2: power-key active-high due to EvalBoard v3.1a having 100 K pull-down on SODIMM pin 45 */
-
-
 /* MMC/SD */
 
-#ifndef CONFIG_MACH_HM_VCB
+#if !defined(CONFIG_MACH_HM_MX4_VCC)
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 	/* We dont have a card detect pin for wifi. I is always connected. */
 	.is_8bit	= 0,
@@ -837,6 +832,7 @@ static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 	.power_gpio	= -1,
 	.wp_gpio	= -1,
 };
+#endif /* !CONFIG_MACH_HM_MX4_VCC */
 
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
 	.cd_gpio		= MMC_CD,
@@ -852,22 +848,20 @@ int __init colibri_t20_sdhci_init(void)
 	tegra_sdhci_device4.dev.platform_data =
 			&colibri_t20_sdhci_mmc_platform_data;
 
-	tegra_sdhci_device2.dev.platform_data =
-			&colibri_t20_sdhci_wifi_platform_data;
+	platform_device_register(&tegra_sdhci_device4);
 #else
 	tegra_sdhci_device2.dev.platform_data =
 			&colibri_t20_sdhci_mmc_platform_data;
 
 	tegra_sdhci_device4.dev.platform_data =
 			&colibri_t20_sdhci_wifi_platform_data;
-#endif /* CONFIG_MACH_HM_MX4_VCC */
 
 	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device4);
+#endif /* CONFIG_MACH_HM_MX4_VCC */
 
 	return 0;
 }
-#endif
 
 /* NAND */
 

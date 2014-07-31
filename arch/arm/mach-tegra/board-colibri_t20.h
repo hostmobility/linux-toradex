@@ -47,7 +47,12 @@
 
 #define MECS_USB_HUB_RESET	TEGRA_GPIO_PBB3	/* SODIMM 127 */
 
+#if defined(CONFIG_MACH_HM_MX4_VCC)
+#define MMC_CD		TEGRA_GPIO_PBB3	/* SODIMM 127 */
+#else
 #define MMC_CD		TEGRA_GPIO_PT4	/* SODIMM 43 */
+#endif /* CONFIG_MACH_HM_MX4_VCC */
+
 
 #define NAND_WP_N	TEGRA_GPIO_PS0
 
