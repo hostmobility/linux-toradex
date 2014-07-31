@@ -27,6 +27,7 @@
 #include <linux/i2c-tegra.h>
 #include <linux/input.h>
 #include <linux/io.h>
+#include <linux/irq.h>
 #include <linux/leds_pwm.h>
 #include <linux/lm95245.h>
 #include <linux/memblock.h>
@@ -61,6 +62,7 @@
 #include "pm.h"
 #include "pm-irq.h"
 #include "wakeups-t2.h"
+#include "wakeups.h"
 
 /* Legacy defines from previous tegra_nor.h (changed) */
 #define __BITMASK0(len)					((1 << (len)) - 1)
@@ -574,43 +576,105 @@ static void colibri_t20_gpio_init(void)
 			}
 		}
 	}
-
-	/* Enable wake up on selected gpio (see mx4_iomap.h) - set edge in sysfs from userspace to enable */
-	err = enable_irq_wake(gpio_to_irq(GPIO_WAKEUP_PIN));
-	if (err) {
-		pr_err("Failed to enable wakeup for irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
-	}
-	else {
-		pr_info("Enabling gpio wakeup on irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
-	}
-	err = tegra_pm_irq_set_wake_type(gpio_to_irq(GPIO_WAKEUP_PIN), IRQF_TRIGGER_RISING);
-	if (err) {
-		pr_err("Failed to set wake type for irq %d\n", gpio_to_irq(GPIO_WAKEUP_PIN));
-	}
-	else {
-		pr_info("Setting wake type to rising\n");
-	}
-
-#ifdef CONFIG_HM_WAKE_ON_CAN
-    /* Enable wake up on CAN. */
-    err = enable_irq_wake(gpio_to_irq(TEGRA_GPIO_PB6));
-	if (err) {
-		pr_err("Failed to enable wakeup for irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
-	}
-	else {
-		pr_info("Enabling gpio wakeup on irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
-	}
-	err = tegra_pm_irq_set_wake_type(gpio_to_irq(TEGRA_GPIO_PB6), IRQF_TRIGGER_FALLING | IRQF_TRIGGER_LOW);
-	if (err) {
-		pr_err("Failed to set wake type for irq %d\n", gpio_to_irq(TEGRA_GPIO_PB6));
-	}
-	else {
-		pr_info("Setting wake type to falling\n");
-	}
-#endif /* HM_WAKE_ON_CAN */
 }
 
+#ifdef CONFIG_DEBUG_FS
 
+static irqreturn_t wake_up_irq(int irq, void *data)
+{
+	return IRQ_HANDLED;
+}
+
+static int setup_wake_source(unsigned int gpio, unsigned long flags,
+	const char *name)
+{
+	int irq = gpio_to_irq(gpio);
+	int err = 0;
+
+	if((err = request_irq(irq, wake_up_irq, flags, name, NULL))){
+		printk(KERN_ERR "Failed to request irq: %d\n", irq);
+		goto error;
+	}
+
+	if((err = enable_irq_wake(irq))){
+		printk(KERN_ERR "Failed to enable wake irq: %d\n", irq);
+		free_irq(irq, NULL);
+		goto error;
+	}
+
+error:
+	return err;
+}
+
+#define WAKE_SOURCE_DIG_IN_2	(1 << 0)
+#define WAKE_SOURCE_CAN			(1 << 1)
+static u64 wake_sources;
+
+static int colibri_t20_get_wakeup_source(void *data, u64 *val)
+{
+	*val = (u64)wake_sources;
+	return 0;
+}
+
+static int colibri_t20_set_wakeup_source(void *data, u64 val)
+{
+	int err = 0;
+
+	if(val & WAKE_SOURCE_DIG_IN_2){
+		err = setup_wake_source(GPIO_WAKEUP_PIN, IRQF_TRIGGER_RISING
+			| IRQF_NO_SUSPEND, "GPIO-WAKE");
+
+	} else {
+		if(wake_sources & WAKE_SOURCE_DIG_IN_2) {
+			int irq = gpio_to_irq(GPIO_WAKEUP_PIN);
+
+			if((err = disable_irq_wake(irq)))
+				printk(KERN_ERR "Failed to disable irq wake: %d", irq);
+
+			free_irq(irq, NULL);
+		}
+	}
+
+	if(err)
+		goto error;
+
+	if(val & WAKE_SOURCE_CAN){
+		err = setup_wake_source(CAN_WAKEUP_PIN, IRQF_TRIGGER_FALLING
+			| IRQF_NO_SUSPEND, "CAN-WAKE");
+	} else {
+		if(wake_sources & WAKE_SOURCE_CAN) {
+			int irq = gpio_to_irq(CAN_WAKEUP_PIN);
+
+			if((err = disable_irq_wake(irq)))
+				printk(KERN_ERR "Failed to disable irq wake: %d", irq);
+
+			free_irq(irq, NULL);
+		}
+	}
+
+error:
+	wake_sources = val;
+
+	return err;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(wake_source_fops, colibri_t20_get_wakeup_source,
+	colibri_t20_set_wakeup_source, "%llu\n");
+#endif /* CONFIG_DEBUG_FS */
+
+static int colibri_t20_wakeup_source_init(void)
+{
+	struct dentry *wake_source_debugfs_root;
+
+	wake_source_debugfs_root = debugfs_create_dir("t20_wake_source", 0);
+
+	if (!debugfs_create_file("wake_source", 0644, wake_source_debugfs_root,
+		NULL, &wake_source_fops))
+		return -ENOMEM;
+
+	colibri_t20_set_wakeup_source(NULL, (u64)0);
+	return 0;
+}
 
 /* I2C */
 #ifdef CONFIG_SENSORS_L3G4200D
@@ -1755,6 +1819,8 @@ static void __init colibri_t20_init(void)
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
 	colibri_l3g4200d_init();
+
+	colibri_t20_wakeup_source_init();
 
 	tegra_clk_init_from_table(colibri_t20_clk_init_table);
 	colibri_t20_pinmux_init();
