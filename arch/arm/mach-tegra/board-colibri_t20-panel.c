@@ -220,66 +220,13 @@ static struct resource colibri_t20_disp2_resources[] = {
 	},
 };
 
-static struct tegra_dc_mode colibri_t20_panel_modes[] = {
-#ifdef TEGRA_FB_VGA
-	{
-		/* 640x480p 60hz: EIA/CEA-861-B Format 1 */
-		.pclk		= 25175000,	/* pixclock */
-		.h_ref_to_sync	= 8,
-		.v_ref_to_sync	= 2,
-		.h_sync_width	= 96,		/* hsync_len */
-		.v_sync_width	= 2,		/* vsync_len */
-		.h_back_porch	= 48,		/* left_margin */
-		.v_back_porch	= 33,		/* upper_margin */
-		.h_active	= 640,
-		.v_active	= 480,
-		.h_front_porch	= 16,		/* right_margin */
-		.v_front_porch	= 10,		/* lower_margin */
-	},
-#else /* TEGRA_FB_VGA */
-	{
-		/* 800x480@60 (NEXCOM VMD 1001) */
-		.pclk		= 	30000000,
-		.h_ref_to_sync	= 1,
-		.v_ref_to_sync	= 1,
-		.h_sync_width	= 80,
-		.v_sync_width	= 3,
-		.h_back_porch	= 96,
-		.v_back_porch	= 8,
-		.h_active	= 800,
-		.v_active	= 480,
-		.h_front_porch	= 16,
-		.v_front_porch	= 1,
-	},
-#endif /* TEGRA_FB_VGA */
-};
-
 static struct tegra_fb_data colibri_t20_fb_data = {
 	.win		= 0,
-#ifdef TEGRA_FB_VGA
-	.xres		= 640,
-	.yres		= 480,
-#else /* TEGRA_FB_VGA */
-	.xres		= 800,
-	.yres		= 480,
-#endif /* TEGRA_FB_VGA */
-#ifndef CONFIG_ANDROID
-	.bits_per_pixel	= 16,
-#else
-	.bits_per_pixel	= 32,
-#endif
 	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
 static struct tegra_fb_data colibri_t20_hdmi_fb_data = {
 	.win		= 0,
-	.xres		= 640,
-	.yres		= 480,
-#ifndef CONFIG_ANDROID
-	.bits_per_pixel	= 16,
-#else
-	.bits_per_pixel	= 32,
-#endif
 	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
@@ -309,8 +256,12 @@ static struct tegra_dc_out colibri_t20_disp1_out = {
 	.depth		= 18,
 	.dither		= TEGRA_DC_ORDERED_DITHER,
 
-	.modes		= colibri_t20_panel_modes,
-	.n_modes	= ARRAY_SIZE(colibri_t20_panel_modes),
+#ifdef TEGRA_FB_VGA
+       .default_mode           = "640x480-16@60",
+#else /* TEGRA_FB_VGA */
+       .default_mode           = "1920x1080-16@60",
+#endif /* TEGRA_FB_VGA */
+
 
 	.out_pins	= colibri_t20_dc_out_pins,
 	.n_out_pins	= ARRAY_SIZE(colibri_t20_dc_out_pins),
@@ -327,6 +278,13 @@ static struct tegra_dc_out colibri_t20_disp2_out = {
 	.hotplug_gpio	= colibri_t20_hdmi_hpd,
 
 	.max_pixclock	= KHZ2PICOS(148500),
+
+#ifdef TEGRA_FB_VGA
+    .default_mode           = "640x480-16@60",
+#else /* TEGRA_FB_VGA */
+    .default_mode           = "1920x1080-16@60",
+#endif /* TEGRA_FB_VGA */
+
 
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
