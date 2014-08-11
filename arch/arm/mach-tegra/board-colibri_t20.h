@@ -70,7 +70,7 @@
 #define USBH_PEN	TEGRA_GPIO_PW2	/* SODIMM 129 */
 
 /* Use SODIMM pin 73 as DAC power save on Iris carrier board */
-#define IRIS
+//#define IRIS
 
 /* Uncomment for back light and USB hub support on MECS Tellurium carrier
    board */
