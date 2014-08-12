@@ -246,53 +246,39 @@ static struct tegra_dc_out_pin colibri_t20_dc_out_pins[] = {
 };
 
 static struct tegra_dc_out colibri_t20_disp1_out = {
-	.type		= TEGRA_DC_OUT_RGB,
-//	.parent_clk	= "pll_c",
+	.type			= TEGRA_DC_OUT_RGB,
+	.parent_clk_backup = "pll_c",
 
 	.max_pixclock	= KHZ2PICOS(162000),
 
-	.align		= TEGRA_DC_ALIGN_MSB,
-	.order		= TEGRA_DC_ORDER_RED_BLUE,
-	.depth		= 18,
-	.dither		= TEGRA_DC_ORDERED_DITHER,
+	.align			= TEGRA_DC_ALIGN_MSB,
+	.order			= TEGRA_DC_ORDER_RED_BLUE,
+	.depth			= 24,
+	.dither			= TEGRA_DC_ORDERED_DITHER,
+    .default_mode   = "1920x1080-32@60",
 
-#ifdef TEGRA_FB_VGA
-       .default_mode           = "640x480-16@60",
-#else /* TEGRA_FB_VGA */
-       .default_mode           = "1920x1080-16@60",
-#endif /* TEGRA_FB_VGA */
+	.out_pins		= colibri_t20_dc_out_pins,
+	.n_out_pins		= ARRAY_SIZE(colibri_t20_dc_out_pins),
 
-
-	.out_pins	= colibri_t20_dc_out_pins,
-	.n_out_pins	= ARRAY_SIZE(colibri_t20_dc_out_pins),
-
-	.enable		= colibri_t20_panel_enable,
-	.disable	= colibri_t20_panel_disable,
+	.enable			= colibri_t20_panel_enable,
+	.disable		= colibri_t20_panel_disable,
 };
 
 static struct tegra_dc_out colibri_t20_disp2_out = {
-	.type		= TEGRA_DC_OUT_HDMI,
-	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
+	.type			= TEGRA_DC_OUT_HDMI,
+	.flags			= TEGRA_DC_OUT_HOTPLUG_HIGH,
 
-	.dcc_bus	= 1,
+	.dcc_bus		= 1,
 	.hotplug_gpio	= colibri_t20_hdmi_hpd,
 
 	.max_pixclock	= KHZ2PICOS(148500),
+    .default_mode   = "1920x1080-32@60",
 
-#ifdef TEGRA_FB_VGA
-    .default_mode           = "640x480-16@60",
-#else /* TEGRA_FB_VGA */
-    .default_mode           = "1920x1080-16@60",
-#endif /* TEGRA_FB_VGA */
+	.align			= TEGRA_DC_ALIGN_MSB,
+	.order			= TEGRA_DC_ORDER_RED_BLUE,
 
-
-	.align		= TEGRA_DC_ALIGN_MSB,
-	.order		= TEGRA_DC_ORDER_RED_BLUE,
-
-	.enable		= colibri_t20_hdmi_enable,
-	.disable	= colibri_t20_hdmi_disable,
-
-//	.dither		= TEGRA_DC_ORDERED_DITHER,
+	.enable			= colibri_t20_hdmi_enable,
+	.disable		= colibri_t20_hdmi_disable,
 };
 
 static struct tegra_dc_platform_data colibri_t20_disp1_pdata = {
