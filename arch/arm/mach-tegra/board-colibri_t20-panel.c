@@ -255,7 +255,7 @@ static struct tegra_dc_out colibri_t20_disp1_out = {
 	.order			= TEGRA_DC_ORDER_RED_BLUE,
 	.depth			= 24,
 	.dither			= TEGRA_DC_ORDERED_DITHER,
-    .default_mode   = "1920x1080-32@60",
+    .default_mode           = "640x480-16@60"
 
 	.out_pins		= colibri_t20_dc_out_pins,
 	.n_out_pins		= ARRAY_SIZE(colibri_t20_dc_out_pins),
@@ -272,7 +272,7 @@ static struct tegra_dc_out colibri_t20_disp2_out = {
 	.hotplug_gpio	= colibri_t20_hdmi_hpd,
 
 	.max_pixclock	= KHZ2PICOS(148500),
-    .default_mode   = "1920x1080-32@60",
+    .default_mode           = "640x480-16@60"
 
 	.align			= TEGRA_DC_ALIGN_MSB,
 	.order			= TEGRA_DC_ORDER_RED_BLUE,
