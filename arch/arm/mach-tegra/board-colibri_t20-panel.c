@@ -46,7 +46,10 @@
  Previos map TEGRA_GPIO_PT4 conflicted with MMC cd signal*/
 #define colibri_t20_bl_enb	TEGRA_GPIO_PP4
 #endif
+
+
 #define colibri_t20_hdmi_hpd	TEGRA_GPIO_PN7	/* HOTPLUG_DETECT */
+
 #ifdef IRIS
 #define iris_dac_psave		TEGRA_GPIO_PA0	/* DAC_PSAVE# */
 #else
@@ -446,12 +449,17 @@ int __init colibri_t20_panel_init(void)
 	res->end = tegra_fb2_start + tegra_fb2_size - 1;
 #endif /* CONFIG_TEGRA_GRHOST & CONFIG_TEGRA_DC */
 
+#if 1
+	tegra_move_framebuffer(tegra_fb_start, tegra_bootloader_fb_start,
+                               min(tegra_fb_size, tegra_bootloader_fb_size));
+#else
 	/* Make sure LVDS framebuffer is cleared. */
 	to_io = ioremap(tegra_fb_start, tegra_fb_size);
 	if (to_io) {
 		memset(to_io, 0, tegra_fb_size);
 		iounmap(to_io);
 	} else pr_err("%s: Failed to map LVDS framebuffer\n", __func__);
+#endif
 
 	/* Make sure HDMI framebuffer is cleared.
 	   Note: this seems to fix a tegradc.1 initialisation race in case of
