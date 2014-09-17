@@ -50,7 +50,7 @@ KERN_INFO "    http://www.asix.com.tw\n";
 
 static char g_mac_addr[2][ETH_ALEN];
 static int g_usr_mac = 0;
-static int g_mac_alloc[2];
+static int g_mac_alloc[2] = {-1, -1};
 
 /* configuration of maximum bulk in size */
 static int bsize = AX88772B_MAX_BULKIN_16K;
