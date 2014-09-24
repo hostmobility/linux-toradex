@@ -429,7 +429,6 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PZ4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P164 - NC"},
 	{TEGRA_GPIO_PAA4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P166 - NC"},
 	{TEGRA_GPIO_PAA5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P168 - NC"},
-	{TEGRA_GPIO_PAA6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P170 - NC"},
 	{TEGRA_GPIO_PAA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P172 - NC"},
 
 #ifndef CONFIG_HM_GMI_MUX
@@ -1009,25 +1008,14 @@ static struct platform_device tegra_nand_device = {
 	},
 };
 
-/* VCB LED:s */
-#ifdef CONFIG_MACH_HM_VCB
+
+#ifdef CONFIG_HM_WIFI_NETDEV_LED
 static struct gpio_led status_leds[] = {
 	[0] =  {
 		/* Global on switch for LEDs */
-		.name = "led-on-2",
-		.gpio = (TEGRA_GPIO_PAA1),
-		.active_low = 0,
-		.default_state = LEDS_GPIO_DEFSTATE_ON,
-	},
-	[1] =  {
-		.name = "led-vehicle",
-		.gpio = (TEGRA_GPIO_PD6),
-		.active_low = 0,
-		.default_state = LEDS_GPIO_DEFSTATE_OFF,
-	},
-	[2] =  {
-		.name = "led-usb",
-		.gpio = (TEGRA_GPIO_PL2),
+		.name = "mx4-wifi",
+		.default_trigger = "netdev",
+		.gpio = (MX4_WIFI_LED),
 		.active_low = 0,
 		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
@@ -1045,21 +1033,7 @@ static struct platform_device status_led_dev = {
 		.platform_data	= &status_led_data,
 	},
 };
-
-#if 0
-static struct gpio status_leds_gpios[] = {
-	{ TEGRA_GPIO_PL2, GPIOF_OUT_INIT_LOW, "LED-USB" }, /* default to OFF */
-	{ TEGRA_GPIO_PAA1, GPIOF_OUT_INIT_HIGH,  "LED-ON-2" }, /* default to ON */
-	{ TEGRA_GPIO_PD6, GPIOF_OUT_INIT_HIGH,  "LED-VEHICLE" }, /* default to OFF */
-};
-//err = gpio_request_array(status_leds_gpios, ARRAY_SIZE(status_leds_gpios));
-gpio_request_one(TEGRA_GPIO_PL2, GPIOF_OUT_INIT_LOW, "LED-USB");
-if (err) {
-	pr_err("Failed to register status LED:s\n");
-}
-#endif
-
-#endif
+#endif /* CONFIG_HM_WIFI_NETDEV_LED */
 
 
 /* RTC */
@@ -1740,9 +1714,9 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 	&colibri_t20_audio_device,
 #endif
 	&tegra_spi_device4,
-#ifdef CONFIG_MACH_HM_VCB
+#ifdef CONFIG_HM_WIFI_NETDEV_LED
 	&status_led_dev,
-#endif
+#endif /* CONFIG_HM_WIFI_NETDEV_LED */
 	&tegra_pwfm1_device,
 	&tegra_pwfm2_device,
 	&tegra_pwfm3_device,

@@ -135,6 +135,15 @@ config HM_WAKE_ON_CAN
 	help
 		Select this if you want to enable wake on CAN feature
 
+config HM_WIFI_NETDEV_LED
+	bool "MX-4 Wifi LED"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	default n
+	select LEDS_GPIO
+	select LEDS_TRIGGER_NETDEV
+	help
+		Select this if you want wifi-led controled by led class and netdev on MX-4
+
 comment "Tegra board type"
 
 config MACH_COLIBRI_T20
@@ -163,6 +172,7 @@ config MACH_HM_MX4_VCC
        bool "Host Mobility MX4 VCC"
        depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
        select HM_GTT_CAN
+       select HM_WIFI_NETDEV_LED
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 VCC board
 

@@ -96,5 +96,7 @@
 #define GPIO_WAKEUP_PIN				TEGRA_GPIO_PC7
 #define CAN_WAKEUP_PIN				TEGRA_GPIO_PB6
 
+#define MX4_WIFI_LED				TEGRA_GPIO_PAA6
+
 /* End Host Mobility MX-4 MAP*/
 #endif
