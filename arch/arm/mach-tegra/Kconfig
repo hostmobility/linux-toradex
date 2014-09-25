@@ -140,6 +140,7 @@ config HM_WIFI_NETDEV_LED
 	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
 	default n
 	select LEDS_GPIO
+	select LEDS_TRIGGERS
 	select LEDS_TRIGGER_NETDEV
 	help
 		Select this if you want wifi-led controled by led class and netdev on MX-4
