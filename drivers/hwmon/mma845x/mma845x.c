@@ -1061,9 +1061,10 @@ static int InitializeChip(struct ChipInfo_t *pChipInfo)
 	i2c_smbus_write_byte_data(pClient, (REG845X_CTRL_REG1), ret);
 
 	/*
-	 **  Route all interrupts to INT1
+	 **  Route data ready interrupt to INT1
+     **  Other interrupts to INT2
 	 */
-	ret = 0xff; 
+	ret = 0x43; 
 	i2c_smbus_write_byte_data(pClient, (REG845X_CTRL_REG5), ret);
 
 	/* Enable orientation functionality */
