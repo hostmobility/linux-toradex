@@ -10,6 +10,7 @@
 /dts-v1/;
 #include "vf610-colibri.dtsi"
 #include "vf-colibri-eval-v3.dtsi"
+#include "vf-hm-mx4.dtsi"
 
 / {
 	model = "Host Mobility MX-4 with Toradex Colibri VF61";
