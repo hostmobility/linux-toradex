@@ -31,7 +31,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_esdhc1>;
 	bus-width = <4>;
-	cd-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
+    cd-gpios = <&gpio3 4 GPIO_ACTIVE_LOW>;
 };
 
 &fec1 {
@@ -158,7 +158,7 @@
 				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
 				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
 				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
-				VF610_PAD_PTB20__GPIO_42	0x219d
+                VF610_PAD_PTD26__GPIO_68     0x219
 			>;
 		};
 
