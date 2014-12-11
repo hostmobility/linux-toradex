@@ -1,6 +1,9 @@
 #include <dt-bindings/input/input.h>
 #include "vf610-pinfunc.h"
 
+/* Digital in 2 and 3 are mapped as input keys and also configured as wakeup sources. 
+ * Accelerometer does only have interrupt pin 1, only mapped to iomux so it can be exported. 
+*/
 / {
     digital-io {
         compatible = "gpio-keys";
@@ -21,7 +24,9 @@
             linux,code = <KEY_POWER>;
             debounce-interval = <10>;
             gpio-key,wakeup;
-        };  
+        };
+
+
     };
 };
 
@@ -33,5 +38,19 @@
                 VF610_PAD_PTB19__GPIO_41    0x219d
             >;
         };
+
+        pinctrl_acc: gpio-acc {
+            fsl,pins = <
+                VF610_PAD_PTD31__GPIO_63    0x219d
+            >;
+        };
+
+    };
+};
+
+&i2c0 {
+    acc: mma8452q@1c {
+        compatible = "fsl,mma8452";
+        reg = <0x1c>;
     };
 };
