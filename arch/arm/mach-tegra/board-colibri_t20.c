@@ -148,7 +148,7 @@ static struct resource colibri_can_resource[] = {
 static struct sja1000_platform_data colibri_can_platdata = {
 	.osc_freq	= 24000000,
 	.ocr		= (OCR_MODE_NORMAL | OCR_TX0_PUSHPULL),
-#ifdef CONFIG_MACH_HM_MX4_VCC
+#ifdef CONFIG_HM_DAISY_CHAIN_CAN
 	.cdr		= CDR_CLKOUT_MASK |  /* Set CLKOUT to Fosc */
 			  CDR_CBP, /* CAN input comparator bypass */
 #else

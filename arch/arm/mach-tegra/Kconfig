@@ -135,6 +135,13 @@ config HM_WAKE_ON_CAN
 	help
 		Select this if you want to enable wake on CAN feature
 
+config HM_DAISY_CHAIN_CAN
+	bool "MX-4 CAN clock is daisy chained from CAN-1"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+	default n
+	help
+	  Support for daisy chained CAN clock from CAN-1.
+
 config HM_WIFI_NETDEV_LED
 	bool "MX-4 Wifi LED"
 	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
@@ -176,6 +183,7 @@ config MACH_HM_MX4_VCC
        select HM_EXT_8250_UART
        select HM_WIFI_NETDEV_LED
        select HM_DIGITAL_INPUTS
+       select HM_DAISY_CHAIN_CAN
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 VCC board
 
@@ -184,6 +192,7 @@ config MACH_HM_MX4_VCC_T20
        depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
        select HM_GTT_CAN
        select HM_WIFI_NETDEV_LED
+       select HM_DAISY_CHAIN_CAN
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 VCC T20 board
 
