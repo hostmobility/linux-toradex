@@ -154,7 +154,7 @@ static struct sja1000_platform_data colibri_can_platdata = {
 #else
 	.cdr		= CDR_CLK_OFF | /* Clock off (CLKOUT pin) */
 			  CDR_CBP, /* CAN input comparator bypass */
-#endif /* CONFIG_MACH_HM_MX4_VCC */
+#endif /* CONFIG_HM_DAISY_CHAIN_CAN */
 };
 
 static struct platform_device colibri_can_device = {
