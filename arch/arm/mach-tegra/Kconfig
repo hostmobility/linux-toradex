@@ -135,6 +135,13 @@ config HM_WAKE_ON_CAN
 	help
 		Select this if you want to enable wake on CAN feature
 
+config HM_REDPINE_WIFI
+	bool "MX-4 Redpine wifi chip"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	default n
+	help
+		Select this if you want to enable Redpine wifi connected to SDIO port
+
 config HM_DAISY_CHAIN_CAN
 	bool "MX-4 CAN clock is daisy chained from CAN-1"
 	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
@@ -171,6 +178,7 @@ config MACH_HM_MX4_GTT
        bool "Host Mobility MX4 GTT"
        depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
        select HM_GTT_CAN
+       select HM_REDPINE_WIFI
        select HM_EXT_8250_UART
        select HM_DIGITAL_INPUTS
        help
