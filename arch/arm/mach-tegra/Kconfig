@@ -157,7 +157,6 @@ config MACH_HM_MX4
        bool "Host Mobility MX4"
        depends on ARCH_TEGRA_2x_SOC
        select MACH_COLIBRI_T20
-       select HM_EXT_8250_UART
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 board
 
@@ -165,6 +164,7 @@ config MACH_HM_MX4_GTT
        bool "Host Mobility MX4 GTT"
        depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
        select HM_GTT_CAN
+       select HM_EXT_8250_UART
        select HM_DIGITAL_INPUTS
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 GTT board
@@ -173,6 +173,7 @@ config MACH_HM_MX4_VCC
        bool "Host Mobility MX4 VCC"
        depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
        select HM_GTT_CAN
+       select HM_EXT_8250_UART
        select HM_WIFI_NETDEV_LED
        select HM_DIGITAL_INPUTS
        help
