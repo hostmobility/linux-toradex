@@ -1549,11 +1549,7 @@ static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 		.hot_plug			= true,
 		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= false,
-#ifdef CONFIG_MACH_HM_MX4_VCC
 		.vbus_gpio			= TEGRA_GPIO_PC0,
-#else
-        .vbus_gpio = -1,
-#endif
 		.vbus_gpio_inverted		= 0,
 		.vbus_reg			= NULL,
 	},
