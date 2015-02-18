@@ -1502,6 +1502,8 @@ static struct tegra_usb_platform_data tegra_ehci2_ulpi_link_pdata = {
 	},
 };
 
+
+#ifdef CONFIG_MACH_HM_MX4_GTT
 static void modem_link_platform_open(void)
 {
 	int modem_vbus_gpio = USBH_PEN;
@@ -1531,9 +1533,13 @@ static struct tegra_usb_phy_platform_ops modem_link_plat_ops = {
 	.pre_phy_off = modem_link_platform_pre_phy_off,
 };
 
+#endif /* CONFIG_MACH_HM_MX4_GTT */
+
 static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 	.has_hostpc	= false,
+#ifdef CONFIG_MACH_HM_MX4_GTT
 	.ops 		= &modem_link_plat_ops,
+#endif /* CONFIG_MACH_HM_MX4_GTT */
 	.op_mode	= TEGRA_USB_OPMODE_HOST,
 	.phy_intf	= TEGRA_USB_PHY_INTF_UTMI,
 	.port_otg	= false,
