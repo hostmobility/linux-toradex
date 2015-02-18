@@ -1072,7 +1072,7 @@ static struct spi_board_info tegra_spi_devices[] __initdata = {
 	{
 		.bus_num	= 3,		/* SPI4 */
 		.chip_select	= 0,
-		.irq		= TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PY6),
+		.irq		= TEGRA_GPIO_TO_IRQ(MX4_WAKE_UP_CPU),
 		.max_speed_hz	= 12000000,
 		.modalias	= "mx4_io_spi",
 		.mode		= SPI_MODE_1,
