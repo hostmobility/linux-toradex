@@ -457,8 +457,12 @@ static struct gpio colibri_t20_gpios[] = {
 	#endif
 #endif /* CONFIG_HM_DIGITAL_INPUTS */
 
+#ifdef CONFIG_MACH_HM_MX4_GTT
+	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
+#else
 	{TEGRA_GPIO_PW2,	(GPIOF_IN ),                	"P129 - MODEM-WAKEUP"},
-	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP-GTT"},
+#endif /* CONFIG_MACH_HM_MX4_GTT */
+
 	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
 
 #ifndef CONFIG_HM_GMI_MUX
