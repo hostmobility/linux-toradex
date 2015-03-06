@@ -100,13 +100,8 @@
 #define MX4_CT_WIFI_LED				TEGRA_GPIO_PN6
 
 
-#ifdef CONFIG_MACH_HM_MX4_VCC_T20
-#define MX4_WAKE_UP_CPU				TEGRA_GPIO_PV3
-#define MX4_DATA_READY_PIC			TEGRA_GPIO_PY6
-#else
 #define MX4_WAKE_UP_CPU				TEGRA_GPIO_PY6
-#define MX4_DATA_READY_PIC			0
-#endif /* */
+#define MX4_DATA_READY_PIC			TEGRA_GPIO_PY3
 
 /* End Host Mobility MX-4 MAP*/
 #endif
