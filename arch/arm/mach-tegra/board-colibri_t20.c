@@ -1495,7 +1495,7 @@ static struct tegra_usb_platform_data tegra_ehci2_ulpi_link_pdata = {
 	},
 	.u_data.host = {
 		.hot_plug			= false,
-		.power_off_on_suspend		= true,
+		.power_off_on_suspend		= false,
 		.remote_wakeup_supported	= false,
 		.vbus_gpio			= -1,
 		.vbus_reg			= NULL,
