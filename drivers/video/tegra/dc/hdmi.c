@@ -1457,6 +1457,9 @@ static bool tegra_dc_hdmi_detect(struct tegra_dc *dc)
 	return true;
 
 fail:
+    /* disable upon boot disconnected as well as upon later disconnect */
+    if (dc->enabled)
+        tegra_dc_disable(dc);
 	hdmi->eld_retrieved = false;
 #ifdef CONFIG_SWITCH
 	switch_set_state(&hdmi->hpd_switch, 0);
