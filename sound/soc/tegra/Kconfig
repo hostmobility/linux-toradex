@@ -99,13 +99,13 @@ config SND_SOC_TEGRA_COLIBRI_T20
 	  Toradex Colibri T20 module.
 
 config SND_SOC_TEGRA_MX4_T20
-	tristate "SoC Audio support for MX4 T20 module"
+	tristate "SoC Audio support for MX4 T20 board"
 	depends on SND_SOC_TEGRA && MACH_COLIBRI_T20
 	select SND_SOC_TEGRA20_AC97
 	select SND_SOC_WM9712
 	help
 	  Say Y or M here if you want to add support for SoC audio on the
-	  Toradex Colibri T20 module.
+	  Toradex MX-4 T20 board.
 
 config SND_SOC_TEGRA_COLIBRI_T30
 	tristate "SoC Audio support for Apalis/Colibri T30 modules"
