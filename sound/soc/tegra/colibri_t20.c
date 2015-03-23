@@ -79,6 +79,7 @@ static int colibri_t20_wm9715l_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+#ifdef CONFIG_SND_SOC_TEGRA20_SPDIF
 static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params)
 {
@@ -123,6 +124,7 @@ static int tegra_spdif_hw_params(struct snd_pcm_substream *substream,
 
 	return 0;
 }
+#endif /* CONFIG_SND_SOC_TEGRA20_SPDIF */
 
 static int tegra_hw_free(struct snd_pcm_substream *substream)
 {
@@ -139,10 +141,12 @@ static struct snd_soc_ops colibri_t20_wm9715l_ops = {
 	.hw_free = tegra_hw_free,
 };
 
+#ifdef CONFIG_SND_SOC_TEGRA20_SPDIF
 static struct snd_soc_ops tegra_spdif_ops = {
 	.hw_params = tegra_spdif_hw_params,
 	.hw_free = tegra_hw_free,
 };
+#endif /* CONFIG_SND_SOC_TEGRA20_SPDIF */
 
 static const struct snd_soc_dapm_widget colibri_t20_wm9715l_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("HEADPHONE", NULL),
@@ -238,6 +242,7 @@ static struct snd_soc_dai_link colibri_t20_wm9715l_dai[] = {
 		.ops = &colibri_t20_wm9715l_ops,
 	},
 //order
+#ifdef CONFIG_SND_SOC_TEGRA20_SPDIF
 	{
 		.name = "SPDIF",
 		.stream_name = "SPDIF PCM",
@@ -247,6 +252,7 @@ static struct snd_soc_dai_link colibri_t20_wm9715l_dai[] = {
 		.codec_dai_name = "dit-hifi",
 		.ops = &tegra_spdif_ops,
 	},
+#endif /* CONFIG_SND_SOC_TEGRA20_SPDIF */
 #if 0
 	{
 		.name = "AC97 Aux",
