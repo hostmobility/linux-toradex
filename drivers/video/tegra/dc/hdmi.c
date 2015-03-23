@@ -1261,26 +1261,8 @@ static bool tegra_dc_hdmi_valid_asp_ratio(const struct tegra_dc *dc,
 	if (!mode->yres)
 		return false;
 
-	return true; // Allow all ratios
-
-	/* To check the aspect upto two decimal digits, calculate in % */
-	m_aspratio = (mode->xres*100 / mode->yres);
-
-	if ((m_aspratio < TEGRA_DC_HDMI_MIN_ASPECT_RATIO_PERCENT) ||
-			(m_aspratio > TEGRA_DC_HDMI_MAX_ASPECT_RATIO_PERCENT))
-				return false;
-
-	/* Check from the table of  supported aspect ratios, allow
-	    difference of 1% for second decimal digit calibration */
-	for (count = 0; count < ARRAY_SIZE(tegra_dc_hdmi_aspect_ratios);
-		 count++) {
-			s_aspratio =  tegra_dc_hdmi_aspect_ratios[count];
-			if ((m_aspratio == s_aspratio) ||
-				(abs(m_aspratio - s_aspratio) == 1))
-				return true;
-	}
-
-	return false;
+	/* Allow all ratios */
+	return true;
 }
 
 
