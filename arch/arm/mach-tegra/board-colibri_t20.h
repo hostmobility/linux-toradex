@@ -60,7 +60,12 @@
 //conflicts with MECS Tellurium xPOD2 SSPTXD2
 #define USBC_DET	TEGRA_GPIO_PK5	/* SODIMM 137 */
 #define USBH_OC		TEGRA_GPIO_PW3	/* SODIMM 131 */
+
+#ifdef CONFIG_MACH_HM_MX4_GTT
 #define USBH_PEN	TEGRA_GPIO_PW2	/* SODIMM 129 */
+#else
+#define USBH_PEN	TEGRA_GPIO_PC0	/* SODIMM 129 */
+#endif /* CONFIG_MACH_HM_MX4_GTT */
 
 /* Use SODIMM pin 73 as DAC power save on Iris carrier board */
 //#define IRIS
