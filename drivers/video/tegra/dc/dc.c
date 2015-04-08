@@ -67,6 +67,18 @@ struct tegra_dc *tegra_dcs[TEGRA_MAX_DC];
 DEFINE_MUTEX(tegra_dc_lock);
 DEFINE_MUTEX(shared_lock);
 
+/* Disable EDID on hotplug */
+int g_disable_edid = 0;
+
+static int __init tegra_dc_disable_edid(char *s)
+{
+	if (!(*s) || !strcmp(s, "1"))
+		g_disable_edid = 1;
+
+	return 0;
+}
+__setup("tegra_disable_edid=", tegra_dc_disable_edid);
+
 void tegra_dc_clk_enable(struct tegra_dc *dc)
 {
 	if (!tegra_is_clk_enabled(dc->clk)) {
@@ -526,6 +538,9 @@ bool tegra_dc_hpd(struct tegra_dc *dc)
 {
 	int sense;
 	int level;
+
+	if (g_disable_edid)
+		return false;
 
 	level = gpio_get_value(dc->out->hotplug_gpio);
 
