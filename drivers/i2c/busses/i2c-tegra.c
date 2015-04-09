@@ -725,7 +725,7 @@ static int tegra_i2c_xfer_msg(struct tegra_i2c_bus *i2c_bus,
 	if (i2c_dev->is_dvc)
 		dvc_i2c_mask_irq(i2c_dev, DVC_CTRL_REG3_I2C_DONE_INTR_EN);
 
-	if (WARN_ON(ret == 0)) {
+	if (ret == 0) {
 		dev_err(i2c_dev->dev,
 			"i2c transfer timed out, addr 0x%04x, data 0x%02x\n",
 			msg->addr, msg->buf[0]);
