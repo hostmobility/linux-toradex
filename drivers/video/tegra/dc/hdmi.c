@@ -1442,7 +1442,6 @@ static void tegra_dc_hdmi_detect_worker(struct work_struct *work)
 	msleep(5);
 	if (!tegra_dc_hdmi_detect(dc)) {
 		tegra_dc_disable(dc);
-		tegra_fb_update_monspecs(dc->fb, NULL, NULL);
 
 		dc->connected = false;
 		tegra_dc_ext_process_hotplug(dc->ndev->id);
