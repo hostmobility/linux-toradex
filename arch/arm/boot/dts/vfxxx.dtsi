@@ -479,7 +479,7 @@
 				clocks = <&clks VF610_CLK_USBC0>;
 				fsl,usbphy = <&usbphy0>;
 				fsl,usbmisc = <&usbmisc0 0>;
-				dr_mode = "peripheral";
+				dr_mode = "host";
 				status = "disabled";
 			};
 
