@@ -111,5 +111,11 @@
 #define MMC_CD		TEGRA_GPIO_PBB3	/* SODIMM 127 */
 #endif /* CONFIG_MACH_HM_MX4_VCC */
 
+
+struct mx4_io_platform_data {
+	int event_rdy;
+};
+
+
 /* End Host Mobility MX-4 MAP*/
 #endif
