@@ -108,6 +108,13 @@ config HM_DIGITAL_INPUTS
 	help
 	  Support for CPU-based digital inputs on Host Mobility's carrier board for Toradex T20.
 
+config HM_EVENT_IRQ
+	bool "Board has an event interrupt line"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	default n
+	help
+	  Support for interrupt triggered events from CO-CPU on Host Mobility's carrier board for Toradex T20.
+
 config HM_EXT_AX88772B
 	bool "External ASIX AX88772B ethernet adapter"
 	depends on ARCH_TEGRA_2x_SOC && MACH_HM_VCB

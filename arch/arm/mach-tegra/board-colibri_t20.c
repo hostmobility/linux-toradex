@@ -1070,7 +1070,11 @@ static struct platform_device tegra_rtc_device = {
 #if defined(CONFIG_SPI_TEGRA) && defined(CONFIG_SPI_SPIDEV)
 
 static struct mx4_io_platform_data mx4_io_pdata = {
+#ifdef CONFIG_HM_EVENT_IRQ
 	.event_rdy = TEGRA_GPIO_TO_IRQ(MX4_DATA_READY_PIC),
+#else
+	.event_rdy = -1,
+#endif
 };
 
 
