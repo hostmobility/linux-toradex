@@ -418,7 +418,6 @@ static struct gpio colibri_t20_gpios[] = {
 	//Pin 136, 138, 140, 142 Muxed to PM2 et al in pinmux (SPI2). Currently not used
 	{TEGRA_GPIO_PX3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P136 - NC"},
 	{TEGRA_GPIO_PX2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P138 - NC"},
-	{TEGRA_GPIO_PB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P154 - NC"},
 	{TEGRA_GPIO_PN5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P158 - NC"},
 	{TEGRA_GPIO_PN4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P160 - NC"},
 	{TEGRA_GPIO_PZ2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P156 - NC"},
@@ -1011,17 +1010,25 @@ static struct platform_device tegra_nand_device = {
 static struct gpio_led status_leds[] = {
 	[0] =  {
 		/* Global on switch for LEDs */
+		.name = "mx4-ct-wifi",
+		.default_trigger = "netdev",
+		.gpio = (MX4_CT_WIFI_LED),
+		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	[1] =  {
+		/* Global on switch for LEDs */
 		.name = "mx4-wifi",
 		.default_trigger = "netdev",
 		.gpio = (MX4_WIFI_LED),
 		.active_low = 0,
 		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
-	[1] =  {
-		/* Global on switch for LEDs */
-		.name = "mx4-ct-wifi",
-		.default_trigger = "netdev",
-		.gpio = (MX4_CT_WIFI_LED),
+	[2] =  {
+		/* WIFI-RED on MX-4 T20 */
+		.name = "mx4-wifi-red",
+		.default_trigger = "none",
+		.gpio = (MX4_WIFI_RED),
 		.active_low = 0,
 		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
