@@ -122,6 +122,7 @@ obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-memory.o
 obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-panel.o
 obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-pinmux.o
 obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-power.o
+obj-${CONFIG_MACH_COLIBRI_T20}          += mx4-pm.o
 
 obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-kbc.o
