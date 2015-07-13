@@ -556,24 +556,29 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 			tegra_fb_find_best_mode(&var, &info->modelist);
 	}
 
-	/* Prepare fb info with new mode details */
-	fb_videomode_to_var(&info->var, info->mode);
-	event.info = fb_info->info;
+	if (info->mode != NULL) {
+		/* Prepare fb info with new mode details */
+		fb_videomode_to_var(&info->var, info->mode);
+		event.info = fb_info->info;
 
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	/* Send a noti to change fb_display[].mode for all vc's */
-	console_lock();
-	fb_notifier_call_chain(FB_EVENT_MODE_CHANGE_ALL, &event);
-	console_unlock();
+		/* Send a noti to change fb_display[].mode for all vc's */
+		console_lock();
+		fb_notifier_call_chain(FB_EVENT_MODE_CHANGE_ALL, &event);
+		console_unlock();
 
-	/* Notify framebuffer console about mode change */
-	console_lock();
-	fb_notifier_call_chain(FB_EVENT_NEW_MODELIST, &event);
-	console_unlock();
+		/* Notify framebuffer console about mode change */
+		console_lock();
+		fb_notifier_call_chain(FB_EVENT_NEW_MODELIST, &event);
+		console_unlock();
 #else
-	fb_notifier_call_chain(FB_EVENT_NEW_MODELIST, &event);
+		fb_notifier_call_chain(FB_EVENT_NEW_MODELIST, &event);
 #endif
-
+	} else {
+		/* No valid/accepted modes founds, We should restore the modelist
+		and stuff */
+		printk(KERN_EMERG "Failed to find a valid FB mode\n");
+	}
 	mutex_unlock(&fb_info->info->lock);
 }
 
