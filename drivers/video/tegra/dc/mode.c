@@ -44,6 +44,23 @@ const struct fb_videomode tegra_modes[] = {
 		.flag = FB_FLAG_RATIO_16_9,
 		.vmode = FB_VMODE_NONINTERLACED
 	},
+	/* 800x480@60 (NEXCOM VMD 1001) */
+	{
+		.name =		"800x480CT",
+		.refresh =	60,
+		.xres = 	800,
+		.yres = 	480,
+		.pixclock = 30000,
+		.left_margin = 	96,
+		.right_margin = 16,
+		.upper_margin = 8,
+		.lower_margin = 1,
+		.hsync_len =	80,
+		.vsync_len = 	3,
+		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.flag = FB_FLAG_RATIO_16_9,
+		.vmode = FB_VMODE_NONINTERLACED
+	},
 	/* TouchRevolution Fusion 10" aka Chunghwa Picture Tubes
 	 * CLAA100NC05 10.1 inch 1024x600 single channel LVDS panel
 	 */
