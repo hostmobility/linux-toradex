@@ -67,28 +67,6 @@
 #define HDMI_ELD_PRODUCT_CODE_INDEX		18
 #define HDMI_ELD_MONITOR_NAME_INDEX		20
 
-/* These two values need to be cross checked in case of
-     addition/removal from tegra_dc_hdmi_aspect_ratios[] */
-#define TEGRA_DC_HDMI_MIN_ASPECT_RATIO_PERCENT	80
-#define TEGRA_DC_HDMI_MAX_ASPECT_RATIO_PERCENT	320
-
-/* Percentage equivalent of standard aspect ratios
-    accurate upto two decimal digits */
-static int tegra_dc_hdmi_aspect_ratios[] = {
-	/*   3:2	*/	150,
-	/*   4:3	*/	133,
-	/*   4:5	*/	 80,
-	/*   5:4	*/	125,
-	/*   9:5	*/	180,
-	/*  16:5	*/	320,
-	/*  16:9	*/	178,
-	/* 16:10	*/	160,
-	/* 19:10	*/	190,
-	/* 25:16	*/	156,
-	/* 64:35	*/	183,
-	/* 72:35	*/	206
-};
-
 struct tegra_dc_hdmi_data {
 	struct tegra_dc			*dc;
 	struct tegra_edid		*edid;
@@ -1254,32 +1232,11 @@ static bool tegra_dc_reload_mode(struct fb_videomode *mode)
 static bool tegra_dc_hdmi_valid_asp_ratio(const struct tegra_dc *dc,
 					struct fb_videomode *mode)
 {
-	int count = 0;
-	int m_aspratio = 0;
-	int s_aspratio = 0;
-
 	if (!mode->yres)
 		return false;
 
-	/* To check the aspect upto two decimal digits, calculate in % */
-	if (mode->yres)
-		m_aspratio = (mode->xres*100 / mode->yres);
-
-	if ((m_aspratio < TEGRA_DC_HDMI_MIN_ASPECT_RATIO_PERCENT) ||
-			(m_aspratio > TEGRA_DC_HDMI_MAX_ASPECT_RATIO_PERCENT))
-				return false;
-
-	/* Check from the table of  supported aspect ratios, allow
-	    difference of 1% for second decimal digit calibration */
-	for (count = 0; count < ARRAY_SIZE(tegra_dc_hdmi_aspect_ratios);
-		 count++) {
-			s_aspratio =  tegra_dc_hdmi_aspect_ratios[count];
-			if ((m_aspratio == s_aspratio) ||
-				(abs(m_aspratio - s_aspratio) == 1))
-				return true;
-	}
-
-	return false;
+	/* Allow all ratios */
+	return true;
 }
 
 
