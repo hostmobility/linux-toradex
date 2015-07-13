@@ -96,6 +96,76 @@ config TEGRA_IRDA
 	  Adds support for Vishay IrDA transceiver at UARTB port
 	  of Verbier Boards(E1186 and E1198) with no ULPI rework done.
 
+config HM_EXT_8250_UART
+	bool "External 8250 UART"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	help
+	  Support for external 8250 UART on Host Mobility's carrier board for Toradex T20.
+
+config HM_DIGITAL_INPUTS
+	bool "Digital inputs on connector"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	help
+	  Support for CPU-based digital inputs on Host Mobility's carrier board for Toradex T20.
+
+config HM_EVENT_IRQ
+	bool "Board has an event interrupt line"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	default n
+	help
+	  Support for interrupt triggered events from CO-CPU on Host Mobility's carrier board for Toradex T20.
+
+config HM_EXT_AX88772B
+	bool "External ASIX AX88772B ethernet adapter"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_VCB
+	help
+	  Support for external ASIX AX88772B ethernet adapter on Host Mobility's carrier board for Toradex T20.
+
+config HM_GTT_CAN
+    bool "MX4 GTT additional CAN"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+    default n
+    help
+      Support for additional CAN busses on Host Mobility's MX4 GTT board.
+
+config HM_GMI_MUX
+	bool "MX-4 multiplexed GMI bus"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+	default n
+	help
+		Select this if you want a multiplexed GMI bus on MX-4 board
+
+config HM_WAKE_ON_CAN
+	bool "MX-4 wake on CAN feature"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+	default n
+	help
+		Select this if you want to enable wake on CAN feature
+
+config HM_REDPINE_WIFI
+	bool "MX-4 Redpine wifi chip"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	default n
+	help
+		Select this if you want to enable Redpine wifi connected to SDIO port
+
+config HM_DAISY_CHAIN_CAN
+	bool "MX-4 CAN clock is daisy chained from CAN-1"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4 && CAN_SJA1000
+	default n
+	help
+	  Support for daisy chained CAN clock from CAN-1.
+
+config HM_WIFI_NETDEV_LED
+	bool "MX-4 Wifi LED"
+	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+	default n
+	select LEDS_GPIO
+	select LEDS_TRIGGERS
+	select LEDS_TRIGGER_NETDEV
+	help
+		Select this if you want wifi-led controled by led class and netdev on MX-4
+
 comment "Tegra board type"
 
 config MACH_COLIBRI_T20
@@ -103,6 +173,51 @@ config MACH_COLIBRI_T20
        depends on ARCH_TEGRA_2x_SOC
        help
          Support for Toradex Colibri T20 module on Iris carrier board
+
+config MACH_HM_MX4
+       bool "Host Mobility MX4"
+       depends on ARCH_TEGRA_2x_SOC
+       select MACH_COLIBRI_T20
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 board
+
+config MACH_HM_MX4_GTT
+       bool "Host Mobility MX4 GTT"
+       depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+       select HM_GTT_CAN
+       select HM_REDPINE_WIFI
+       select HM_EXT_8250_UART
+       select HM_DIGITAL_INPUTS
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 GTT board
+
+config MACH_HM_MX4_VCC
+       bool "Host Mobility MX4 VCC"
+       depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+       select HM_GTT_CAN
+       select HM_EXT_8250_UART
+       select HM_WIFI_NETDEV_LED
+       select HM_DIGITAL_INPUTS
+       select HM_DAISY_CHAIN_CAN
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 VCC board
+
+config MACH_HM_MX4_VCC_T20
+       bool "Host Mobility MX4 VCC T20"
+       depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+       select HM_GTT_CAN
+       select HM_WIFI_NETDEV_LED
+       select HM_DAISY_CHAIN_CAN
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 VCC T20 board
+
+config MACH_HM_VCB
+        bool "Host Mobility VCB"
+        depends on ARCH_TEGRA_2x_SOC
+        select MACH_COLIBRI_T20
+        select HM_EXT_AX88772B
+        help
+          Support for Toradex Colibri T20 module on Host Mobility's VCB board
 
 config MACH_HARMONY
        bool "Harmony board"

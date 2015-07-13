@@ -826,7 +826,7 @@ static struct plat_serial8250_port debug_uartd_platform_data[] = {
 	},
 };
 
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+//#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 static struct plat_serial8250_port debug_uarte_platform_data[] = {
 	{
 		.membase        = IO_ADDRESS(TEGRA_UARTE_BASE),
@@ -841,7 +841,7 @@ static struct plat_serial8250_port debug_uarte_platform_data[] = {
 		.flags          = 0,
 	},
 };
-#endif
+//#endif
 
 struct platform_device debug_uarta_device = {
 	.name = "serial8250",
@@ -875,7 +875,7 @@ struct platform_device debug_uartd_device = {
 	},
 };
 
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+//#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 struct platform_device debug_uarte_device = {
 	.name = "serial8250",
 	.id = PLAT8250_DEV_PLATFORM,
@@ -883,7 +883,7 @@ struct platform_device debug_uarte_device = {
 		.platform_data = debug_uarte_platform_data,
 	},
 };
-#endif
+//#endif
 
 #ifdef CONFIG_ARCH_TEGRA_2x_SOC
 static struct resource tegra_ac97_resource[] = {
@@ -1799,7 +1799,7 @@ void __init tegra_init_debug_uart_rate(void)
 	debug_uartb_platform_data[0].uartclk = uartclk;
 	debug_uartc_platform_data[0].uartclk = uartclk;
 	debug_uartd_platform_data[0].uartclk = uartclk;
-#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
+//#if !defined(CONFIG_ARCH_TEGRA_2x_SOC)
 	debug_uarte_platform_data[0].uartclk = uartclk;
-#endif
+//#endif
 }
