@@ -50,6 +50,23 @@ const struct fb_videomode tegra_modes[] = {
 		.refresh =	60,
 		.xres = 	800,
 		.yres = 	480,
+		.pixclock = 33807,
+		.left_margin = 	96,
+		.right_margin = 16,
+		.upper_margin = 12,
+		.lower_margin = 4,
+		.hsync_len =	80,
+		.vsync_len = 	4,
+		.sync = 0,
+		.flag = FB_FLAG_RATIO_16_9,
+		.vmode = FB_VMODE_NONINTERLACED
+	},
+	/* 800x480@60 (NEXCOM VMD 1001) */
+	{
+		.name =		"800x480CT2",
+		.refresh =	60,
+		.xres = 	800,
+		.yres = 	480,
 		.pixclock = 30000,
 		.left_margin = 	96,
 		.right_margin = 16,
