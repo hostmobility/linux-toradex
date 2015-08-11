@@ -193,6 +193,21 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
 		adc_feature->clk_div = 8;
 	}
 
+	adck_rate = ipg_rate / info->adc_feature.clk_div;
+
+	/*
+	 * Determine the long sample time adder value to be used based
+	 * on the default minimum sample time provided.
+	 */
+	adck_period = NSEC_PER_SEC / adck_rate;
+	lst_addr_min = adc_feature->default_sample_time / adck_period;
+	for (i = 0; i < ARRAY_SIZE(vf610_lst_adder); i++) {
+		if (vf610_lst_adder[i] > lst_addr_min) {
+			adc_feature->lst_adder_index = i;
+			break;
+		}
+	}
+
 	/*
 	 * Determine the long sample time adder value to be used based
 	 * on the default minimum sample time provided.
@@ -217,7 +232,6 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
 	 * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
 	 * LSTAdder(Long Sample Time): 3, 5, 7, 9, 13, 17, 21, 25 ADCK cycles
 	 */
-	adck_rate = ipg_rate / info->adc_feature.clk_div;
 	for (i = 0; i < ARRAY_SIZE(vf610_hw_avgs); i++)
 		info->sample_freq_avail[i] =
 			adck_rate / (6 + vf610_hw_avgs[i] *
