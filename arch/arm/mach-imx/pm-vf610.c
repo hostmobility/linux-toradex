@@ -497,6 +497,8 @@ static int __init vf610_suspend_init(const struct vf610_pm_socdata *socdata)
 		of_node_put(node);
 	}
 
+	has_cke_reset_pulls = true;
+
 	if (has_cke_reset_pulls)
 		pr_info("PM: CKE/RESET pulls available, enable Suspend-to-RAM\n");
 	else
