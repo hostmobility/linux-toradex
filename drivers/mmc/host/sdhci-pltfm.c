@@ -31,6 +31,7 @@
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/pm_runtime.h>
 #ifdef CONFIG_PPC
 #include <asm/machdep.h>
@@ -267,8 +268,11 @@ int sdhci_pltfm_rpm_suspend(struct device *dev)
 	ret = sdhci_suspend_host(host);
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
+
 	if (ret)
 		return ret;
+
+	pinctrl_pm_select_sleep_state(dev);
 
 	return pm_runtime_force_suspend(dev);
 }
@@ -278,6 +282,8 @@ int sdhci_pltfm_rpm_resume(struct device *dev)
 {
 	int ret;
 	struct sdhci_host *host = dev_get_drvdata(dev);
+
+	pinctrl_pm_select_default_state(dev);
 
 	ret = pm_runtime_force_resume(dev);
 
