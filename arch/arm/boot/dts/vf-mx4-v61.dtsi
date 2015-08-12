@@ -1,0 +1,174 @@
+/*
+ * Copyright 2015 Host Mobility AB
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ */
+
+#include <dt-bindings/input/input.h>
+
+/ {
+	chosen {
+		bootargs = "console=ttyLP0,115200";
+	};
+
+	clk24m: clk24m {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+	};
+
+	regulators {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		sys_5v0_reg: regulator@0 {
+			compatible = "regulator-fixed";
+			reg = <0>;
+			regulator-name = "5v0";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			regulator-always-on;
+		};
+
+		/* USBH_PEN */
+		usbh_vbus_reg: regulator@1 {
+			compatible = "regulator-fixed";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_usbh1_reg>;
+			reg = <1>;
+			gpio = <&gpio2 19 0>;
+			enable-active-high;
+			regulator-name = "usbh_vbus";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			vin-supply = <&sys_5v0_reg>;
+
+			regulator-state-mem {
+				regulator-on-in-suspend;
+			};
+		};
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpiokeys>;
+
+		power {
+			label = "power off";
+			gpios = <&gpio2 24 GPIO_ACTIVE_HIGH>;
+			linux,code = <KEY_POWER>;
+			debounce-interval = <10>;
+		};
+	};
+};
+
+&dspi0 {
+	status = "okay";
+
+	mcp2515can: can@1 {
+		compatible = "microchip,mcp2515";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_can_int>;
+		reg = <1>;
+		clocks = <&clk24m>;
+		spi-max-frequency = <10000000>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <2 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&dspi1 {
+	status = "okay";
+
+    mx4_io_spi: dspi@0 {
+       	compatible = "mx4_io_spi";
+       	reg = <0>;
+       	spi-max-frequency = <8000000>;
+       	pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_mx4_io_int>;
+		interrupt-parent = <&gpio0>;
+       	interrupts = <20 IRQ_TYPE_EDGE_RISING>;
+       	gpios = <&gpio1 9 IRQ_TYPE_EDGE_RISING>;
+       	spi-cpha;
+   };
+
+    spidev1: dspi@1 {
+        compatible = "spidev";
+        reg = <1>;
+        spi-max-frequency = <50000000>;
+    };
+};
+
+&i2c2 {
+	status = "okay";
+
+    acc: mma8452q@1c {
+    	compatible = "fsl,mma8452";
+    	reg = <0x1c>;
+    	pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_acc>;
+        interrupt-parent = <&gpio1>;
+        interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+    };
+};
+
+
+&esdhc1 {
+	status = "okay";
+};
+
+&fec1 {
+	phy-mode = "rmii";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_fec1>;
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
+};
+
+&usbh1 {
+	vbus-supply = <&usbh_vbus_reg>;
+};
+
+ &iomuxc {
+ 	vf610-colibri {
+ 		pinctrl_gpiokeys: gpiokeys {
+ 			fsl,pins = <
+				VF610_PAD_PTD9__GPIO_88		0x0001
+			>;
+ 		};
+		pinctrl_can_int: can_int {
+			fsl,pins = <
+				VF610_PAD_PTB12__GPIO_34	0x22ed
+			>;
+		};
+
+        pinctrl_acc: acc_int1 {
+            fsl,pins = <
+                VF610_PAD_PTD31__GPIO_63    0x219d
+            >;
+      	};
+
+		pinctrl_mx4_io_int: mx4_io_int {
+            fsl,pins = <
+                VF610_PAD_PTA30__GPIO_20	0x0009
+                VF610_PAD_PTB19__GPIO_41	0x0009
+            >;
+        };
+ 	};
+ };
