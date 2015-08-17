@@ -1279,21 +1279,18 @@ static int __maybe_unused flexcan_suspend(struct device *device)
 	struct flexcan_priv *priv = netdev_priv(dev);
 	int err;
 
-	err = clk_prepare_enable(priv->clk_ipg);
-	if (err)
-		return err;
-
-	err = clk_prepare_enable(priv->clk_per);
-	if (err)
-		goto out_disable_ipg;
-
-	err = flexcan_chip_disable(priv);
-	if (err)
-		return err;
-
 	if (netif_running(dev)) {
 		netif_stop_queue(dev);
 		netif_device_detach(dev);
+	} else {
+		clk_prepare_enable(priv->clk_ipg);
+		clk_prepare_enable(priv->clk_per);
+	}
+
+	err = flexcan_chip_disable(priv);
+	if (err) {
+		dev_err(device, "chip disabled failed: %d", err);
+		return err;
 	}
 
 	clk_disable(priv->clk_per);
@@ -1302,9 +1299,6 @@ static int __maybe_unused flexcan_suspend(struct device *device)
 	priv->can.state = CAN_STATE_SLEEPING;
 
 	return 0;
-
-out_disable_ipg:
-	clk_disable(priv->clk_ipg);
 }
 
 static int __maybe_unused flexcan_resume(struct device *device)
