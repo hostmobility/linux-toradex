@@ -1287,6 +1287,7 @@ static int __maybe_unused flexcan_suspend(struct device *device)
 		clk_prepare_enable(priv->clk_per);
 	}
 
+	flexcan_chip_freeze(priv);
 	err = flexcan_chip_disable(priv);
 	if (err) {
 		dev_err(device, "chip disabled failed: %d", err);
