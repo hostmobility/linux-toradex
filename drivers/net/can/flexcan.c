@@ -375,8 +375,14 @@ static int flexcan_chip_disable(struct flexcan_priv *priv)
 static int flexcan_chip_freeze(struct flexcan_priv *priv)
 {
 	struct flexcan_regs __iomem *regs = priv->base;
-	unsigned int timeout = 1000 * 1000 * 10 / priv->can.bittiming.bitrate;
+	u32 bitrate = priv->can.bittiming.bitrate;
+	unsigned int timeout;
 	u32 reg;
+
+	if (!bitrate)
+		return -EINVAL;
+
+	timeout = 1000 * 1000 * 10 / bitrate;
 
 	reg = flexcan_read(&regs->mcr);
 	reg |= FLEXCAN_MCR_HALT;
