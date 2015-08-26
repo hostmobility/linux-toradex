@@ -23,6 +23,7 @@
 #include <linux/colibri_usb.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
+#include <linux/gpio_keys.h>
 #include <linux/i2c.h>
 #include <linux/i2c-tegra.h>
 #include <linux/input.h>
@@ -817,6 +818,38 @@ static void colibri_t20_i2c_init(void)
 	i2c_register_board_info(0, colibri_t20_i2c_bus1_board_info, ARRAY_SIZE(colibri_t20_i2c_bus1_board_info));
 	i2c_register_board_info(4, colibri_t20_i2c_bus4_board_info, ARRAY_SIZE(colibri_t20_i2c_bus4_board_info));
 }
+
+
+#ifdef CONFIG_KEYBOARD_GPIO
+#define GPIO_KEY(_id, _gpio, _lowactive, _iswake)	\
+	{						\
+		.code = _id,				\
+		.gpio = TEGRA_GPIO_##_gpio,		\
+		.active_low = _lowactive,		\
+		.desc = #_id,				\
+		.type = EV_KEY,				\
+		.wakeup = _iswake,			\
+		.debounce_interval = 10,		\
+	}
+
+static struct gpio_keys_button colibri_t20_keys[] = {
+	GPIO_KEY(KEY_POWER, PBB2, 1, 0),		/* SODIMM 133 INPUT-VOLTAGE-LOW */
+};
+
+static struct gpio_keys_platform_data colibri_t20_keys_platform_data = {
+	.buttons	= colibri_t20_keys,
+	.nbuttons	= ARRAY_SIZE(colibri_t20_keys),
+};
+
+static struct platform_device colibri_t20_keys_device = {
+	.name	= "gpio-keys",
+	.id	= 0,
+	.dev = {
+		.platform_data = &colibri_t20_keys_platform_data,
+	},
+};
+#endif /* CONFIG_KEYBOARD_GPIO */
+
 
 /* MMC/SD */
 
