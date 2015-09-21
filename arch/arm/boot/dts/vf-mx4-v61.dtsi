@@ -60,7 +60,7 @@
 
 		power {
 			label = "power off";
-			gpios = <&gpio2 24 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio2 24 GPIO_ACTIVE_LOW>;
 			linux,code = <KEY_POWER>;
 			debounce-interval = <10>;
 		};
