@@ -1146,6 +1146,14 @@ static int mmc_sd_resume(struct mmc_host *host)
 }
 
 /*
+ * Callback for pre_suspend
+ */
+static int mmc_sd_pre_suspend(struct mmc_host *host)
+{
+	return -ENOSYS;
+}
+
+/*
  * Callback for runtime_suspend.
  */
 static int mmc_sd_runtime_suspend(struct mmc_host *host)
@@ -1203,6 +1211,7 @@ static const struct mmc_bus_ops mmc_sd_ops = {
 	.detect = mmc_sd_detect,
 	.runtime_suspend = mmc_sd_runtime_suspend,
 	.runtime_resume = mmc_sd_runtime_resume,
+	.pre_suspend = mmc_sd_pre_suspend,
 	.suspend = mmc_sd_suspend,
 	.resume = mmc_sd_resume,
 	.power_restore = mmc_sd_power_restore,
