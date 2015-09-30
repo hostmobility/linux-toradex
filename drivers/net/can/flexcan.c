@@ -1273,53 +1273,9 @@ static int flexcan_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int __maybe_unused flexcan_suspend(struct device *device)
-{
-	struct net_device *dev = dev_get_drvdata(device);
-	struct flexcan_priv *priv = netdev_priv(dev);
-	int err;
-
-	if (netif_running(dev)) {
-		netif_stop_queue(dev);
-		netif_device_detach(dev);
-	} else {
-		clk_prepare_enable(priv->clk_ipg);
-		clk_prepare_enable(priv->clk_per);
-	}
-
-	flexcan_chip_freeze(priv);
-	flexcan_chip_disable(priv);
-
-	clk_disable(priv->clk_per);
-	clk_disable(priv->clk_ipg);
-
-	priv->can.state = CAN_STATE_SLEEPING;
-
-	return 0;
-}
-
-static int __maybe_unused flexcan_resume(struct device *device)
-{
-	struct net_device *dev = dev_get_drvdata(device);
-	struct flexcan_priv *priv = netdev_priv(dev);
-
-	clk_enable(priv->clk_per);
-	clk_enable(priv->clk_ipg);
-
-	priv->can.state = CAN_STATE_ERROR_ACTIVE;
-	if (netif_running(dev)) {
-		netif_device_attach(dev);
-		netif_start_queue(dev);
-	}
-	return flexcan_chip_enable(priv);
-}
-
-static SIMPLE_DEV_PM_OPS(flexcan_pm_ops, flexcan_suspend, flexcan_resume);
-
 static struct platform_driver flexcan_driver = {
 	.driver = {
 		.name = DRV_NAME,
-		.pm = &flexcan_pm_ops,
 		.of_match_table = flexcan_of_match,
 	},
 	.probe = flexcan_probe,
