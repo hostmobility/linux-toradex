@@ -448,24 +448,7 @@ static int __flexcan_get_berr_counter(const struct net_device *dev,
 static int flexcan_get_berr_counter(const struct net_device *dev,
 				    struct can_berr_counter *bec)
 {
-	const struct flexcan_priv *priv = netdev_priv(dev);
-	int err;
-
-	err = clk_prepare_enable(priv->clk_ipg);
-	if (err)
-		return err;
-
-	err = clk_prepare_enable(priv->clk_per);
-	if (err)
-		goto out_disable_ipg;
-
-	err = __flexcan_get_berr_counter(dev, bec);
-
-	clk_disable_unprepare(priv->clk_per);
- out_disable_ipg:
-	clk_disable_unprepare(priv->clk_ipg);
-
-	return err;
+	return __flexcan_get_berr_counter(dev, bec);
 }
 
 static int flexcan_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -994,17 +977,9 @@ static int flexcan_open(struct net_device *dev)
 	struct flexcan_priv *priv = netdev_priv(dev);
 	int err;
 
-	err = clk_prepare_enable(priv->clk_ipg);
-	if (err)
-		return err;
-
-	err = clk_prepare_enable(priv->clk_per);
-	if (err)
-		goto out_disable_ipg;
-
 	err = open_candev(dev);
 	if (err)
-		goto out_disable_per;
+		return err;
 
 	err = request_irq(dev->irq, flexcan_irq, IRQF_SHARED, dev->name, dev);
 	if (err)
@@ -1026,10 +1001,6 @@ static int flexcan_open(struct net_device *dev)
 	free_irq(dev->irq, dev);
  out_close:
 	close_candev(dev);
- out_disable_per:
-	clk_disable_unprepare(priv->clk_per);
- out_disable_ipg:
-	clk_disable_unprepare(priv->clk_ipg);
 
 	return err;
 }
@@ -1043,8 +1014,6 @@ static int flexcan_close(struct net_device *dev)
 	flexcan_chip_stop(dev);
 
 	free_irq(dev->irq, dev);
-	clk_disable_unprepare(priv->clk_per);
-	clk_disable_unprepare(priv->clk_ipg);
 
 	close_candev(dev);
 
@@ -1086,18 +1055,11 @@ static int register_flexcandev(struct net_device *dev)
 	struct flexcan_regs __iomem *regs = priv->base;
 	u32 reg, err;
 
-	err = clk_prepare_enable(priv->clk_ipg);
-	if (err)
-		return err;
-
-	err = clk_prepare_enable(priv->clk_per);
-	if (err)
-		goto out_disable_ipg;
-
 	/* select "bus clock", chip must be disabled */
 	err = flexcan_chip_disable(priv);
 	if (err)
-		goto out_disable_per;
+		return err;
+
 	reg = flexcan_read(&regs->ctrl);
 	reg &= ~FLEXCAN_CTRL_CLK_SRC;
 	flexcan_write(reg, &regs->ctrl);
@@ -1129,10 +1091,6 @@ static int register_flexcandev(struct net_device *dev)
 	/* disable core and turn off clocks */
  out_chip_disable:
 	flexcan_chip_disable(priv);
- out_disable_per:
-	clk_disable_unprepare(priv->clk_per);
- out_disable_ipg:
-	clk_disable_unprepare(priv->clk_ipg);
 
 	return err;
 }
