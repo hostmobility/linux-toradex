@@ -13193,6 +13193,12 @@ M:	Laxman Dewangan <ldewangan@nvidia.com>
 S:	Supported
 F:	drivers/input/keyboard/tegra-kbc.c
 
+TEGRA NAND DRIVER
+M:	Lucas Stach <dev@lynxeye.de>
+S:	Maintained
+F:	Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
+F:	drivers/mtd/nand/tegra_nand.c
+
 TEGRA PWM DRIVER
 M:	Thierry Reding <thierry.reding@gmail.com>
 S:	Supported
