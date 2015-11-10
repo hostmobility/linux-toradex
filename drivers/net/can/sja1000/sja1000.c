@@ -218,6 +218,9 @@ static void sja1000_start(struct net_device *dev)
 	priv->write_reg(priv, REG_RXERR, 0x0);
 	priv->read_reg(priv, REG_ECC);
 
+	/* Clear interrupt flags */
+	priv->read_reg(priv, REG_IR);
+
 	/* leave reset mode */
 	set_normal_mode(dev);
 }
