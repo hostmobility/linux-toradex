@@ -241,9 +241,13 @@ static int vf610_gpio_irq_set_wake(struct irq_data *d, u32 enable)
 
 	if (wkpu_gpio >= 0) {
 		void __iomem *base = NULL;
-		u32 wrer, irer;
+		u32 wrer, irer, wisr;
 
 		base = platform_get_drvdata(port->pdev_wkpu);
+
+		/* Clear interrupts */
+		wisr = vf610_gpio_readl(base + WKPU_WISR);
+		vf610_gpio_writel(wisr, base + WKPU_WISR);
 
 		/* WKPU wakeup flag for LPSTOPx modes...  */
 		wrer = vf610_gpio_readl(base + WKPU_WRER);
