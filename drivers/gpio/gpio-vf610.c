@@ -31,6 +31,9 @@
 
 #define VF610_GPIO_PER_PORT		32
 
+#define VF610_MX4_V61_WAKEUP_MASK	BIT(12)
+#define VF610_MX4_V61_WAKEUP_IRQ	86
+
 struct vf610_gpio_port {
 	struct gpio_chip gc;
 	void __iomem *base;
@@ -441,7 +444,12 @@ static irqreturn_t vf610_wkpu_irq(int irq, void *data)
 
 	wisr = vf610_gpio_readl(base + WKPU_WISR);
 	vf610_gpio_writel(wisr, base + WKPU_WISR);
-	pr_debug("%s, WKPU interrupt received, flags %08x\n", __func__, wisr);
+
+#warning "TODO: implement proper IRQ forwarding"
+	if (wisr & VF610_MX4_V61_WAKEUP_MASK)
+		generic_handle_irq(VF610_MX4_V61_WAKEUP_IRQ);
+
+	pr_info("%s, WKPU interrupt received, flags %08x\n", __func__, wisr);
 
 	return 0;
 }
