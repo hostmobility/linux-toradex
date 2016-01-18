@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Toradex AG
+ * Copyright 2014-2015 Toradex AG
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,14 @@
 		compatible = "gpio-backlight";
 		gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
 		default-on;
+	};
+
+	extcon_usbc_det: usbc_det {
+		compatible = "linux,extcon-usb-gpio";
+		debounce = <25>;
+		id-gpio = <&gpio3 6 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usbc_det>;
 	};
 
 	regulators {
@@ -217,8 +225,10 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_gpiotouch>;
 		reg = <0x10>;
-		gpios = <&gpio0 30 GPIO_ACTIVE_HIGH /* SO-DIMM 28, Pen down interrupt */
-			 &gpio0 23 GPIO_ACTIVE_LOW /* SO-DIMM 30, Reset interrupt */
+		/* SODIMM 28, Pen down interrupt */
+		gpios = <&gpio0 30 GPIO_ACTIVE_HIGH
+		/* SODIMM 30, Reset interrupt */
+			 &gpio0 23 GPIO_ACTIVE_LOW
 			>;
 		status = "disabled";
 	};
@@ -254,6 +264,10 @@
 	status = "okay";
 };
 
+&usbdev0 {
+	extcon = <&extcon_usbc_det>;
+};
+
 &usbh1 {
 	vbus-supply = <&usbh_vbus_reg>;
 };
@@ -268,7 +282,7 @@
 
 		pinctrl_gpiokeys: gpiokeys {
 			fsl,pins = <
-				VF610_PAD_PTB19__GPIO_41	0x219d
+				VF610_PAD_PTB19__GPIO_41	0x218d
 			>;
 		};
 
