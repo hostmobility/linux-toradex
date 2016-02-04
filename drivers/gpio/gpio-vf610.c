@@ -32,7 +32,7 @@
 #define VF610_GPIO_PER_PORT		32
 
 #define VF610_MX4_V61_WAKEUP_MASK	BIT(12)
-#define VF610_MX4_V61_WAKEUP_IRQ	86
+#define VF610_MX4_V61_WAKEUP_IRQ	87
 
 struct vf610_gpio_port {
 	struct gpio_chip gc;
