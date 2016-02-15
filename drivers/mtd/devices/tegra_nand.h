@@ -51,6 +51,7 @@
 #define TAG_PTR_REG				(TEGRA_NAND_BASE + 0x44)
 #define ECC_PTR_REG				(TEGRA_NAND_BASE + 0x48)
 #define DEC_STATUS_REG				(TEGRA_NAND_BASE + 0x4c)
+#define DEC_STAT_BUF_REG				(TEGRA_NAND_BASE + 0xd4)
 #define HWSTATUS_CMD_REG			(TEGRA_NAND_BASE + 0x50)
 #define HWSTATUS_MASK_REG			(TEGRA_NAND_BASE + 0x54)
 #define LL_CONFIG_REG				(TEGRA_NAND_BASE + 0x58)
@@ -76,6 +77,7 @@
 #define COMMAND_ALE_BYTE_SIZE(val)		REG_FIELD((val), 0, 4)
 
 /* nand isr bits */
+#define ISR_CORRFAIL_ERR		REG_BIT(24)
 #define ISR_UND					REG_BIT(7)
 #define ISR_OVR					REG_BIT(6)
 #define ISR_CMD_DONE				REG_BIT(5)
@@ -137,6 +139,8 @@
 #define DEC_STATUS_ERR_CNT(val)			REG_GET_FIELD((val), 16, 8)
 #define DEC_STATUS_ECC_FAIL_A			REG_BIT(1)
 #define DEC_STATUS_ECC_FAIL_B			REG_BIT(0)
+#define   DEC_STAT_BUF_MAX_CORR_CNT_MASK	0x00001f00
+#define   DEC_STAT_BUF_MAX_CORR_CNT_SHIFT	8
 
 /* nand hwstatus_mask bits */
 #define HWSTATUS_RDSTATUS_MASK(val)		REG_FIELD((val), 24, 8)

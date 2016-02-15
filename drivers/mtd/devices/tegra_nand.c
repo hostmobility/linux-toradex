@@ -112,11 +112,7 @@ struct tegra_nand_info {
 	/* ecc error vector info (offset into page and data mask to apply */
 	void *ecc_buf;
 	dma_addr_t ecc_addr;
-	/* ecc error status (page number, err_cnt) */
-	uint32_t *ecc_errs;
-	uint32_t num_ecc_errs;
-	uint32_t max_ecc_errs;
-	spinlock_t ecc_lock;
+	bool last_read_error;
 
 	uint32_t command_reg;
 	uint32_t config_reg;
@@ -252,6 +248,133 @@ static int dump_nand_regs(void)
 	return 1;
 }
 
+/**
+ * nand_check_erased_buf - check if a buffer contains (almost) only 0xff data
+ * @buf: buffer to test
+ * @len: buffer length
+ * @bitflips_threshold: maximum number of bitflips
+ *
+ * Check if a buffer contains only 0xff, which means the underlying region
+ * has been erased and is ready to be programmed.
+ * The bitflips_threshold specify the maximum number of bitflips before
+ * considering the region is not erased.
+ * Note: The logic of this function has been extracted from the memweight
+ * implementation, except that nand_check_erased_buf function exit before
+ * testing the whole buffer if the number of bitflips exceed the
+ * bitflips_threshold value.
+ *
+ * Returns a positive number of bitflips less than or equal to
+ * bitflips_threshold, or -ERROR_CODE for bitflips in excess of the
+ * threshold.
+ */
+static int nand_check_erased_buf(void *buf, int len, int bitflips_threshold)
+{
+	const unsigned char *bitmap = buf;
+	int bitflips = 0;
+	int weight;
+
+	for (; len && ((uintptr_t)bitmap) % sizeof(long);
+	     len--, bitmap++) {
+		weight = hweight8(*bitmap);
+		bitflips += BITS_PER_BYTE - weight;
+		if (unlikely(bitflips > bitflips_threshold))
+			return -EBADMSG;
+	}
+
+	for (; len >= sizeof(long);
+	     len -= sizeof(long), bitmap += sizeof(long)) {
+		weight = hweight_long(*((unsigned long *)bitmap));
+		bitflips += BITS_PER_LONG - weight;
+		if (unlikely(bitflips > bitflips_threshold))
+			return -EBADMSG;
+	}
+
+	for (; len > 0; len--, bitmap++) {
+		weight = hweight8(*bitmap);
+		bitflips += BITS_PER_BYTE - weight;
+		if (unlikely(bitflips > bitflips_threshold))
+			return -EBADMSG;
+	}
+
+	return bitflips;
+}
+
+/**
+ * nand_check_erased_ecc_chunk - check if an ECC chunk contains (almost) only
+ *				 0xff data
+ * @data: data buffer to test
+ * @datalen: data length
+ * @ecc: ECC buffer
+ * @ecclen: ECC length
+ * @extraoob: extra OOB buffer
+ * @extraooblen: extra OOB length
+ * @bitflips_threshold: maximum number of bitflips
+ *
+ * Check if a data buffer and its associated ECC and OOB data contains only
+ * 0xff pattern, which means the underlying region has been erased and is
+ * ready to be programmed.
+ * The bitflips_threshold specify the maximum number of bitflips before
+ * considering the region as not erased.
+ *
+ * Note:
+ * 1/ ECC algorithms are working on pre-defined block sizes which are usually
+ *    different from the NAND page size. When fixing bitflips, ECC engines will
+ *    report the number of errors per chunk, and the NAND core infrastructure
+ *    expect you to return the maximum number of bitflips for the whole page.
+ *    This is why you should always use this function on a single chunk and
+ *    not on the whole page. After checking each chunk you should update your
+ *    max_bitflips value accordingly.
+ * 2/ When checking for bitflips in erased pages you should not only check
+ *    the payload data but also their associated ECC data, because a user might
+ *    have programmed almost all bits to 1 but a few. In this case, we
+ *    shouldn't consider the chunk as erased, and checking ECC bytes prevent
+ *    this case.
+ * 3/ The extraoob argument is optional, and should be used if some of your OOB
+ *    data are protected by the ECC engine.
+ *    It could also be used if you support subpages and want to attach some
+ *    extra OOB data to an ECC chunk.
+ *
+ * Returns a positive number of bitflips less than or equal to
+ * bitflips_threshold, or -ERROR_CODE for bitflips in excess of the
+ * threshold. In case of success, the passed buffers are filled with 0xff.
+ */
+static int nand_check_erased_ecc_chunk(void *data, int datalen,
+				void *ecc, int ecclen,
+				void *extraoob, int extraooblen,
+				int bitflips_threshold)
+{
+	int data_bitflips = 0, ecc_bitflips = 0, extraoob_bitflips = 0;
+
+	data_bitflips = nand_check_erased_buf(data, datalen,
+					      bitflips_threshold);
+	if (data_bitflips < 0)
+		return data_bitflips;
+
+	bitflips_threshold -= data_bitflips;
+
+	ecc_bitflips = nand_check_erased_buf(ecc, ecclen, bitflips_threshold);
+	if (ecc_bitflips < 0)
+		return ecc_bitflips;
+
+	bitflips_threshold -= ecc_bitflips;
+
+	extraoob_bitflips = nand_check_erased_buf(extraoob, extraooblen,
+						  bitflips_threshold);
+	if (extraoob_bitflips < 0)
+		return extraoob_bitflips;
+
+	if (data_bitflips)
+		memset(data, 0xff, datalen);
+
+	if (ecc_bitflips)
+		memset(ecc, 0xff, ecclen);
+
+	if (extraoob_bitflips)
+		memset(extraoob, 0xff, extraooblen);
+
+	return data_bitflips + ecc_bitflips + extraoob_bitflips;
+}
+
 static inline void enable_ints(struct tegra_nand_info *info, uint32_t mask)
 {
 	(void)info;
@@ -279,7 +402,6 @@ static irqreturn_t tegra_nand_irq(int irq, void *dev_id)
 	uint32_t isr;
 	uint32_t ier;
 	uint32_t dma_ctrl;
-	uint32_t tmp;
 
 	isr = readl(ISR_REG);
 	ier = readl(IER_REG);
@@ -295,17 +417,8 @@ static irqreturn_t tegra_nand_irq(int irq, void *dev_id)
 			pr_err("tegra_nand_irq: Spurious cmd done irq!\n");
 	}
 
-	if (isr & ISR_ECC_ERR) {
-		/* always want to read the decode status so xfers don't stall. */
-		tmp = readl(DEC_STATUS_REG);
-
-		/* was ECC check actually enabled */
-		if ((ier & IER_ECC_ERR)) {
-			unsigned long flags;
-			spin_lock_irqsave(&info->ecc_lock, flags);
-			info->ecc_errs[info->num_ecc_errs++] = tmp;
-			spin_unlock_irqrestore(&info->ecc_lock, flags);
-		}
+	if (isr & ISR_CORRFAIL_ERR) {
+		info->last_read_error = true;
 	}
 
 	if ((dma_ctrl & DMA_CTRL_IS_DMA_DONE) &&
@@ -741,47 +854,45 @@ correct_ecc_errors_on_blank_page(struct tegra_nand_info *info, u8 *datbuf,
 				 u8 *oobbuf, unsigned int a_len,
 				 unsigned int b_len)
 {
-	int i;
-	int all_ff = 1;
-	unsigned long flags;
+	int stat;
+	u32 value;
 
-	spin_lock_irqsave(&info->ecc_lock, flags);
-	if (info->num_ecc_errs) {
-		if (datbuf) {
-			for (i = 0; i < a_len; i++)
-				if (datbuf[i] != 0xFF)
-					all_ff = 0;
-		}
-		if (oobbuf) {
-			for (i = 0; i < b_len; i++)
-				if (oobbuf[i] != 0xFF)
-					all_ff = 0;
-		}
-		if (all_ff)
-			info->num_ecc_errs = 0;
-	}
-	spin_unlock_irqrestore(&info->ecc_lock, flags);
-}
+	value = readl(DEC_STATUS_REG);
+	if (value & DEC_STATUS_ECC_FAIL_A) {
+		/*
+		 * The ECC isn't smart enough to figure out if a page is
+		 * completely erased and flags an error in this case. So we
+		 * check the read data here to figure out if it's a legitimate
+		 * error or a false positive.
+		 */
+		stat = nand_check_erased_ecc_chunk(datbuf, a_len, oobbuf, b_len,
+				NULL, 0, 32);
 
-static void update_ecc_counts(struct tegra_nand_info *info, int check_oob)
-{
-	unsigned long flags;
-	int i;
-
-	spin_lock_irqsave(&info->ecc_lock, flags);
-	for (i = 0; i < info->num_ecc_errs; ++i) {
-		/* correctable */
-		info->mtd.ecc_stats.corrected +=
-		    DEC_STATUS_ERR_CNT(info->ecc_errs[i]);
-
-		/* uncorrectable */
-		if (info->ecc_errs[i] & DEC_STATUS_ECC_FAIL_A)
+		if (stat < 0)
 			info->mtd.ecc_stats.failed++;
-		if (check_oob && (info->ecc_errs[i] & DEC_STATUS_ECC_FAIL_B))
-			info->mtd.ecc_stats.failed++;
+		else
+			info->mtd.ecc_stats.corrected += stat;
+
+		return;
 	}
-	info->num_ecc_errs = 0;
-	spin_unlock_irqrestore(&info->ecc_lock, flags);
+
+	if (info->last_read_error) {
+		value = readl(DEC_STAT_BUF_REG);
+		value = (value & DEC_STAT_BUF_MAX_CORR_CNT_MASK) >>
+			DEC_STAT_BUF_MAX_CORR_CNT_SHIFT;
+		/*
+		 * The value returned in the register is the maximum of
+		 * bitflips encountered in any of the ECC regions. As there is
+		 * no way to get the number of bitflips in a specific regions
+		 * we are not able to deliver correct stats but instead
+		 * overestimate the number of corrected bitflips by assuming
+		 * that all regions encountered the maximum number of bitflips.
+		 *
+		 * 8 = ecc steps
+		 */
+		info->mtd.ecc_stats.corrected += value * 8;
+		info->last_read_error = false;
+	}
 }
 
 static inline void clear_regs(struct tegra_nand_info *info)
@@ -1087,7 +1198,6 @@ do_read_oob(struct mtd_info *mtd, loff_t from, struct mtd_oob_ops *ops)
 		}
 
 		unaligned = 0;
-		update_ecc_counts(info, oobbuf != NULL);
 
 		if (!page_count)
 			break;
@@ -1370,7 +1480,7 @@ static void tegra_nand_resume(struct mtd_info *mtd)
 	/* enable interrupts */
 	disable_ints(info, 0xffffffff);
 	enable_ints(info,
-		    IER_ERR_TRIG_VAL(4) | IER_UND | IER_OVR | IER_CMD_DONE |
+		    IER_UND | IER_OVR | IER_CMD_DONE |
 		    IER_ECC_ERR | IER_GIE);
 
 	writel(0, CONFIG_REG);
@@ -1599,7 +1709,6 @@ static int __devinit tegra_nand_probe(struct platform_device *pdev)
 	init_completion(&info->dma_complete);
 
 	mutex_init(&info->lock);
-	spin_lock_init(&info->ecc_lock);
 
 	chip = &info->chip;
 	chip->priv = &info->mtd;
@@ -1678,15 +1787,6 @@ static int __devinit tegra_nand_probe(struct platform_device *pdev)
 	pr_info("%s: NVIDIA Tegra NAND controller @ base=0x%08x irq=%d.\n",
 		DRIVER_NAME, TEGRA_NAND_PHYS, pdev->resource[0].start);
 
-	/* allocate memory to hold the ecc error info */
-	info->max_ecc_errs = MAX_DMA_SZ / mtd->writesize;
-	info->ecc_errs = kmalloc(info->max_ecc_errs * sizeof(uint32_t),
-				 GFP_KERNEL);
-	if (!info->ecc_errs) {
-		err = -ENOMEM;
-		goto out_dis_irq;
-	}
-
 	/* alloc the bad block bitmap */
 	num_erase_blocks = mtd->size;
 	do_div(num_erase_blocks, mtd->erasesize);
@@ -1694,7 +1794,7 @@ static int __devinit tegra_nand_probe(struct platform_device *pdev)
 				  sizeof(unsigned long), GFP_KERNEL);
 	if (!info->bb_bitmap) {
 		err = -ENOMEM;
-		goto out_free_ecc;
+		goto out_dis_irq;
 	}
 
 	err = scan_bad_blocks(info);
@@ -1764,9 +1864,6 @@ out_free_rw_buffer:
 out_free_bbbmap:
 	kfree(info->bb_bitmap);
 
-out_free_ecc:
-	kfree(info->ecc_errs);
-
 out_dis_irq:
 	disable_ints(info, 0xffffffff);
 	free_irq(pdev->resource[0].start, info);
@@ -1793,7 +1890,6 @@ static int __devexit tegra_nand_remove(struct platform_device *pdev)
 	if (info) {
 		free_irq(pdev->resource[0].start, info);
 		kfree(info->bb_bitmap);
-		kfree(info->ecc_errs);
 		kfree(info->partial_unaligned_rw_buffer);
 
 		device_remove_file(&pdev->dev, &dev_attr_device_id);
