@@ -1637,8 +1637,12 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
 	/*
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
+	 *
+	 * Mirza added an additional delay of 140 ms, since we turn on 3.3V in a
+	 * later stage (go_to_sleep.sh) of the resume process we need to wait
+	 * additional time before we are ready to initialize the SD card.
 	 */
-	mmc_delay(10);
+	mmc_delay(150);
 
 	mmc_pwrseq_post_power_on(host);
 
