@@ -24,6 +24,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/lm95245.h>
 #include <linux/mfd/stmpe.h>
+#include <linux/mma845x.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/platform_device.h>
 #include <linux/serial_8250.h>
@@ -490,17 +491,26 @@ static void colibri_t30_gpio_init(void)
 }
 
 /* I2C */
+#ifdef CONFIG_MXC_MMA845X
+static struct mxc_mma845x_platform_data mma845x_data = {
+	.gpio_pin_get = NULL,
+	.gpio_pin_put = NULL,
+	.int1 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PK4), //P106
+	.int2 = TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PU5), //P116
+};
+#endif
 
 /* Make sure that the pinmuxing enable the 'open drain' feature for pins used
    for I2C */
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t30_i2c_bus1_board_info[] __initdata = {
+#ifdef CONFIG_MXC_MMA845X
 	{
-		/* M41T0M6 real time clock on Iris carrier board */
-		I2C_BOARD_INFO("rtc-ds1307", 0x68),
-			.type = "m41t00",
+		I2C_BOARD_INFO("mma845x", 0x1C),
+			.platform_data = (void *)&mma845x_data,
 	},
+#endif
 };
 
 static struct tegra_i2c_platform_data colibri_t30_i2c1_platform_data = {
