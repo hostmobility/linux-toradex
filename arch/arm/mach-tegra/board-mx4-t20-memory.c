@@ -18,7 +18,7 @@
 #include <linux/kernel.h>
 #include <linux/memblock.h>
 
-#include "board-colibri_t20.h"
+#include "board-mx4-t20.h"
 #include "board.h"
 #include "tegra2_emc.h"
 
