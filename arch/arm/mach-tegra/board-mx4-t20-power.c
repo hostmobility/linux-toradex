@@ -26,7 +26,7 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 
-#include "board-colibri_t20.h"
+#include "board-mx4-t20.h"
 #include "board.h"
 #include "fuse.h"
 #include "gpio-names.h"
@@ -216,7 +216,7 @@ static struct tps6586x_platform_data tps_platform = {
 	.subdevs	= tps_devs,
 	.gpio_base	= TPS6586X_GPIO_BASE,
 
-	/* Do not use full power off. This will increase current 
+	/* Do not use full power off. This will increase current
 	consumption but we will be able to force re-boot with reset. */
 	.use_power_off	= false,
 };
