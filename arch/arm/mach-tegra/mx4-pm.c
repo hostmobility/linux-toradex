@@ -45,18 +45,26 @@
 #define POWER_DOWN					REG_BIT(19)
 
 
-static struct gpio gpios_to_handle[] = {	
+static struct gpio gpios_to_handle[] = {
 	{TEGRA_GPIO_PY4,	GPIOF_OUT_INIT_LOW,	"P35 - FF-TXD"},
 	{TEGRA_GPIO_PY5,	GPIOF_OUT_INIT_LOW,	"P33 - FF-RXD"},
 	{TEGRA_GPIO_PC2,	GPIOF_OUT_INIT_LOW,	"P21 - STD-TXD"},
 	{TEGRA_GPIO_PK7,	GPIOF_OUT_INIT_LOW,	"P32 - BT-RTS"},
 	{TEGRA_GPIO_PJ7,	GPIOF_OUT_INIT_LOW,	"P38 - BT-TXD"},
 
-	
+
 	{TEGRA_GPIO_PI0,	GPIOF_OUT_INIT_LOW,	"P89 - nWE"},
-	{TEGRA_GPIO_PI1,	GPIOF_OUT_INIT_LOW,	"P91 - nOE"},		
-	{TEGRA_GPIO_PW0,	GPIOF_OUT_INIT_LOW,	"P93 - RDnWR"},	
-	{TEGRA_GPIO_PK2,	GPIOF_OUT_INIT_LOW,	"P105 - nCS"},	
+	{TEGRA_GPIO_PI1,	GPIOF_OUT_INIT_LOW,	"P91 - nOE"},
+	{TEGRA_GPIO_PW0,	GPIOF_OUT_INIT_LOW,	"P93 - RDnWR"},
+	{TEGRA_GPIO_PK2,	GPIOF_OUT_INIT_LOW,	"P105 - nCS"},
+#ifdef CONFIG_MACH_COLIBRI_T30
+	{TEGRA_GPIO_PS2,	GPIOF_OUT_INIT_LOW,	"P47 - SDIO_CLK"},
+	{TEGRA_GPIO_PS3,	GPIOF_OUT_INIT_LOW,	"P190 - SDIO_CMD"},
+	{TEGRA_GPIO_PS4,	GPIOF_OUT_INIT_LOW,	"P192 - SDIO_DAT0"},
+	{TEGRA_GPIO_PS5,	GPIOF_OUT_INIT_LOW,	"P49 - SDIO_DAT1"},
+	{TEGRA_GPIO_PS6,	GPIOF_OUT_INIT_LOW,	"P51 - SDIO_DAT2"},
+	{TEGRA_GPIO_PS7,	GPIOF_OUT_INIT_LOW,	"P53 - SDIO_DAT3"},
+#endif
 };
 
 #if 0
@@ -82,7 +90,7 @@ static int tegra_mx4_custom_suspend(void)
 			pr_warning("gpio_request(%d) failed, err = %d",
 				   gpios_to_handle[i].gpio, err);
 		}
-		tegra_gpio_enable(gpios_to_handle[i].gpio);	
+		tegra_gpio_enable(gpios_to_handle[i].gpio);
 	}
 	local_irq_restore(flags);
 	return 0;
@@ -98,7 +106,7 @@ static void tegra_mx4_custom_resume(void)
 	local_irq_save(flags);
 	printk( KERN_INFO "Entering custom mx4 resume rutine!");
 
-	for (i = 0; i < length; i++) {		
+	for (i = 0; i < length; i++) {
 		tegra_gpio_disable(gpios_to_handle[i].gpio);
 		gpio_free(gpios_to_handle[i].gpio);
 	}
