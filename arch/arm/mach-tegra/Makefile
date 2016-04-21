@@ -194,6 +194,7 @@ obj-${CONFIG_MACH_COLIBRI_T30}          += board-mx4-t30-memory.o
 obj-${CONFIG_MACH_COLIBRI_T30}          += board-mx4-t30-panel.o
 obj-${CONFIG_MACH_COLIBRI_T30}          += board-mx4-t30-pinmux.o
 obj-${CONFIG_MACH_COLIBRI_T30}          += board-mx4-t30-power.o
+obj-${CONFIG_MACH_COLIBRI_T30}          += mx4-pm.o
 
 obj-${CONFIG_MACH_KAI}                  += board-touch-kai-synaptics-spi.o
 obj-y                                   += board-touch-raydium_spi.o
