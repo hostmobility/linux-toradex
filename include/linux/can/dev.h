@@ -16,6 +16,7 @@
 #include <linux/can.h>
 #include <linux/can/netlink.h>
 #include <linux/can/error.h>
+#include <linux/netdevice.h>
 #include <linux/can/led.h>
 
 /*
