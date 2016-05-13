@@ -629,6 +629,40 @@ static void __init colibri_t30_i2c_init(void)
 }
 
 
+
+#ifdef CONFIG_KEYBOARD_GPIO
+#define GPIO_KEY(_id, _gpio, _lowactive, _iswake)	\
+	{						\
+		.code = _id,				\
+		.gpio = TEGRA_GPIO_##_gpio,		\
+		.active_low = _lowactive,		\
+		.desc = #_id,				\
+		.type = EV_KEY,				\
+		.wakeup = _iswake,			\
+		.debounce_interval = 10,		\
+	}
+
+/* Note: Only wake-able gpios can be used as wakeup keys */
+static struct gpio_keys_button colibri_t30_keys[] = {
+
+	GPIO_KEY(KEY_POWER, PT5, 1, 0),		/* SODIMM 133 INPUT-VOLTAGE-LOW */
+};
+
+static struct gpio_keys_platform_data colibri_t30_keys_platform_data = {
+	.buttons	= colibri_t30_keys,
+	.nbuttons	= ARRAY_SIZE(colibri_t30_keys),
+};
+
+static struct platform_device colibri_t30_keys_device = {
+	.name	= "gpio-keys",
+	.id	= 0,
+	.dev = {
+		.platform_data = &colibri_t30_keys_platform_data,
+	},
+};
+#endif /* CONFIG_KEYBOARD_GPIO */
+
+
 /* MMC/SD */
 
 #ifndef COLIBRI_T30_SDMMC4B
@@ -1416,6 +1450,9 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 #endif
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
+#endif
+#ifdef CONFIG_KEYBOARD_GPIO
+	&colibri_t30_keys_device,
 #endif
 	&tegra_ahub_device,
 	&tegra_dam_device0,
