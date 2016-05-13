@@ -375,7 +375,7 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 static struct gpio colibri_t30_gpios[] = {
 //	{TEGRA_GPIO_PA2,	GPIOF_IN,	"SODIMM pin 186"},
 //	{TEGRA_GPIO_PA3,	GPIOF_IN,	"SODIMM pin 184"},
-	{TEGRA_GPIO_PB2,	GPIOF_IN,	"SODIMM pin 154"},
+//	{TEGRA_GPIO_PB2,	GPIOF_IN,	"SODIMM pin 154"},
 #ifndef COLIBRI_T30_VI
 	{TEGRA_GPIO_PC1,	GPIOF_IN,	"SODIMM pin 81"},
 #endif
@@ -396,7 +396,7 @@ static struct gpio colibri_t30_gpios[] = {
 //	{TEGRA_GPIO_PN3,	GPIOF_IN,	"SODIMM pin 180"},
 //	{TEGRA_GPIO_PN4,	GPIOF_IN,	"SODIMM pin 160"},
 //	{TEGRA_GPIO_PN5,	GPIOF_IN,	"SODIMM pin 158"},
-	{TEGRA_GPIO_PN6,	GPIOF_IN,	"SODIMM pin 162"},
+//	{TEGRA_GPIO_PN6,	GPIOF_IN,	"SODIMM pin 162"},
 //conflicts with ADDRESS13
 //	{TEGRA_GPIO_PP4,	GPIOF_IN,	"SODIMM pin 120"},
 //conflicts with ADDRESS14
@@ -661,6 +661,39 @@ static struct platform_device colibri_t30_keys_device = {
 	},
 };
 #endif /* CONFIG_KEYBOARD_GPIO */
+
+
+static struct gpio_led status_leds[] = {
+	[0] =  {
+		/* WIFI-GREEN on MX-4 T20/T30 */
+		.name = "mx4-wifi",
+		.default_trigger = "netdev",
+		.gpio = TEGRA_GPIO_PN6,
+		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+	[1] =  {
+		/* WIFI-RED on MX-4 T20/T30 */
+		.name = "mx4-wifi-red",
+		.default_trigger = "none",
+		.gpio = TEGRA_GPIO_PB2,
+		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	},
+};
+
+static struct gpio_led_platform_data status_led_data = {
+	.num_leds	= ARRAY_SIZE(status_leds),
+	.leds		= status_leds
+};
+
+static struct platform_device colibri_t30_wifi_leds = {
+	.name		= "leds-gpio",
+	.id		= -1,
+	.dev		= {
+		.platform_data	= &status_led_data,
+	},
+};
 
 
 /* MMC/SD */
@@ -1454,6 +1487,7 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 #ifdef CONFIG_KEYBOARD_GPIO
 	&colibri_t30_keys_device,
 #endif
+	&colibri_t30_wifi_leds,
 	&tegra_ahub_device,
 	&tegra_dam_device0,
 	&tegra_dam_device1,
