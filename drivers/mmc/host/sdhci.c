@@ -48,6 +48,9 @@
 static unsigned int debug_quirks = 0;
 static unsigned int debug_quirks2;
 
+struct device_attribute sd_detect_attr;
+static unsigned int sw_sd_detect = 1;
+
 static void sdhci_finish_data(struct sdhci_host *);
 
 static void sdhci_finish_command(struct sdhci_host *);
@@ -140,6 +143,28 @@ static void sdhci_dumpregs(struct sdhci_host *host)
  * Low level functions                                                       *
  *                                                                           *
 \*****************************************************************************/
+static ssize_t sdhci_write_sd_detect_mode (struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long value;
+
+	if (kstrtoul(buf, 10, &value) < 0){
+		return -EINVAL;
+	}
+
+	sw_sd_detect = value;
+
+	return count;
+}
+
+static int sdhci_create_name_attr(struct device *dev)
+{
+    sysfs_attr_init(&sd_detect_attr.attr);
+    sd_detect_attr.attr.name = "sd_detect";
+    sd_detect_attr.attr.mode = S_IWUGO;
+    sd_detect_attr.store = sdhci_write_sd_detect_mode;
+    return device_create_file(dev, &sd_detect_attr);
+}
 
 static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
 {
@@ -1637,9 +1662,13 @@ static int sdhci_do_get_cd(struct sdhci_host *host)
 	if (host->flags & SDHCI_DEVICE_DEAD)
 		return 0;
 
-	/* If nonremovable, assume that the card is always present. */
-	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
-		return 1;
+	/* If non-removable/polling, assume that the card is always present.
+
+	   sw_sd_detect overrides above.
+	*/
+	if ((host->mmc->caps & MMC_CAP_NONREMOVABLE) ||
+		(host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION))
+		return sw_sd_detect;
 
 	/*
 	 * Try slot gpio detect, if defined it take precedence
@@ -1647,10 +1676,6 @@ static int sdhci_do_get_cd(struct sdhci_host *host)
 	 */
 	if (!IS_ERR_VALUE(gpio_cd))
 		return !!gpio_cd;
-
-	/* If polling, assume that the card is always present. */
-	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
-		return 1;
 
 	/* Host native card detect */
 	return !!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT);
@@ -3406,6 +3431,14 @@ int sdhci_add_host(struct sdhci_host *host)
 	}
 #endif
 
+	ret = sdhci_create_name_attr(mmc_dev(mmc));
+ 	if (ret) {
+ 		pr_err("%s: Failed to create sd_detect sysfs attribute: %d\n",
+		       mmc_hostname(mmc), ret);
+ 		goto untasklet;
+ 	}
+
+
 	mmiowb();
 
 	mmc_add_host(mmc);
@@ -3457,6 +3490,8 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 	}
 
 	sdhci_disable_card_detection(host);
+
+	device_remove_file(mmc_dev(mmc), &sd_detect_attr);
 
 	mmc_remove_host(mmc);
 
