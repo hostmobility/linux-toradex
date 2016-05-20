@@ -799,13 +799,14 @@ static irqreturn_t flexcan_irq(int irq, void *dev_id)
 	if (reg_esr & FLEXCAN_ESR_ALL_INT)
 		flexcan_write(reg_esr & FLEXCAN_ESR_ALL_INT, &regs->esr);
 
+	/* The error bits are cleared on read,
+	 * save them for later use.
+	 */
+	priv->reg_esr = reg_esr & FLEXCAN_ESR_ERR_BUS;
+
 	/* bus error IRQ and bus error reporting is activated */
 	if ((reg_esr & FLEXCAN_ESR_ERR_STATE) ||
 	    flexcan_has_and_handle_berr(priv, reg_esr)) {
-		/* The error bits are cleared on read,
-		 * save them for later use.
-		 */
-		priv->reg_esr = reg_esr & FLEXCAN_ESR_ERR_BUS;
 		flexcan_write(priv->reg_ctrl_default & ~FLEXCAN_CTRL_ERR_ALL,
 			      &regs->ctrl);
 		can_rx_fifo_irq_error(&priv->fifo);
