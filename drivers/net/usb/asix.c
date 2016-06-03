@@ -49,8 +49,9 @@ KERN_INFO "ASIX USB Ethernet Adapter:v" DRV_VERSION
 	" " __TIME__ " " __DATE__ "\n"
 	"    http://www.asix.com.tw\n";
 
-static char g_mac_addr[ETH_ALEN];
+static char g_mac_addr[2][ETH_ALEN];
 static int g_usr_mac = 0;
+static int g_mac_alloc[2] = {-1, -1};
 
 /* configuration of maximum bulk in size */
 static int bsize = AX88772B_MAX_BULKIN_16K;
@@ -73,7 +74,7 @@ static int ax8817x_mdio_read_le(struct net_device *netdev, int phy_id, int loc);
 static int ax88772b_set_csums(struct usbnet *dev);
 
 /* Retrieve user set MAC address */
-static int __init setup_asix_mac(char *macstr)
+static int setup_mac(char *macstr, int mac_nr)
 {
 	int i, j;
 	unsigned char result, value;
@@ -96,14 +97,26 @@ static int __init setup_asix_mac(char *macstr)
 		}
 
 		macstr++;
-		g_mac_addr[i] = result;
+		g_mac_addr[mac_nr][i] = result;
 	}
 
 	g_usr_mac = 1;
 
 	return 0;
 }
+static int __init setup_asix_mac(char *macstr)
+{
+    g_mac_alloc[0] = setup_mac(macstr, 0);
+    return g_mac_alloc[0];
+}
+static int __init setup_asix_mac2(char *macstr)
+{
+    g_mac_alloc[1] = setup_mac(macstr, 1);
+    return g_mac_alloc[1];
+}
+
 __setup("asix_mac=", setup_asix_mac);
+__setup("asix_mac2=", setup_asix_mac2);
 
 /* ASIX AX8817X based USB 2.0 Ethernet Devices */
 
@@ -677,12 +690,12 @@ static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
 
 	do {
 		ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
-		
+
 		msleep(1);
 
 		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, &smsr);
 	} while (!(smsr & AX_HOST_EN) && (i++ < 30));
-	
+
 	ax8817x_read_cmd(dev, AX_CMD_READ_MII_REG, phy_id, (__u16)loc, 2, res);
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, NULL);
 
@@ -743,8 +756,8 @@ ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, int val)
 		msleep(1);
 
 		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, &smsr);
-	} while (!(smsr & AX_HOST_EN) && (i++ < 30));	
-		
+	} while (!(smsr & AX_HOST_EN) && (i++ < 30));
+
 	ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG, phy_id,
 			  (__u16)loc, 2, res);
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, NULL);
@@ -1192,15 +1205,15 @@ static int ax8817x_check_ether_addr(struct usbnet *dev)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
 		dev->net->addr_assign_type |= NET_ADDR_RANDOM;
 #endif
-		random_ether_addr(dev->net->dev_addr); 
+		random_ether_addr(dev->net->dev_addr);
 #endif
 		*tmp = 0;
 		*(tmp + 1) = 0x0E;
 		*(tmp + 2) = 0xC6;
 		*(tmp + 3) = 0x8F;
 
-		return -EADDRNOTAVAIL;	
-	} 
+		return -EADDRNOTAVAIL;
+	}
 	return 0;
 }
 
@@ -1220,18 +1233,19 @@ static int ax8817x_get_mac(struct usbnet *dev, u8* buf)
 	if (!memcmp(dev->net->dev_addr, default_asix_mac, ETH_ALEN)) {
 		if (g_usr_mac && (g_usr_mac < 3)) {
 			/* Get user set MAC address */
-			if (g_usr_mac == 2) {
-				/* 0x100000 offset for 2nd Ethernet MAC */
-				g_mac_addr[3] += 0x10;
-				if (g_mac_addr[3] < 0x10)
-					devwarn(dev, "MAC address byte 3 "
-						     "(0x%02x) wrap around",
-						g_mac_addr[3]);
-			}
-			memcpy(dev->net->dev_addr, g_mac_addr, ETH_ALEN);
-			g_usr_mac++;
-		} else devwarn(dev, "using default ASIX MAC");
+            if (!g_mac_alloc[0]) {
+                g_mac_alloc[0] = 1;
+                memcpy(dev->net->dev_addr, g_mac_addr[0], ETH_ALEN);
+                g_usr_mac++;
+            }
+            else if (!g_mac_alloc[1]) {
+                g_mac_alloc[1] = 1;
+                memcpy(dev->net->dev_addr, g_mac_addr[1], ETH_ALEN);
+                g_usr_mac++;
+            }
+		} else devwarn(dev, "using default ASIX MAC, %d", g_usr_mac);
 	}
+
 
 	if (ax8817x_check_ether_addr(dev)) {
 		ret = access_eeprom_mac(dev, dev->net->dev_addr, 0x04, 1);
@@ -1261,7 +1275,7 @@ static int ax8817x_get_mac(struct usbnet *dev, u8* buf)
 	/* Set the MAC address */
 	ax8817x_write_cmd (dev, AX88772_CMD_WRITE_NODE_ID, 0, 0,
 			   ETH_ALEN, dev->net->dev_addr);
-	
+
 	if (ret < 0) {
 		deverr(dev, "Failed to write MAC address: %d", ret);
 		goto out;
@@ -1791,7 +1805,7 @@ static int ax88772a_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (ret < 0) {
 		deverr(dev, "Get HW address failed: %d", ret);
 		goto out2;
-	}	
+	}
 
 	/* make sure the driver can enable sw mii operation */
 	ret = ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
@@ -1849,7 +1863,7 @@ static int ax88772a_bind(struct usbnet *dev, struct usb_interface *intf)
 		if (tmp32 != (AX88772A_IPG2_DEFAULT << 16 |
 			AX88772A_IPG1_DEFAULT << 8 | AX88772A_IPG0_DEFAULT)) {
 			printk("Non-authentic ASIX product\nASIX does not support it\n");
-			ret = -ENODEV;		
+			ret = -ENODEV;
 			goto out2;
 		}
 	}
@@ -2235,7 +2249,7 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 		if (tmp32 != (AX88772A_IPG2_DEFAULT << 16 |
 			AX88772A_IPG1_DEFAULT << 8 | AX88772A_IPG0_DEFAULT)) {
 			printk("Non-authentic ASIX product\nASIX does not support it\n");
-			ret = -ENODEV;		
+			ret = -ENODEV;
 			goto err_out;
 		}
 	}
@@ -2312,18 +2326,17 @@ static void ax88772b_unbind(struct usbnet *dev, struct usb_interface *intf)
 
 	if (ax772b_data) {
 		/* Check for user set MAC address */
-		if (!memcmp(dev->net->dev_addr, g_mac_addr, ETH_ALEN)) {
+		if (!memcmp(dev->net->dev_addr, g_mac_addr[0], ETH_ALEN))
+        {
 			/* Release user set MAC address */
-			g_usr_mac--;
+            g_mac_alloc[0] = 0;
+            g_usr_mac--;
+        }
 
-			if (g_usr_mac == 2) {
-				/* 0x100000 offset for 2nd Ethernet MAC */
-				g_mac_addr[3] -= 0x10;
-				if (g_mac_addr[3] > 0xf0)
-					devwarn(dev, "MAC address byte 3 "
-						     "(0x%02x) wrap around",
-						g_mac_addr[3]);
-			}
+        if (!memcmp(dev->net->dev_addr, g_mac_addr[1], ETH_ALEN)) {
+			/* Release user set MAC address */
+            g_mac_alloc[1] = 0;
+			g_usr_mac--;
 		}
 
 		flush_workqueue(ax772b_data->ax_work);
@@ -3276,7 +3289,7 @@ static int ax88772_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 #ifndef RX_SKB_COPY
 		ax_skb = skb_clone(skb, GFP_ATOMIC);
 #else
-		ax_skb = alloc_skb(size + NET_IP_ALIGN, GFP_ATOMIC);	
+		ax_skb = alloc_skb(size + NET_IP_ALIGN, GFP_ATOMIC);
 		skb_reserve(ax_skb, NET_IP_ALIGN);
 #endif
 		if (ax_skb) {
@@ -3435,7 +3448,7 @@ static int ax88772b_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 		ax_skb = skb_clone(skb, GFP_ATOMIC);
 #else
 		ax_skb = alloc_skb(rx_hdr.len + NET_IP_ALIGN, GFP_ATOMIC);
-		skb_reserve(ax_skb, NET_IP_ALIGN);	
+		skb_reserve(ax_skb, NET_IP_ALIGN);
 #endif
 		if (ax_skb) {
 #ifndef RX_SKB_COPY
@@ -3451,7 +3464,7 @@ static int ax88772b_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 
 #else
 			skb_put(ax_skb, rx_hdr.len);
-			memcpy(ax_skb->data, skb->data + sizeof(struct ax88772b_rx_header), rx_hdr.len); 
+			memcpy(ax_skb->data, skb->data + sizeof(struct ax88772b_rx_header), rx_hdr.len);
 #endif
 
 			ax_skb->truesize = rx_hdr.len + sizeof(struct sk_buff);
@@ -3636,7 +3649,7 @@ static void ax88772_link_reset(struct work_struct *work)
 
 			if (ax772_data->presvd_phy_advertise && ax772_data->presvd_phy_bmcr) {
 				ax88772_restore_bmcr_anar(dev);
-				
+
 			} else {
 				ax8817x_mdio_write_le(dev->net, dev->mii.phy_id,
 						      MII_ADVERTISE,
@@ -3908,7 +3921,7 @@ static void ax88772b_link_reset(struct work_struct *work)
 	}
 
 	ax772b_data->Event = AX_NOP;
-	
+
 	return;
 }
 
