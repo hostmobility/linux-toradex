@@ -36,7 +36,7 @@
 #include <mach/irqs.h>
 
 #include "board.h"
-#include "board-colibri_t20.h"
+#include "board-mx4-t20.h"
 #include "devices.h"
 #include "gpio-names.h"
 #include "tegra2_host1x_devices.h"

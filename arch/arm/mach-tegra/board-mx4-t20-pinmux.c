@@ -20,7 +20,7 @@
 
 #include <mach/pinmux.h>
 
-#include "board-colibri_t20.h"
+#include "board-mx4-t20.h"
 #include "gpio-names.h"
 
 #define DEFAULT_DRIVE(_name)					\
