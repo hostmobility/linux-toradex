@@ -230,7 +230,7 @@
 #define DEV_NAME	"ttyLP"
 #define UART_NR		6
 
-static bool nodma = true;
+static bool nodma = false;
 module_param(nodma, bool, S_IRUGO);
 
 struct lpuart_port {
