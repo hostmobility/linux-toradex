@@ -84,6 +84,17 @@ static int pcf85063_start_clock(struct i2c_client *client, u8 ctrl1)
 	return 0;
 }
 
+static int pcf85063_hw_probe(struct i2c_client *client)
+{
+	int ret;
+
+	ret = i2c_smbus_read_byte_data(client, PCF85063_REG_CTRL1);
+	if (ret < 0)
+		return -EIO;
+
+	return 0;
+}
+
 static int pcf85063_get_datetime(struct i2c_client *client, struct rtc_time *tm)
 {
 	int rc;
@@ -200,6 +211,11 @@ static int pcf85063_probe(struct i2c_client *client,
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 		return -ENODEV;
+
+	if (pcf85063_hw_probe(client) < 0) {
+		dev_info(&client->dev, "hardware probe failed\n");
+		return -ENODEV;
+	}
 
 	rtc = rtc_device_register(pcf85063_driver.driver.name,
 				&client->dev, &pcf85063_rtc_ops, THIS_MODULE);
