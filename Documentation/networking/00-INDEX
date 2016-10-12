@@ -80,6 +80,8 @@ fib_trie.txt
 	- Level Compressed Trie (LC-trie) notes: a structure for routing.
 filter.txt
 	- Linux Socket Filtering
+flexray.txt
+	- FlexRay Protocol Family
 fore200e.txt
 	- FORE Systems PCA-200E/SBA-200E ATM NIC driver info.
 framerelay.txt
