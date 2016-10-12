@@ -33,6 +33,7 @@ obj-$(CONFIG_NETROM)		+= netrom/
 obj-$(CONFIG_ROSE)		+= rose/
 obj-$(CONFIG_AX25)		+= ax25/
 obj-$(CONFIG_CAN)		+= can/
+obj-$(CONFIG_FLEXRAY)		+= flexray/
 obj-$(CONFIG_IRDA)		+= irda/
 obj-$(CONFIG_BT)		+= bluetooth/
 obj-$(CONFIG_SUNRPC)		+= sunrpc/
