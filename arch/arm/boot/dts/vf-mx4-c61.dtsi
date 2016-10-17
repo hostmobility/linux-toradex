@@ -12,8 +12,8 @@
 / {
 	chosen {
 		bootargs = "console=ttyLP0,115200";
-	}
-;
+	};
+
 	clk24m: clk24m {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
