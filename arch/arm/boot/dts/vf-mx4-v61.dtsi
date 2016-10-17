@@ -107,14 +107,20 @@
 &i2c2 {
 	status = "okay";
 
-    acc: mma8452q@1c {
-    	compatible = "fsl,mma8452";
-    	reg = <0x1c>;
-    	pinctrl-names = "default";
+    	acc: mma8452q@1c {
+	    	compatible = "fsl,mma8452";
+	    	reg = <0x1c>;
+	    	pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_acc>;
-        interrupt-parent = <&gpio1>;
-        interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
-    };
+
+	        interrupt-parent = <&gpio1>;
+	        interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+    	};
+
+	rtc@51 {
+		compatible = "nxp,pcf85063";
+		reg = <0x51>;
+	};
 };
 
 
