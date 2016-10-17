@@ -14,4 +14,9 @@
 / {
 	model = "Toradex Colibri VF61 on Host Mobility MX-4 V61 board";
 	compatible = "hostmobility,vf610-mx4_v61", "hostmobility,vf610-mx4_v61", "fsl,vf610";
+
+	aliases {
+		rtc0 = "/i2c@400e6000/rtc@51";
+		rtc1 = "/snvs@400a7000/snvs-rtc-lp@34";
+	};
 };
