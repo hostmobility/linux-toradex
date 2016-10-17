@@ -115,6 +115,11 @@
 		interrupt-parent = <&gpio1>;
 		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
 	};
+
+	rtc@51 {
+		compatible = "nxp,pcf85063";
+		reg = <0x51>;
+	};
 };
 
 
