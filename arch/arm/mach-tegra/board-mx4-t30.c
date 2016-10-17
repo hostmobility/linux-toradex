@@ -505,6 +505,11 @@ static struct mxc_mma845x_platform_data mma845x_data = {
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t30_i2c_bus1_board_info[] __initdata = {
+#ifdef CONFIG_RTC_DRV_PCF85063
+    	{
+		I2C_BOARD_INFO("pcf85063", 0x51),
+	},
+#endif
 #ifdef CONFIG_MXC_MMA845X
 	{
 		I2C_BOARD_INFO("mma845x", 0x1C),
