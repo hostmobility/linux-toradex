@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 Host Mobility AB
+ * Copyright 2016 Host Mobility AB
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -9,14 +9,9 @@
 
 /dts-v1/;
 #include "vf610-mx4.dtsi"
-#include "vf-mx4-v61.dtsi"
+#include "vf-mx4-c61.dtsi"
 
 / {
-	model = "Toradex Colibri VF61 on Host Mobility MX-4 V61 board";
-	compatible = "hostmobility,vf610-mx4_v61", "hostmobility,vf610-mx4_v61", "fsl,vf610";
-
-	aliases {
-		rtc0 = "/i2c@400e6000/rtc@51";
-		rtc1 = "/snvs@400a7000/snvs-rtc-lp@34";
-	};
+	model = "Toradex Colibri VF61 on Host Mobility MX-4 C61 board";
+	compatible = "hostmobility,vf610-mx4_c61", "hostmobility,vf610-mx4_c61", "fsl,vf610";
 };
