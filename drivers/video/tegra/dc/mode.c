@@ -97,6 +97,23 @@ const struct fb_videomode tegra_modes[] = {
 		.flag = FB_FLAG_RATIO_16_9,
 		.vmode = FB_VMODE_NONINTERLACED
 	},
+	/* 1440x900@60 (Bosch screen) */
+	{
+		.name =		"1440x900CT",
+		.refresh =	60,
+		.xres = 	1440,
+		.yres = 	900,
+		.pixclock = 9392,
+		.left_margin = 	232,
+		.right_margin = 80,
+		.upper_margin = 28,
+		.lower_margin = 1,
+		.hsync_len =	152,
+		.vsync_len = 	3,
+		.sync = FB_SYNC_VERT_HIGH_ACT,
+		//.flag = FB_FLAG_RATIO_16_9,
+		.vmode = FB_VMODE_NONINTERLACED
+	},
 
 	/* Portrait modes */
 	{
