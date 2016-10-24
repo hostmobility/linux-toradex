@@ -765,6 +765,11 @@ static struct platform_device tegra_rtc_device = {
 /* SPI */
 
 #if defined(CONFIG_SPI_TEGRA) && defined(CONFIG_SPI_SPIDEV)
+
+static struct mx4_io_platform_data mx4_io_pdata = {
+	.event_rdy = -1,
+};
+
 static struct spi_board_info tegra_spi_devices[] __initdata = {
 	{
 		.bus_num	= 3,		/* SPI4 */
@@ -773,7 +778,7 @@ static struct spi_board_info tegra_spi_devices[] __initdata = {
 		.max_speed_hz	= 5000000,
 		.modalias	= "mx4_io_spi",
 		.mode		= SPI_MODE_1,
-		.platform_data	= NULL,
+		.platform_data	= &mx4_io_pdata,
 	},
 	{
 		.bus_num	= 3,
