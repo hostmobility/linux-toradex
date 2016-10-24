@@ -30,5 +30,9 @@
 
 #define GPIO_WAKEUP_PIN			TEGRA_GPIO_PC7
 
+struct mx4_io_platform_data {
+	int event_rdy;
+};
+
 /* End Host Mobility MX-4 MAP*/
 #endif
