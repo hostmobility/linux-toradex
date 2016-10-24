@@ -211,13 +211,11 @@ config MACH_HM_MX4_VCC_T20
        help
          Support for Toradex Colibri T20 module on Host Mobility's MX4 VCC T20 board
 
-config MACH_HM_VCB
-        bool "Host Mobility VCB"
-        depends on ARCH_TEGRA_2x_SOC
-        select MACH_COLIBRI_T20
-        select HM_EXT_AX88772B
-        help
-          Support for Toradex Colibri T20 module on Host Mobility's VCB board
+config MACH_HM_MX4_MIL
+       bool "Host Mobility MX4 MIL"
+       depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
+       help
+         Support for Toradex Colibri T20 module on Host Mobility's MX4 MIL board
 
 config MACH_HARMONY
        bool "Harmony board"
