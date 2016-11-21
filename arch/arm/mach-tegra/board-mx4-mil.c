@@ -1226,7 +1226,6 @@ static void __init colibri_t20_init(void)
 	colibri_t20_regulator_init();
 
 	colibri_t20_usb_init();
-	colibri_t20_panel_init();
 
 	/* Note: V1.1c modules require proper BCT setting 666 rather than
 	   721.5 MHz EMC clock */
