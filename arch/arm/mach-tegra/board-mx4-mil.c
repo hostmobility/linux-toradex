@@ -1253,7 +1253,7 @@ void __init colibri_t20_reserve(void)
 
 	/* we specify zero for special handling due to already reserved
 	   fbmem/nvmem (U-Boot 2011.06 compatibility from our V1.x images) */
-	tegra_reserve(0, SZ_8M + SZ_1M, SZ_16M);
+	tegra_reserve(0, 0, 0);
 	tegra_ram_console_debug_reserve(SZ_1M);
 }
 
