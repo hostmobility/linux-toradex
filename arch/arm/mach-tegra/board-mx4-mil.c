@@ -1198,11 +1198,7 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 #endif
 	&tegra_nand_device,
 	&tegra_pmu_device,
-	&tegra_gart_device,
-	&tegra_aes_device,
 	&tegra_wdt_device,
-	&tegra_avp_device,
-	&tegra_das_device,
 	&spdif_dit_device,
 	&tegra_spi_device4,
 	&status_led_dev,
