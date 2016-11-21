@@ -129,7 +129,6 @@ endif
 
 obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil.o
 obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil-memory.o
-obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil-panel.o
 obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil-pinmux.o
 obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil-power.o
 obj-${CONFIG_MACH_HM_MX4_MIL}          += mx4-pm.o
