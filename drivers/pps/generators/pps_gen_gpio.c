@@ -98,6 +98,14 @@ static enum hrtimer_restart hrtimer_event(struct hrtimer *timer)
 		local_irq_restore(flags);
 		pr_err("we are late this time %ld.%09ld\n",
 		       ts1.tv_sec, ts1.tv_nsec);
+		if(expire_time.tv_sec != ts1.tv_sec) {
+			pr_err("wanted seconds %ld != %ld\n",
+			expire_time.tv_sec, ts1.tv_sec);
+		}
+                if(ts1.tv_nsec > lim) {
+                        pr_err("nsec %09ld > %09ld\n",
+                        ts1.tv_nsec, lim);
+                }
 		goto done;
 	}
 
