@@ -117,12 +117,28 @@ obj-$(CONFIG_TEGRA_DYNAMIC_PWRDET)      += powerdetect.o
 obj-$(CONFIG_TEGRA_USB_MODEM_POWER)     += tegra_usb_modem_power.o
 obj-$(CONFIG_TEGRA_PCI)                 += pcie.o
 
-obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20.o
-obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-memory.o
-obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-panel.o
-obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-pinmux.o
-obj-${CONFIG_MACH_COLIBRI_T20}          += board-mx4-t20-power.o
-obj-${CONFIG_MACH_COLIBRI_T20}          += mx4-pm.o
+ifneq ($(CONFIG_MACH_HM_MX4_MIL),y)
+ifneq ($(CONFIG_MACH_HM_MX4_T20),y)
+obj-${CONFIG_MACH_COLIBRI_T20}          += board-colibri_t20.o
+obj-${CONFIG_MACH_COLIBRI_T20}          += board-colibri_t20-memory.o
+obj-${CONFIG_MACH_COLIBRI_T20}          += board-colibri_t20-panel.o
+obj-${CONFIG_MACH_COLIBRI_T20}          += board-colibri_t20-pinmux.o
+obj-${CONFIG_MACH_COLIBRI_T20}          += board-colibri_t20-power.o
+endif
+endif
+
+obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil.o
+obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil-memory.o
+obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil-pinmux.o
+obj-${CONFIG_MACH_HM_MX4_MIL}          += board-mx4-mil-power.o
+obj-${CONFIG_MACH_HM_MX4_MIL}          += mx4-pm.o
+
+obj-${CONFIG_MACH_HM_MX4_T20}          += board-mx4-t20.o
+obj-${CONFIG_MACH_HM_MX4_T20}          += board-mx4-t20-memory.o
+obj-${CONFIG_MACH_HM_MX4_T20}          += board-mx4-t20-panel.o
+obj-${CONFIG_MACH_HM_MX4_T20}          += board-mx4-t20-pinmux.o
+obj-${CONFIG_MACH_HM_MX4_T20}          += board-mx4-t20-power.o
+obj-${CONFIG_MACH_HM_MX4_T20}          += mx4-pm.o
 
 obj-${CONFIG_MACH_HARMONY}              += board-harmony.o
 obj-${CONFIG_MACH_HARMONY}              += board-harmony-kbc.o
