@@ -27,6 +27,7 @@
 #include <linux/mma845x.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/platform_device.h>
+#include <linux/pps_gen_gpio.h>
 #include <linux/serial_8250.h>
 #include <linux/spi-tegra.h>
 #include <linux/spi/spi.h>
@@ -667,6 +668,19 @@ static struct platform_device colibri_t30_keys_device = {
 };
 #endif /* CONFIG_KEYBOARD_GPIO */
 
+#ifdef PPS_GENERATOR_GPIO
+static struct pps_gen_gpio_platform_data pps_gpio_pdata = {
+	.gpio = TEGRA_GPIO_PN6,
+};
+
+static struct platform_device pps_gpio = {
+	.name 		= "pps_gen_gpio",
+	.id 		= 0,
+	.dev		= {
+		.platform_data = &pps_gpio_pdata,
+	}
+};
+#endif
 
 static struct gpio_led status_leds[] = {
 	[0] =  {
