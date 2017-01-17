@@ -27,6 +27,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
+#include <linux/pps_gen_gpio.h>
 #include <linux/time.h>
 #include <linux/hrtimer.h>
 #include <linux/gpio.h>
@@ -43,13 +44,29 @@ module_param_named(delay, send_delay, uint, 0);
 
 /* device specific private data structure */
 struct pps_gen_gpio_devdata {
+#ifdef CONFIG_OF
 	struct gpio_desc *pps_gpio;	/* GPIO port descriptor */
+#else
+	unsigned pps_gpio;
+#endif
 	struct hrtimer timer;
 	long port_write_time;		/* calibrated port write time (ns) */
 };
 
 /* calibrated time between a hrtimer event and the reaction */
 static long hrtimer_error = SAFETY_INTERVAL;
+
+#ifdef CONFIG_OF
+static void pps_gen_set_gpio(struct gpio_desc *gpio, int value)
+{
+	gpiod_set_value(gpio, value);
+}
+#else
+static void pps_gen_set_gpio(unsigned int gpio, int value)
+{
+	gpio_set_value(gpio, value);
+}
+#endif
 
 /* the kernel hrtimer event */
 static enum hrtimer_restart hrtimer_event(struct hrtimer *timer)
@@ -90,7 +107,7 @@ static enum hrtimer_restart hrtimer_event(struct hrtimer *timer)
 	} while (expire_time.tv_sec == ts2.tv_sec && ts2.tv_nsec < lim);
 
 	/* set the signal */
-	gpiod_set_value(devdata->pps_gpio, 1);
+	pps_gen_set_gpio(devdata->pps_gpio, 1);
 
 	/* busy loop until the time is right for a clear edge */
 	lim = NSEC_PER_SEC - devdata->port_write_time;
@@ -99,7 +116,7 @@ static enum hrtimer_restart hrtimer_event(struct hrtimer *timer)
 	} while (expire_time.tv_sec == ts2.tv_sec && ts2.tv_nsec < lim);
 
 	/* unset the signal */
-	gpiod_set_value(devdata->pps_gpio, 0);
+	pps_gen_set_gpio(devdata->pps_gpio, 0);
 
 	getnstimeofday(&ts3);
 
@@ -149,7 +166,7 @@ static void calibrate_port(struct pps_gen_gpio_devdata *devdata)
 
 		local_irq_save(irq_flags);
 		getnstimeofday(&a);
-		gpiod_set_value(devdata->pps_gpio, 0);
+		pps_gen_set_gpio(devdata->pps_gpio, 0);
 		getnstimeofday(&b);
 		local_irq_restore(irq_flags);
 
@@ -177,6 +194,8 @@ static int pps_gen_gpio_probe(struct platform_device *pdev)
 	int ret;
 	struct device *dev = &pdev->dev;
 	struct pps_gen_gpio_devdata *devdata;
+	struct pps_gen_gpio_platform_data *pdata = pdev->dev.platform_data;
+#ifdef CONFIG_OF
 	int num_gpios;
 
 	/* get number of gpios defined in property pps-gen-gpios of DT node
@@ -190,6 +209,7 @@ static int pps_gen_gpio_probe(struct platform_device *pdev)
 	} else {
 		pr_info("found %d GPIOS defined in DT\n", num_gpios);
 	}
+#endif
 
 	/* allocate space for device info */
 	devdata = devm_kzalloc(dev, sizeof(struct pps_gen_gpio_devdata),
@@ -197,6 +217,7 @@ static int pps_gen_gpio_probe(struct platform_device *pdev)
 	if (!devdata)
 		return -ENOMEM;
 
+#ifdef CONFIG_OF
 	/* pps-gen is the function associated with gpio list pps-gen-gpios */
 	devdata->pps_gpio = devm_gpiod_get(dev, "pps-gen");
 	if (IS_ERR(devdata->pps_gpio)) {
@@ -205,13 +226,17 @@ static int pps_gen_gpio_probe(struct platform_device *pdev)
 		return PTR_ERR(devdata->pps_gpio);
 	}
 
-	platform_set_drvdata(pdev, devdata);
-
 	ret = gpiod_direction_output(devdata->pps_gpio, 1);
+#else
+	devdata->pps_gpio = pdata->gpio;
+	ret = gpio_direction_output(devdata->pps_gpio, 1);
+#endif
 	if (ret < 0) {
 		dev_err(dev, "cannot configure PPS GPIO\n");
 		return ret;
 	}
+
+	platform_set_drvdata(pdev, devdata);
 
 	calibrate_port(devdata);
 
@@ -229,7 +254,8 @@ static int pps_gen_gpio_remove(struct platform_device *pdev)
 	return 0;
 }
 
-/* the compatible property here defined is searched for in DT, and 
+#ifdef CONFIG_OF
+/* the compatible property here defined is searched for in DT, and
  * when a match is found, the corresponding DT node name is passed
  * backed in pdev->name */
 static const struct of_device_id pps_gen_gpio_dt_ids[] = {
@@ -237,12 +263,15 @@ static const struct of_device_id pps_gen_gpio_dt_ids[] = {
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(of, pps_gen_gpio_dt_ids);
+#endif
 
 static struct platform_driver pps_gen_gpio_driver = {
 	.driver		= {
 		.name	= "pps_gen_gpio", /* not used to match device */
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_OF
 		.of_match_table = of_match_ptr(pps_gen_gpio_dt_ids),
+#endif
 	},
 	.probe		= pps_gen_gpio_probe,
 	.remove		= pps_gen_gpio_remove,
