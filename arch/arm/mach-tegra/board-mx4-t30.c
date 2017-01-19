@@ -668,19 +668,18 @@ static struct platform_device colibri_t30_keys_device = {
 };
 #endif /* CONFIG_KEYBOARD_GPIO */
 
-#ifdef PPS_GENERATOR_GPIO
+
 static struct pps_gen_gpio_platform_data pps_gpio_pdata = {
 	.gpio = TEGRA_GPIO_PN6,
 };
 
-static struct platform_device pps_gpio = {
+static struct platform_device pps_gpio_device = {
 	.name 		= "pps_gen_gpio",
-	.id 		= 0,
+	.id 		= -1,
 	.dev		= {
 		.platform_data = &pps_gpio_pdata,
 	}
 };
-#endif
 
 static struct gpio_led status_leds[] = {
 	[0] =  {
@@ -691,14 +690,7 @@ static struct gpio_led status_leds[] = {
 		.active_low = 0,
 		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
-	[1] =  {
-		/* WIFI-RED on MX-4 T20/T30 */
-		.name = "mx4-wifi-red",
-		.default_trigger = "none",
-		.gpio = TEGRA_GPIO_PB2,
-		.active_low = 0,
-		.default_state = LEDS_GPIO_DEFSTATE_OFF,
-	},
+/* mx4-wifi-red must be restored, do not merge this change */
 };
 
 static struct gpio_led_platform_data status_led_data = {
@@ -1507,6 +1499,7 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 	&colibri_t30_keys_device,
 #endif
 	&colibri_t30_wifi_leds,
+	&pps_gpio_device,
 	&tegra_ahub_device,
 	&tegra_dam_device0,
 	&tegra_dam_device1,
