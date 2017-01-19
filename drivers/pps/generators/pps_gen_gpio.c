@@ -237,6 +237,9 @@ static int pps_gen_gpio_probe(struct platform_device *pdev)
 	ret = gpiod_direction_output(devdata->pps_gpio, 1);
 #else
 	devdata->pps_gpio = pdata->gpio;
+
+	gpio_request(devdata->pps_gpio, "PPS_GPIO");
+	gpio_export(devdata->pps_gpio, false);
 	ret = gpio_direction_output(devdata->pps_gpio, 1);
 #endif
 	if (ret < 0) {
