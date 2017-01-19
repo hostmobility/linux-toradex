@@ -670,7 +670,7 @@ static struct platform_device colibri_t30_keys_device = {
 
 
 static struct pps_gen_gpio_platform_data pps_gpio_pdata = {
-	.gpio = TEGRA_GPIO_PN6,
+	.gpio = TEGRA_GPIO_PB2,
 };
 
 static struct platform_device pps_gpio_device = {
