@@ -559,7 +559,7 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
 	if (!dma->chan_rx) {
 		dev_err(dev, "rx dma channel not available\n");
 		ret = -ENODEV;
-		return ret;
+		goto err_rx_channel;
 	}
 
 	dma->chan_tx = dma_request_slave_channel(dev, "tx");
@@ -623,7 +623,7 @@ err_tx_dma_buf:
 	dma_release_channel(dma->chan_tx);
 err_tx_channel:
 	dma_release_channel(dma->chan_rx);
-
+err_rx_channel:
 	devm_kfree(dev, dma);
 	dspi->dma = NULL;
 
