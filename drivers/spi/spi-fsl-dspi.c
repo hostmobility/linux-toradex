@@ -193,6 +193,8 @@ struct fsl_dspi {
 
 	u32			spi_tcnt;
 	struct fsl_dspi_dma	*dma;
+
+	enum dspi_trans_mode trans_mode;
 };
 
 static u32 dspi_data_to_pushr(struct fsl_dspi *dspi, int tx_word);
@@ -605,7 +607,7 @@ static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
 	}
 
 	dspi->dma = dma;
-	dspi->devtype_data->trans_mode = DSPI_DMA_MODE;
+	dspi->trans_mode = DSPI_DMA_MODE;
 	init_completion(&dma->cmd_tx_complete);
 	init_completion(&dma->cmd_rx_complete);
 
@@ -694,7 +696,7 @@ static int dspi_transfer_one_message(struct spi_master *master,
 		regmap_write(dspi->regmap, SPI_CTAR(0),
 				dspi->cur_chip->ctar_val);
 
-		trans_mode = dspi->devtype_data->trans_mode;
+		trans_mode = dspi->trans_mode;
 		switch (trans_mode) {
 		case DSPI_EOQ_MODE:
 			regmap_write(dspi->regmap, SPI_RSER, SPI_RSER_EOQFE);
@@ -717,7 +719,7 @@ static int dspi_transfer_one_message(struct spi_master *master,
 			goto out;
 		}
 
-		if (dspi->devtype_data->trans_mode != DSPI_DMA_MODE) {
+		if (trans_mode != DSPI_DMA_MODE) {
 			if (wait_event_interruptible(dspi->waitq,
 						dspi->waitflags))
 				dev_err(&dspi->pdev->dev,
@@ -843,7 +845,7 @@ static irqreturn_t dspi_interrupt(int irq, void *dev_id)
 
 		dspi->spi_tcnt = spi_tcnt;
 
-		trans_mode = dspi->devtype_data->trans_mode;
+		trans_mode = dspi->trans_mode;
 		switch (trans_mode) {
 		case DSPI_EOQ_MODE:
 			dspi_eoq_read(dspi);
@@ -982,6 +984,8 @@ static int dspi_probe(struct platform_device *pdev)
 		ret = -EFAULT;
 		goto out_master_put;
 	}
+
+	dspi->trans_mode = dspi->devtype_data->trans_mode;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	base = devm_ioremap_resource(&pdev->dev, res);
