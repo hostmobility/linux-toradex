@@ -252,8 +252,8 @@ static struct dev_rcv_lists *find_dev_rcv_lists(struct net_device *dev)
 		return (struct dev_rcv_lists *)dev->ml_priv;
 }
 
-int flexray_rx_register(struct net_device *dev, flexray_header_t frame_id,
-			flexray_header_t mask,
+int flexray_rx_register(struct net_device *dev, flexray_frame_filter_t frame_id,
+			flexray_frame_filter_t mask,
 			void (*func)(struct sk_buff *, void *),
 			void *data, char *ident)
 {
@@ -302,8 +302,8 @@ static void flexray_rx_delete_receiver(struct rcu_head *rp)
 	kmem_cache_free(rcv_cache, r);
 }
 
-void flexray_rx_unregister(struct net_device *dev, flexray_header_t frame_id,
-			flexray_header_t mask,
+void flexray_rx_unregister(struct net_device *dev, flexray_frame_filter_t frame_id,
+			flexray_frame_filter_t mask,
 			void (*func)(struct sk_buff *, void *), void *data)
 {
 	struct receiver *r = NULL;
@@ -404,8 +404,8 @@ static int flexray_rcv(struct sk_buff *skb, struct net_device *dev,
    
 	if (WARN_ONCE(dev->type != ARPHRD_FLEXRAY,
 		      "PF_FLEXRAY: dropped non conform skbuf: "
-		      "dev type %d, len %d, payload %d\n",
-         dev->type, skb->len, frf->len))
+		      "dev type %d, len %d, payload %d\n", dev->type, skb->len, 
+		      frf->frhead.plr))
 		goto drop;
 
 	/* update statistics */

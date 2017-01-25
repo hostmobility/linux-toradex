@@ -30,13 +30,13 @@ struct flexray_proto {
 extern int  flexray_proto_register(const struct flexray_proto *frp);
 extern void flexray_proto_unregister(const struct flexray_proto *frp);
 
-extern int  flexray_rx_register(struct net_device *dev, flexray_header_t frame_id,
-				flexray_header_t mask,
+extern int  flexray_rx_register(struct net_device *dev, flexray_frame_filter_t frame_id,
+				flexray_frame_filter_t mask,
 				void (*func)(struct sk_buff *, void *),
 				void *data, char *ident);
 
-extern void flexray_rx_unregister(struct net_device *dev, flexray_header_t frame_id,
-				flexray_header_t mask,
+extern void flexray_rx_unregister(struct net_device *dev, flexray_frame_filter_t frame_id,
+				flexray_frame_filter_t mask,
 				void (*func)(struct sk_buff *, void *),
 				void *data);
 
