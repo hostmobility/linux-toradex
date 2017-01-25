@@ -26,7 +26,7 @@ static void vflexray_rx(struct sk_buff *skb, struct net_device *dev)
 	struct net_device_stats *stats = &dev->stats;
 
 	stats->rx_packets++;
-	stats->rx_bytes += frf->len; //flexray_get_pl(frf->head);
+	stats->rx_bytes += frf->frhead.plr;
 
 	skb->protocol  = htons(ETH_P_FLEXRAY);
 	skb->pkt_type  = PACKET_BROADCAST;
@@ -46,8 +46,7 @@ static netdev_tx_t vflexray_tx(struct sk_buff *skb, struct net_device *dev)
 		return NETDEV_TX_OK;
 
 	stats->tx_packets++;
-	stats->tx_bytes += frf->len; //flexray_get_pl(frf->head);
-
+	stats->tx_bytes += frf->frhead.plr;
 	/* set flag whether this packet has to be looped back */
 	loop = skb->pkt_type == PACKET_LOOPBACK;
 
@@ -60,7 +59,7 @@ static netdev_tx_t vflexray_tx(struct sk_buff *skb, struct net_device *dev)
 			 * FLEXRAY core already did the echo for us
 			 */
 			stats->rx_packets++;
-			stats->rx_bytes += frf->len;
+			stats->rx_bytes += frf->frhead.plr;
 		}
 		kfree_skb(skb);
 		return NETDEV_TX_OK;
