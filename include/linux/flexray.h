@@ -19,44 +19,37 @@
 #define FLEXRAY_SYN_FLAG	0x10 /* Sync frame indikator */
 #define FLEXRAY_SFI_FLAG	0x08 /* Startup frame indikator */
 
-/*
- * FlexRay Frame structure (Note: This is updated below)
- *
- * Bit 0     reserved
- * Bit 1     Payload preamble indicator
- * Bit 2     Null frame indikator
- * Bit 3     Sync frame indikator
- * Bit 4     Startup frame indikator
- * Bit 5-15  Frame ID
- * Bit 16-22 Payload length
- * Bit 23-33 Header CRC
- * Bit 34-39 Cycle count
- * PAYLOAD [0-254 Bytes]
- * 24 Bit CRC
- */
+/* define Flexray Type for Filtering of Frame ID:s */
+typedef __u64 flexray_frame_filter_t;
 
-/* define Flexray Header Type for Filters */
-typedef __u64 flexray_header_t;
+/* Flexray header with additional information (flags).
+   Please note that the header is not an identical
+   representation of the original 5-byte header! */
+typedef struct {
+	uint32_t	flags;  /* Frame and error flags */
+	uint16_t	fid;	/* Frame id/slot id */
+	uint8_t		plr;	/* 0-254 bytes in data[] area */
+	uint16_t	crc;	/* original FlexRay header CRC */
+	uint8_t		rcc;	/* FlexRay received cycle count */
+} flexray_header_t;
 
 /**
  * struct flexray_frame - basic FlexRay frame structure
  * @head:      Header
- * @data:       the FlexRay frame payload.
+ * @data:      the FlexRay frame payload.
  * @crc:       the FlexRay frame CRC
  */
 
+/* FlexRay frame with associated metadata */
 struct flexray_frame {
-   __u16    frame_id;   // frame_id/slotid
-   __u16    flags;      //
-   __u8     len;        // 0-127 words in data[] area
-   __u8     cc;         // cycle count
-   __u8     offset;     // offset counter
-   __u8     repetition; // repetition
-   __u64    timestamp;  // Perhaps not needed, but since packet is created on external board, it might...
-   __u8     header_crc; //
-   __u8     data[254] __attribute__((aligned(8)));  //
-   __u8     crc[3];     //
+	uint32_t	seq;
+	uint64_t    timestamp;  /* timeval or timespec */
+	flexray_header_t frhead; /* slightly modified FR header */
+	uint8_t     data[254] __attribute__((aligned(8)));  //
+	uint8_t     crc[3];     /* Use TBI */
 };
+
+typedef struct flexray_frame flexray_frame_t;
 
 #if 0
 // Old implementation used wrapper functions to access the bit-fields.
@@ -188,8 +181,8 @@ struct sockaddr_flexray {
 };
 
 struct flexray_filter {
-	flexray_header_t flexray_id;
-	flexray_header_t flexray_mask;
+	flexray_frame_filter_t flexray_id;
+	flexray_frame_filter_t flexray_mask;
 };
 
 #endif /* FLEXRAY_H */
