@@ -1504,7 +1504,10 @@ static void _tegra_dc_controller_disable(struct tegra_dc *dc)
 	tegra_dc_writel(dc, 0, DC_CMD_INT_ENABLE);
 	disable_irq(dc->irq);
 
+#ifndef CONFIG_MACH_COLIBRI_T20
+/* Hack to prevent boot lock-up if HDMI is not connected. */
 	tegra_dc_clear_bandwidth(dc);
+#endif
 	tegra_dc_clk_disable(dc);
 
 	if (dc->out && dc->out->disable)
@@ -1600,6 +1603,8 @@ static void _tegra_dc_disable(struct tegra_dc *dc)
 void tegra_dc_disable(struct tegra_dc *dc)
 {
 	tegra_dc_ext_disable(dc->ext);
+
+	msleep(1);
 
 	/* it's important that new underflow work isn't scheduled before the
 	 * lock is acquired. */
