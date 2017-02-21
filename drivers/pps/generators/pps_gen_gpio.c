@@ -16,11 +16,6 @@
  * GNU General Public License for more details.
  */
 
-/*
- * TODO:
- * fix issues when realtime clock is adjusted in a leap
- */
-
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kernel.h>
@@ -101,11 +96,13 @@ static enum hrtimer_restart hrtimer_event(struct hrtimer *timer)
 		if(expire_time.tv_sec != ts1.tv_sec) {
 			pr_err("wanted seconds %ld != %ld\n",
 			expire_time.tv_sec, ts1.tv_sec);
+			pr_err("adjusted seconds to %ld\n", ts1.tv_sec);
+			expire_time.tv_sec = ts1.tv_sec;
 		}
-                if(ts1.tv_nsec > lim) {
-                        pr_err("nsec %09ld > %09ld\n",
-                        ts1.tv_nsec, lim);
-                }
+		if(ts1.tv_nsec > lim) {
+			pr_err("nsec %09ld > %09ld\n",
+				ts1.tv_nsec, lim);
+		}
 		goto done;
 	}
 
