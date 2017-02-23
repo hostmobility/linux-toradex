@@ -341,6 +341,15 @@ static struct platform_device colibri_can_device6 = {
 
 #endif /* CONFIG_HM_GTT_CAN */
 
+static uint8_t mx4_quirk_sja1000_can3_interrupt = 0;
+
+static int __init mx4_quirk_sja1000_can3_int(char *__unused)
+{
+	mx4_quirk_sja1000_can3_interrupt = 1;
+	return 0;
+}
+__setup("mx4_quirk_sja1000_can3_interrupt", mx4_quirk_sja1000_can3_int);
+
 
 static uint8_t mx4_quirk_sja1000_no_clock_out = 0;
 
@@ -391,17 +400,29 @@ static void colibri_can_init(void)
 	tegra_gpio_enable(TEGRA_CAN4_INT);
 	tegra_gpio_enable(TEGRA_CAN5_INT);
 	tegra_gpio_enable(TEGRA_CAN6_INT);
-	gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN3-INT");
-	gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN4-INT");
+
 	gpio_request_one(TEGRA_CAN5_INT, GPIOF_DIR_IN, "CAN5-INT");
 	gpio_request_one(TEGRA_CAN6_INT, GPIOF_DIR_IN, "CAN6-INT");
 
+	if (mx4_quirk_sja1000_can3_interrupt) {
+		gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN4-INT");
+		gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN3-INT");
 
-	colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
-	colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+		colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+		colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
 
-	colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
-	colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+		colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+		colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+	} else {
+		gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN3-INT");
+		gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN4-INT");
+
+		colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+		colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+
+		colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+		colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+	}
 
 	colibri_can_resource5[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
 	colibri_can_resource5[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
