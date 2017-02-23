@@ -341,6 +341,63 @@ static struct platform_device colibri_can_device6 = {
 
 #endif /* CONFIG_HM_GTT_CAN */
 
+static void colibri_can_init()
+{
+#ifdef CONFIG_HM_GMI_MUX
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL
+		| SNOR_CONFIG_32BIT,
+		SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX |
+		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);
+#else
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+#endif /* CONFIG_HM_GMI_MUX */
+
+	tegra_gpio_enable(TEGRA_CAN_INT);
+	tegra_gpio_enable(TEGRA_CAN2_INT);
+	gpio_request_one(TEGRA_CAN_INT, GPIOF_DIR_IN, "CAN1-INT");
+	gpio_request_one(TEGRA_CAN2_INT, GPIOF_DIR_IN, "CAN2-INT");
+
+	colibri_can_resource[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+	colibri_can_resource[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+
+	colibri_can_resource2[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+	colibri_can_resource2[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+
+	platform_device_register(&colibri_can_device);
+	platform_device_register(&colibri_can_device2);
+
+#if defined CONFIG_HM_GTT_CAN
+	tegra_gpio_enable(TEGRA_CAN3_INT);
+	tegra_gpio_enable(TEGRA_CAN4_INT);
+	tegra_gpio_enable(TEGRA_CAN5_INT);
+	tegra_gpio_enable(TEGRA_CAN6_INT);
+	gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN3-INT");
+	gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN4-INT");
+	gpio_request_one(TEGRA_CAN5_INT, GPIOF_DIR_IN, "CAN5-INT");
+	gpio_request_one(TEGRA_CAN6_INT, GPIOF_DIR_IN, "CAN6-INT");
+
+
+	colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+	colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+
+	colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+	colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+
+	colibri_can_resource5[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
+	colibri_can_resource5[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
+
+	colibri_can_resource6[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
+	colibri_can_resource6[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
+
+	platform_device_register(&colibri_can_device3);
+	platform_device_register(&colibri_can_device4);
+	platform_device_register(&colibri_can_device5);
+	platform_device_register(&colibri_can_device6);
+#endif /* CONFIG_HM_GTT_CAN */
+}
+
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
 
@@ -1779,59 +1836,7 @@ static void __init colibri_t20_init(void)
 
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
 
-#ifdef CONFIG_HM_GMI_MUX
-	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL
-		| SNOR_CONFIG_32BIT,
-		SNOR_CONFIG_REG);
-	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX |
-		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);
-#else
-	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
-	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
-#endif /* CONFIG_HM_GMI_MUX */
-
-	tegra_gpio_enable(TEGRA_CAN_INT);
-	tegra_gpio_enable(TEGRA_CAN2_INT);
-	gpio_request_one(TEGRA_CAN_INT, GPIOF_DIR_IN, "CAN1-INT");
-	gpio_request_one(TEGRA_CAN2_INT, GPIOF_DIR_IN, "CAN2-INT");
-
-	colibri_can_resource[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
-	colibri_can_resource[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
-
-	colibri_can_resource2[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
-	colibri_can_resource2[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
-
-	platform_device_register(&colibri_can_device);
-	platform_device_register(&colibri_can_device2);
-
-#if defined CONFIG_HM_GTT_CAN
-	tegra_gpio_enable(TEGRA_CAN3_INT);
-	tegra_gpio_enable(TEGRA_CAN4_INT);
-	tegra_gpio_enable(TEGRA_CAN5_INT);
-	tegra_gpio_enable(TEGRA_CAN6_INT);
-	gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN3-INT");
-	gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN4-INT");
-	gpio_request_one(TEGRA_CAN5_INT, GPIOF_DIR_IN, "CAN5-INT");
-	gpio_request_one(TEGRA_CAN6_INT, GPIOF_DIR_IN, "CAN6-INT");
-
-
-	colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
-	colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
-
-	colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
-	colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
-
-	colibri_can_resource5[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
-	colibri_can_resource5[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
-
-	colibri_can_resource6[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
-	colibri_can_resource6[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
-
-	platform_device_register(&colibri_can_device3);
-	platform_device_register(&colibri_can_device4);
-	platform_device_register(&colibri_can_device5);
-	platform_device_register(&colibri_can_device6);
-#endif /* CONFIG_HM_GTT_CAN */
+	colibri_can_init();
 
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
