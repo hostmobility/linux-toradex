@@ -341,8 +341,26 @@ static struct platform_device colibri_can_device6 = {
 
 #endif /* CONFIG_HM_GTT_CAN */
 
-static void colibri_can_init()
+
+static uint8_t mx4_quirk_sja1000_no_clock_out = 0;
+
+static int __init mx4_quirk_sja1000_no_clk(char *__unused)
 {
+	mx4_quirk_sja1000_no_clock_out = 1;
+	return 0;
+}
+__setup("mx4_quirk_sja1000_no_clock_out", mx4_quirk_sja1000_no_clk);
+
+static void colibri_can_init(void)
+{
+	struct sja1000_platform_data * pdata =
+		(struct sja1000_platform_data*)colibri_can_device.dev.platform_data;
+
+
+	if (mx4_quirk_sja1000_no_clock_out) {
+		pdata->cdr = CDR_CLK_OFF | CDR_CBP;
+	}
+
 #ifdef CONFIG_HM_GMI_MUX
 	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL
 		| SNOR_CONFIG_32BIT,
