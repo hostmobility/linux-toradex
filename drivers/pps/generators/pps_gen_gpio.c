@@ -31,6 +31,7 @@
 #define DRVDESC "GPIO PPS signal generator"
 #define SEND_DELAY_MAX  100000
 #define SAFETY_INTERVAL  10000	/* set the hrtimer earlier for safety (ns) */
+#define TIME_ADJ_THRESHOLD 1
 
 /* module parameters */
 static unsigned int send_delay = 30000;
@@ -92,8 +93,11 @@ static enum hrtimer_restart hrtimer_event(struct hrtimer *timer)
 	if (expire_time.tv_sec != ts1.tv_sec || ts1.tv_nsec > lim) {
 		local_irq_restore(flags);
 		pr_err("we are late this time %ld.%09ld\n",
-		       ts1.tv_sec, ts1.tv_nsec);
-		if(expire_time.tv_sec != ts1.tv_sec) {
+			ts1.tv_sec, ts1.tv_nsec);
+	if(((ts1.tv_sec > expire_time.tv_sec) &&
+		(ts1.tv_sec - expire_time.tv_sec > TIME_ADJ_THRESHOLD)) ||
+		((ts1.tv_sec < expire_time.tv_sec) &&
+		(expire_time.tv_sec - ts1.tv_sec > TIME_ADJ_THRESHOLD))) {
 			pr_err("wanted seconds %ld != %ld\n",
 			expire_time.tv_sec, ts1.tv_sec);
 			pr_err("adjusted seconds to %ld\n", ts1.tv_sec);
