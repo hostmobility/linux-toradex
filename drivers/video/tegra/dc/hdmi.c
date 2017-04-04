@@ -1266,7 +1266,7 @@ static bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 	/* Check some of DC's constraints */
 	if (mode->hsync_len > 1 && mode->vsync_len > 1 &&
 		mode->lower_margin + mode->vsync_len + mode->upper_margin > 1 &&
-		mode->xres >= 16 && mode->yres >= 16) {
+		mode->xres >= 256 && mode->yres >= 256) {
 
 		if (mode->lower_margin == 1) {
 			/* This might be the case for HDMI<->DVI

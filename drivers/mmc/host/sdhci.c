@@ -2118,6 +2118,19 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 	BUG_ON(intmask == 0);
 
 	if (!host->cmd) {
+		if (host->mrq) {
+			if (intmask & SDHCI_INT_TIMEOUT) {
+				host->mrq->cmd->error = -ETIMEDOUT;
+				tasklet_schedule(&host->finish_tasklet);
+				return;
+			}
+			else if (intmask & (SDHCI_INT_CRC | SDHCI_INT_END_BIT |
+					    SDHCI_INT_INDEX)) {
+				host->mrq->cmd->error = -EILSEQ;
+				tasklet_schedule(&host->finish_tasklet);
+				return;
+			}
+		}
 		printk(KERN_ERR "%s: Got command interrupt 0x%08x even "
 			"though no command operation was in progress.\n",
 			mmc_hostname(host->mmc), (unsigned)intmask);
@@ -2440,10 +2453,10 @@ int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 
 	if (mmc->card) {
 		/*
-		 * If eMMC cards are put in sleep state, Vccq can be disabled
-		 * but Vcc would still be powered on. In resume, we only restore
-		 * the controller context. So, set MMC_PM_KEEP_POWER flag.
-		 */
+		* If eMMC cards are put in sleep state, Vccq can be disabled
+		* but Vcc would still be powered on. In resume, we only restore
+		* the controller context. So, set MMC_PM_KEEP_POWER flag.
+		*/
 		if (mmc_card_can_sleep(mmc) &&
 			!(mmc->caps & MMC_CAP2_NO_SLEEP_CMD))
 			mmc->pm_flags = MMC_PM_KEEP_POWER;

@@ -346,6 +346,38 @@ static struct platform_device soc_camera_tvp5150soc = {
 	.name	= "soc-camera-pdrv",
 };
 #endif /* CONFIG_SOC_CAMERA_TVP5150 | CONFIG_SOC_CAMERA_TVP5150_MODULE */
+#if defined(CONFIG_SOC_CAMERA_S2D13P04) || \
+		defined(CONFIG_SOC_CAMERA_S2D13P04_MODULE)
+static struct i2c_board_info camera_i2c_s2d13p04 = {
+	I2C_BOARD_INFO("s2d13p04", 0x37),
+};
+
+static struct tegra_camera_platform_data s2d13p04_platform_data = {
+	.disable_camera		= tegra_camera_disable,
+	.enable_camera		= tegra_camera_enable,
+	.flip_h			= 0,
+	.flip_v			= 0,
+	.internal_sync		= false,
+	.port			= TEGRA_CAMERA_PORT_VIP,
+	.vip_h_active_start	= 0x66,
+	.vip_v_active_start	= 0x21,
+};
+
+static struct soc_camera_link iclink_s2d13p04 = {
+	.board_info	= &camera_i2c_s2d13p04,
+	.bus_id		= -1, /* This must match the .id of tegra_vi01_device */
+	.i2c_adapter_id	= 2,
+	.priv		= &s2d13p04_platform_data,
+};
+
+static struct platform_device soc_camera_s2d13p04 = {
+	.dev = {
+		.platform_data = &iclink_s2d13p04,
+	},
+	.id	= 7,
+	.name	= "soc-camera-pdrv",
+};
+#endif /* CONFIG_SOC_CAMERA_S2D13P04 | CONFIG_SOC_CAMERA_S2D13P04_MODULE */
 #endif /* CONFIG_VIDEO_TEGRA | CONFIG_VIDEO_TEGRA_MODULE */
 
 /* CAN */
@@ -429,7 +461,7 @@ static struct tegra_clk_init_table apalis_t30_clk_init_table[] __initdata = {
 	{"pwm",			"pll_p",	3187500,	false},
 	{"spdif_out",		"pll_a_out0",	0,		false},
 	{"vi",			"pll_p",	0,		false},
-	{"vi_sensor",		"pll_p",	150000000,	false},
+	{"vi_sensor",		"pll_p",	24000000,	true},
 	{NULL,			NULL,		0,		0},
 };
 
@@ -798,20 +830,6 @@ static struct tegra_pci_platform_data apalis_t30_pci_platform_data = {
 
 static void apalis_t30_pci_init(void)
 {
-	/* Reset PLX PEX 8605 PCIe Switch plus PCIe devices on Apalis Evaluation
-	   Board */
-	gpio_request(PEX_PERST_N, "PEX_PERST_N");
-	gpio_request(RESET_MOCI_N, "RESET_MOCI_N");
-	gpio_direction_output(PEX_PERST_N, 0);
-	gpio_direction_output(RESET_MOCI_N, 0);
-	/* Must be asserted for 100 ms after power and clocks are stable */
-	msleep(100);
-	gpio_set_value(PEX_PERST_N, 1);
-	/* Err_5: PEX_REFCLK_OUTpx/nx Clock Outputs is not Guaranteed Until
-	   900 us After PEX_PERST# De-assertion */
-	mdelay(1);
-	gpio_set_value(RESET_MOCI_N, 1);
-
 	tegra_pci_device.dev.platform_data = &apalis_t30_pci_platform_data;
 	platform_device_register(&tegra_pci_device);
 }
@@ -1652,6 +1670,10 @@ static void __init apalis_t30_init(void)
 #if defined(CONFIG_SOC_CAMERA_TVP5150) || \
 		defined(CONFIG_SOC_CAMERA_TVP5150_MODULE)
 	platform_device_register(&soc_camera_tvp5150soc);
+#endif
+#if defined(CONFIG_SOC_CAMERA_S2D13P04) || \
+		defined(CONFIG_SOC_CAMERA_S2D13P04_MODULE)
+	platform_device_register(&soc_camera_s2d13p04);
 #endif
 #endif /* CONFIG_VIDEO_TEGRA | CONFIG_VIDEO_TEGRA_MODULE */
 
