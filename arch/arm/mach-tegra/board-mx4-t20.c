@@ -23,6 +23,7 @@
 #include <linux/colibri_usb.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
+#include <linux/gpio_keys.h>
 #include <linux/i2c.h>
 #include <linux/i2c-tegra.h>
 #include <linux/input.h>
@@ -338,6 +339,102 @@ static struct platform_device colibri_can_device6 = {
 };
 
 #endif /* CONFIG_HM_GTT_CAN */
+
+static uint8_t mx4_quirk_sja1000_can3_interrupt = 0;
+
+static int __init mx4_quirk_sja1000_can3_int(char *__unused)
+{
+	mx4_quirk_sja1000_can3_interrupt = 1;
+	return 0;
+}
+__setup("mx4_quirk_sja1000_can3_interrupt", mx4_quirk_sja1000_can3_int);
+
+
+static uint8_t mx4_quirk_sja1000_no_clock_out = 0;
+
+static int __init mx4_quirk_sja1000_no_clk(char *__unused)
+{
+	mx4_quirk_sja1000_no_clock_out = 1;
+	return 0;
+}
+__setup("mx4_quirk_sja1000_no_clock_out", mx4_quirk_sja1000_no_clk);
+
+static void colibri_can_init(void)
+{
+	struct sja1000_platform_data * pdata =
+		(struct sja1000_platform_data*)colibri_can_device.dev.platform_data;
+
+
+	if (mx4_quirk_sja1000_no_clock_out) {
+		pdata->cdr = CDR_CLK_OFF | CDR_CBP;
+	}
+
+#ifdef CONFIG_HM_GMI_MUX
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL
+		| SNOR_CONFIG_32BIT,
+		SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX |
+		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);
+#else
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+#endif /* CONFIG_HM_GMI_MUX */
+
+	tegra_gpio_enable(TEGRA_CAN_INT);
+	tegra_gpio_enable(TEGRA_CAN2_INT);
+	gpio_request_one(TEGRA_CAN_INT, GPIOF_DIR_IN, "CAN1-INT");
+	gpio_request_one(TEGRA_CAN2_INT, GPIOF_DIR_IN, "CAN2-INT");
+
+	colibri_can_resource[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+	colibri_can_resource[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+
+	colibri_can_resource2[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+	colibri_can_resource2[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+
+	platform_device_register(&colibri_can_device);
+	platform_device_register(&colibri_can_device2);
+
+#if defined CONFIG_HM_GTT_CAN
+	tegra_gpio_enable(TEGRA_CAN3_INT);
+	tegra_gpio_enable(TEGRA_CAN4_INT);
+	tegra_gpio_enable(TEGRA_CAN5_INT);
+	tegra_gpio_enable(TEGRA_CAN6_INT);
+
+	gpio_request_one(TEGRA_CAN5_INT, GPIOF_DIR_IN, "CAN5-INT");
+	gpio_request_one(TEGRA_CAN6_INT, GPIOF_DIR_IN, "CAN6-INT");
+
+	if (mx4_quirk_sja1000_can3_interrupt) {
+		gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN4-INT");
+		gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN3-INT");
+
+		colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+		colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+
+		colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+		colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+	} else {
+		gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN3-INT");
+		gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN4-INT");
+
+		colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+		colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+
+		colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+		colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+	}
+
+	colibri_can_resource5[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
+	colibri_can_resource5[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
+
+	colibri_can_resource6[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
+	colibri_can_resource6[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
+
+	platform_device_register(&colibri_can_device3);
+	platform_device_register(&colibri_can_device4);
+	platform_device_register(&colibri_can_device5);
+	platform_device_register(&colibri_can_device6);
+#endif /* CONFIG_HM_GTT_CAN */
+}
 
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
@@ -721,15 +818,11 @@ static struct mxc_mma845x_platform_data mma845x_data = {
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
-//#ifdef CONFIG_SENSORS_L3G4200D
-#if 0
-{
-        I2C_BOARD_INFO(L3G4200D_NAME, 0x68),
-        .platform_data = &colibri_gyro_pdata,
-        .irq = TEGRA_GPIO_TO_IRQ(L3G4200D_DRDY_GPIO),
-    },
+#ifdef CONFIG_RTC_DRV_PCF85063
+    	{
+		I2C_BOARD_INFO("pcf85063", 0x51),
+	},
 #endif
-
 #ifdef CONFIG_MXC_MMA845X
 	{
 		I2C_BOARD_INFO("mma845x", 0x1C),
@@ -817,6 +910,38 @@ static void colibri_t20_i2c_init(void)
 	i2c_register_board_info(4, colibri_t20_i2c_bus4_board_info, ARRAY_SIZE(colibri_t20_i2c_bus4_board_info));
 }
 
+
+#ifdef CONFIG_KEYBOARD_GPIO
+#define GPIO_KEY(_id, _gpio, _lowactive, _iswake)	\
+	{						\
+		.code = _id,				\
+		.gpio = TEGRA_GPIO_##_gpio,		\
+		.active_low = _lowactive,		\
+		.desc = #_id,				\
+		.type = EV_KEY,				\
+		.wakeup = _iswake,			\
+		.debounce_interval = 10,		\
+	}
+
+static struct gpio_keys_button colibri_t20_keys[] = {
+	GPIO_KEY(KEY_POWER, PBB2, 1, 0),		/* SODIMM 133 INPUT-VOLTAGE-LOW */
+};
+
+static struct gpio_keys_platform_data colibri_t20_keys_platform_data = {
+	.buttons	= colibri_t20_keys,
+	.nbuttons	= ARRAY_SIZE(colibri_t20_keys),
+};
+
+static struct platform_device colibri_t20_keys_device = {
+	.name	= "gpio-keys",
+	.id	= 0,
+	.dev = {
+		.platform_data = &colibri_t20_keys_platform_data,
+	},
+};
+#endif /* CONFIG_KEYBOARD_GPIO */
+
+
 /* MMC/SD */
 
 #ifdef CONFIG_HM_REDPINE_WIFI
@@ -831,7 +956,7 @@ static struct tegra_sdhci_platform_data colibri_t20_sdhci_wifi_platform_data = {
 
 static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
 	.cd_gpio		= MMC_CD,
-	.cd_gpio_wake	= 0,
+	.cd_gpio_wake   = 0,
 	.is_8bit		= 0,
 	.power_gpio		= -1,
 	.wp_gpio		= -1,
@@ -1749,59 +1874,7 @@ static void __init colibri_t20_init(void)
 
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
 
-#ifdef CONFIG_HM_GMI_MUX
-	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL
-		| SNOR_CONFIG_32BIT,
-		SNOR_CONFIG_REG);
-	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX |
-		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);
-#else
-	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
-	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
-#endif /* CONFIG_HM_GMI_MUX */
-
-	tegra_gpio_enable(TEGRA_CAN_INT);
-	tegra_gpio_enable(TEGRA_CAN2_INT);
-	gpio_request_one(TEGRA_CAN_INT, GPIOF_DIR_IN, "CAN1-INT");
-	gpio_request_one(TEGRA_CAN2_INT, GPIOF_DIR_IN, "CAN2-INT");
-
-	colibri_can_resource[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
-	colibri_can_resource[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
-
-	colibri_can_resource2[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
-	colibri_can_resource2[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
-
-	platform_device_register(&colibri_can_device);
-	platform_device_register(&colibri_can_device2);
-
-#if defined CONFIG_HM_GTT_CAN
-	tegra_gpio_enable(TEGRA_CAN3_INT);
-	tegra_gpio_enable(TEGRA_CAN4_INT);
-	tegra_gpio_enable(TEGRA_CAN5_INT);
-	tegra_gpio_enable(TEGRA_CAN6_INT);
-	gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN3-INT");
-	gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN4-INT");
-	gpio_request_one(TEGRA_CAN5_INT, GPIOF_DIR_IN, "CAN5-INT");
-	gpio_request_one(TEGRA_CAN6_INT, GPIOF_DIR_IN, "CAN6-INT");
-
-
-	colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
-	colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
-
-	colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
-	colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
-
-	colibri_can_resource5[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
-	colibri_can_resource5[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
-
-	colibri_can_resource6[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
-	colibri_can_resource6[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
-
-	platform_device_register(&colibri_can_device3);
-	platform_device_register(&colibri_can_device4);
-	platform_device_register(&colibri_can_device5);
-	platform_device_register(&colibri_can_device6);
-#endif /* CONFIG_HM_GTT_CAN */
+	colibri_can_init();
 
 #endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
 
