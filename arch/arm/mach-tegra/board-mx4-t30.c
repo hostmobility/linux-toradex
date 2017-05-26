@@ -1117,6 +1117,7 @@ static struct platform_device *colibri_t30_uart_devices[] __initdata = {
 	&tegra_uarta_device, /* Colibri UART_A (formerly FFUART) */
 	&tegra_uartd_device, /* Colibri UART_B (formerly BTUART) */
 	&tegra_uartb_device, /* Colibri UART_C (formerly STDUART) */
+	&tegra_uartc_device, /* UART 3 -> FR-MCU */
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
@@ -1196,6 +1197,7 @@ static void __init colibri_t30_uart_init(void)
 	colibri_t30_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
 	tegra_uarta_device.dev.platform_data = &colibri_t30_uart_pdata;
 	tegra_uartb_device.dev.platform_data = &colibri_t30_uart_pdata;
+	tegra_uartc_device.dev.platform_data = &colibri_t30_uart_pdata;
 	tegra_uartd_device.dev.platform_data = &colibri_t30_uart_pdata;
 
 	/* Register low speed only if it is selected */
