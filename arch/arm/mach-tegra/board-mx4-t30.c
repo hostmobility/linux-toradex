@@ -468,7 +468,10 @@ static struct gpio colibri_t30_gpios[] = {
 	{TEGRA_GPIO_PDD5,	GPIOF_IN,	"SODIMM pin 69"},
 	{TEGRA_GPIO_PDD6,	GPIOF_IN,	"SODIMM pin 65"},
 #endif
-
+	{TEGRA_GPIO_PM6,	GPIOF_OUT_INIT_HIGH,	"FR-MCU-IN"},
+	{TEGRA_GPIO_PH0,	GPIOF_OUT_INIT_HIGH,	"FR-ETH2-WAKE"},
+	{TEGRA_GPIO_PH6,	GPIOF_OUT_INIT_HIGH,	"FR-ETH-WAKE"},
+	{TEGRA_GPIO_PH7,	GPIOF_OUT_INIT_HIGH,	"nFR-RST"},
 };
 
 static void colibri_t30_gpio_init(void)
