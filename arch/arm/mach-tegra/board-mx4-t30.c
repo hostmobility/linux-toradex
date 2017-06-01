@@ -472,6 +472,9 @@ static struct gpio colibri_t30_gpios[] = {
 	{TEGRA_GPIO_PH0,	GPIOF_OUT_INIT_HIGH,	"FR-ETH2-WAKE"},
 	{TEGRA_GPIO_PH6,	GPIOF_OUT_INIT_HIGH,	"FR-ETH-WAKE"},
 	{TEGRA_GPIO_PH7,	GPIOF_OUT_INIT_HIGH,	"nFR-RST"},
+	{TEGRA_GPIO_PJ1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D0"},
+	{TEGRA_GPIO_PE7,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D1"},
+	{TEGRA_GPIO_PF1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D2"},
 };
 
 static void colibri_t30_gpio_init(void)
@@ -797,6 +800,16 @@ static struct spi_board_info tegra_spi_devices[] __initdata = {
 		.mode			= SPI_MODE_1,
 		.platform_data		= NULL,
 	},
+	{
+		.bus_num		= 1,		/* SPI2 */
+		.chip_select		= 0,
+		.controller_data	= &spidev_controller_data,
+		.irq			= 0,
+		.max_speed_hz		= 50000000,
+		.modalias		= "spidev",
+		.mode			= SPI_MODE_1,
+		.platform_data		= NULL,
+	},
 };
 
 static void __init colibri_t30_register_spidev(void)
@@ -810,6 +823,7 @@ static void __init colibri_t30_register_spidev(void)
 
 static struct platform_device *colibri_t30_spi_devices[] __initdata = {
 	&tegra_spi_device1,
+	&tegra_spi_device2,
 };
 
 static struct spi_clk_parent spi_parent_clk[] = {
@@ -847,6 +861,7 @@ static void __init colibri_t30_spi_init(void)
 	colibri_t30_spi_pdata.parent_clk_list = spi_parent_clk;
 	colibri_t30_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk);
 	tegra_spi_device1.dev.platform_data = &colibri_t30_spi_pdata;
+	tegra_spi_device2.dev.platform_data = &colibri_t30_spi_pdata;
 	platform_add_devices(colibri_t30_spi_devices,
 				ARRAY_SIZE(colibri_t30_spi_devices));
 }
