@@ -63,6 +63,23 @@ const struct fb_videomode tegra_modes[] = {
 		.flag = FB_FLAG_RATIO_16_9,
 		.vmode = FB_VMODE_NONINTERLACED
 	},
+        /* 800x480@60 (VDM 65) 31500 60 60 14 28 80 3 */
+        {
+                .name =         "800x480VDM",
+                .refresh =      60,
+                .xres =         800,
+                .yres =         480,
+                .pixclock = 31500,
+                .left_margin =  60,
+                .right_margin = 60,
+                .upper_margin = 14,
+                .lower_margin = 28,
+                .hsync_len =    80,
+                .vsync_len =    3,
+                .sync = 0,
+                .flag = FB_FLAG_RATIO_16_9,
+                .vmode = FB_VMODE_NONINTERLACED
+        },
 	/* 800x480@60 (NEXCOM VMD 1001) */
 	{
 		.name =		"800x480CT",
