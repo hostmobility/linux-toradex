@@ -423,7 +423,7 @@ static struct gpio colibri_t30_gpios[] = {
 #endif
 #ifndef COLIBRI_T30_VI
 	{TEGRA_GPIO_PW5,	GPIOF_IN,	"SODIMM pin 75"},
-	//conflicts with BL_ON
+	//WLAN_CD
 	//{TEGRA_GPIO_PV2,	GPIOF_IN,	"SODIMM pin 71"},
 	{TEGRA_GPIO_PV3,	GPIOF_IN,	"SODI-85, Iris X16-18"},
 #endif
@@ -460,9 +460,9 @@ static struct gpio colibri_t30_gpios[] = {
 #endif
 #ifndef CONFIG_KEYBOARD_GPIO
 //conflicts with volume down key
-	{TEGRA_GPIO_PCC6,	GPIOF_IN,	"SODIMM pin 24"},
+	//{TEGRA_GPIO_PCC6,	GPIOF_IN,	"SODIMM pin 24"},
 //conflicts with volume up key
-	{TEGRA_GPIO_PDD7,	GPIOF_IN,	"SODIMM pin 22"},
+	//{TEGRA_GPIO_PDD7,	GPIOF_IN,	"SODIMM pin 22"},
 #endif
 #ifndef COLIBRI_T30_VI
 	{TEGRA_GPIO_PDD5,	GPIOF_IN,	"SODIMM pin 69"},
@@ -746,8 +746,30 @@ static struct tegra_sdhci_platform_data colibri_t30_sdcard_platform_data = {
 	.no_1v8		= 1,
 };
 
+#define WLAN_EN		TEGRA_GPIO_PO0
+#define WLAN_CD		TEGRA_GPIO_PV2
+#define BT_EN		TEGRA_GPIO_PCC6
+
+static struct tegra_sdhci_platform_data colibri_t30_wifi_platform_data = {
+	.cd_gpio	= -1,
+	.ddr_clk_limit	= 52000000,
+	.is_8bit	= 0,
+	.power_gpio	= -1,
+	.tap_delay	= 0x0f,
+	.wp_gpio	= -1,
+	.no_1v8		= 1,
+};
+
 static void __init colibri_t30_sdhci_init(void)
 {
+	gpio_request(WLAN_EN, "WLAN_EN");
+	gpio_export(WLAN_EN, true);
+	gpio_direction_output(WLAN_EN, 1);
+
+	gpio_request(BT_EN, "BT_EN");
+	gpio_export(BT_EN, true);
+	gpio_direction_output(BT_EN, 0);
+
 	/* register eMMC first */
 	tegra_sdhci_device4.dev.platform_data =
 #ifdef COLIBRI_T30_SDMMC4B
@@ -762,6 +784,10 @@ static void __init colibri_t30_sdhci_init(void)
 			&colibri_t30_sdcard_platform_data;
 	platform_device_register(&tegra_sdhci_device2);
 #endif
+
+	tegra_sdhci_device1.dev.platform_data =
+			&colibri_t30_wifi_platform_data;
+	platform_device_register(&tegra_sdhci_device1);
 }
 
 
