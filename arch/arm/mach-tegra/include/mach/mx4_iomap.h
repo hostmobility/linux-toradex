@@ -104,8 +104,10 @@
 #define MX4_WAKE_UP_CPU				TEGRA_GPIO_PY6
 #define MX4_DATA_READY_PIC			TEGRA_GPIO_PV3
 
-#if defined(MACH_HM_MX4_GTT)
-#define MMC_CD		TEGRA_GPIO_PT4	/* SODIMM 71 */
+#if defined(CONFIG_MACH_HM_MX4_GTT)
+#define MMC_CD						TEGRA_GPIO_PBB3	/* SODIMM 127 */
+#define MMC_CD_P1C_CIRCUIT			TEGRA_GPIO_PT4	/* SODIMM 71 */
+#define CONFIG_MACH_HM_MX4_GTT_SUPPORT_P1C_CIRCUIT
 #elif defined(CONFIG_MACH_HM_MX4_VCC_T20)
 #define MMC_CD		-1 /* Not connected */
 #else
