@@ -1,0 +1,109 @@
+/dts-v1/;
+
+#include "tegra20-colibri-512.dtsi"
+
+/ {
+	model = "Toradex Colibri T20 512MB on MX-4 MIL";
+	compatible = "hostmobility,mx4-mil", "toradex,colibri_t20-512", "nvidia,tegra20";
+
+	aliases {
+		serial0 = &uarta;
+		serial1 = &uartd;
+	};
+
+	pinmux@70000014 {
+		state_default: pinmux {
+			hdint {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+
+			i2cddc {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+
+			sdio4 {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+
+			uarta {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+
+			uartd {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+		};
+	};
+
+	serial@70006000 {
+		status = "okay";
+	};
+
+	serial@70006300 {
+		status = "okay";
+	};
+
+	i2c_ddc: i2c@7000c400 {
+		status = "okay";
+	};
+
+	usb@c5000000 {
+		status = "okay";
+	};
+
+	usb-phy@c5000000 {
+		status = "okay";
+	};
+
+	usb@c5008000 {
+		status = "okay";
+	};
+
+	usb-phy@c5008000 {
+		status = "okay";
+	};
+
+	/* SPI4: Colibri SSP */
+	spi@7000da00 {
+		status = "okay";
+		spi-max-frequency = <25000000>;
+
+		mx4_io_spi: spi@0 {
+			compatible = "mx4_io_spi";
+			reg = <0>;
+			spi-max-frequency = <5000000>;
+			interrupt-parent = <&gpio>;
+			interrupts = <TEGRA_GPIO(Y, 6) GPIO_ACTIVE_HIGH>;
+			spi-cpha;
+		};
+
+		mx4_pic: spi@1 {
+			compatible = "hostmobility,mx4_pic";
+			reg = <1>;
+			spi-max-frequency = <25000000>;
+		};
+	};
+
+	regulators {
+		regulator@0 {
+			compatible = "regulator-fixed";
+			reg = <0>;
+			regulator-name = "usb_host_vbus";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			regulator-boot-on;
+			regulator-always-on;
+			gpio = <&gpio TEGRA_GPIO(W, 2) GPIO_ACTIVE_HIGH>;
+		};
+
+		vcc_sd_reg: regulator@1 {
+			compatible = "regulator-fixed";
+			reg = <1>;
+			regulator-name = "vcc_sd";
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
+			regulator-boot-on;
+			regulator-always-on;
+		};
+	};
+};
