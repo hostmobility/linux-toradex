@@ -8,7 +8,9 @@
 
 	aliases {
 		serial0 = &uarta;
-		serial1 = &uartd;
+		serial1 = &uartb;
+		serial2 = &uartc;
+		serial3 = &uartd;
 	};
 
 	pinmux@70000014 {
@@ -26,6 +28,14 @@
 			};
 
 			uarta {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+
+			uartb {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
+
+			uartc {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 
@@ -47,6 +57,14 @@
 	};
 
 	serial@70006000 {
+		status = "okay";
+	};
+
+	serial@70006040 {
+		status = "okay";
+	};
+
+	serial@70006200 {
 		status = "okay";
 	};
 
