@@ -180,12 +180,17 @@ static struct nand_ecclayout tegra_nand_oob_16 = {
 static struct nand_ecclayout tegra_nand_oob_64 = {
 	.eccbytes = 36,
 	.eccpos = {
-		 4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-		20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-		36, 37, 38, 39
+		4,  5,  6,  7,  8,  9,  10, 11, 12,
+		13, 14, 15, 16, 17, 18, 19, 20, 21,
+		22, 23, 24, 25, 26, 27, 28, 29, 30,
+		31, 32, 33, 34, 35, 36, 37, 38, 39,
 	},
+	.oobavail = 20,
 	.oobfree = {
-		{ .offset = 40, .length = 24 }
+			{
+			.offset = 40,
+			.length = 20,
+			},
 	}
 };
 
@@ -730,7 +735,8 @@ static int tegra_nand_probe(struct platform_device *pdev)
 	if (chip->options & NAND_BUSWIDTH_16)
 		value |= CFG_BUS_WIDTH_16;
 
-	switch (mtd->oobsize) {
+	/* hard-coded in bootloader, must hard-code here as well */
+	switch (64) {
 	case 16:
 		chip->ecc.layout = &tegra_nand_oob_16;
 		chip->ecc.strength = 1;
@@ -739,8 +745,8 @@ static int tegra_nand_probe(struct platform_device *pdev)
 		break;
 	case 64:
 		chip->ecc.layout = &tegra_nand_oob_64;
-		chip->ecc.strength = 8;
-		value |= CFG_ECC_SEL | CFG_TVAL_8 |
+		chip->ecc.strength = 4;
+		value |= CFG_ECC_SEL | CFG_TVAL_4 |
 			 CFG_TAG_BYTE_SIZE(tegra_nand_oob_64.oobfree[0].length
 			 - 1);
 		break;
