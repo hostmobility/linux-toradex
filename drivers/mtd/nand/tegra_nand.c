@@ -16,12 +16,11 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/module.h>
-#include <linux/mtd/nand.h>
-#include <linux/mtd/partitions.h>
-#include <linux/of_mtd.h>
-#include <linux/of.h>
+#include <linux/mtd/rawnand.h>
 #include <linux/platform_device.h>
 #include <linux/reset.h>
+
+#define CUSTOM_HACK_ECC
 
 #define CMD					0x00
 #define   CMD_GO				(1 << 31)
@@ -149,7 +148,6 @@ struct tegra_nand {
 	struct gpio_desc *wp_gpio;
 
 	struct nand_chip chip;
-	struct mtd_info mtd;
 	struct device *dev;
 
 	struct completion command_complete;
@@ -166,62 +164,81 @@ struct tegra_nand {
 
 static inline struct tegra_nand *to_tegra_nand(struct mtd_info *mtd)
 {
-	return container_of(mtd, struct tegra_nand, mtd);
+	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+	return container_of(nand_chip, struct tegra_nand, chip);
 }
 
-static struct nand_ecclayout tegra_nand_oob_16 = {
-	.eccbytes = 4,
-	.eccpos = { 4, 5, 6, 7 },
-	.oobfree = {
-		{ .offset = 8, . length = 8 }
-	}
-};
+static int tegra_nand_ooblayout_ecc(struct mtd_info *mtd, int section,
+				struct mtd_oob_region *oobregion)
+{
+	if(section)
+		return -ERANGE;
 
-static struct nand_ecclayout tegra_nand_oob_64 = {
-	.eccbytes = 36,
-	.eccpos = {
-		 4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-		20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-		36, 37, 38, 39
-	},
-	.oobfree = {
-		{ .offset = 40, .length = 24 }
+#if defined CUSTOM_HACK_ECC
+	oobregion->offset = 4;
+	oobregion->length = 72;
+#else
+	switch(mtd->oobsize) {
+	case 16:
+		oobregion->offset = 4;
+		oobregion->length = 4;
+		break;
+	case 64:
+		oobregion->offset = 4;
+		oobregion->length = 36;
+		break;
+	case 128:
+		oobregion->offset = 4;
+		oobregion->length = 72;
+		break;
+	case 224:
+		oobregion->offset = 4;
+		oobregion->length = 144;
+		break;
+	default:
+		break;
 	}
-};
+#endif
+	return 0;
+}
 
-static struct nand_ecclayout tegra_nand_oob_128 = {
-	.eccbytes = 72,
-	.eccpos = {
-		 4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-		20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-		36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
-		52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
-		68, 69, 70, 71, 72, 73, 74, 75
-	},
-	.oobfree = {
-		{ .offset = 76, .length = 52 }
-	}
-};
+static int tegra_nand_ooblayout_free(struct mtd_info *mtd, int section,
+				struct mtd_oob_region *oobregion)
+{
+	if(section)
+		return -ERANGE;
 
-static struct nand_ecclayout tegra_nand_oob_224 = {
-	.eccbytes = 144,
-	.eccpos = {
-		  4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,
-		 17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,
-		 30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,
-		 43,  44,  45,  46,  47,  48,  49,  50,  51,  52,  53,  54,  55,
-		 56,  57,  58,  59,  60,  61,  62,  63,  64,  65,  66,  67,  68,
-		 69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79,  80,  81,
-		 82,  83,  84,  85,  86,  87,  88,  89,  90,  91,  92,  93,  94,
-		 95,  96,  97,  98,  99, 100, 101, 102, 103, 104, 105, 106, 107,
-		108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
-		121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133,
-		134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146,
-		147
-	},
-	.oobfree = {
-		{ .offset = 148, .length = 76 }
+#if defined CUSTOM_HACK_ECC
+	oobregion->offset = 76;
+	oobregion->length = 48;
+#else
+	switch(mtd->oobsize) {
+	case 16:
+		oobregion->offset = 8;
+		oobregion->length = 8;
+		break;
+	case 64:
+		oobregion->offset = 40;
+		oobregion->length = 24;
+		break;
+	case 128:
+		oobregion->offset = 76;
+		oobregion->length = 52;
+		break;
+	case 224:
+		oobregion->offset = 148;
+		oobregion->length = 76;
+		break;
+	default:
+		break;
 	}
+#endif
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops tegra_nand_ooblayout_ops = {
+	.ecc = tegra_nand_ooblayout_ecc,
+	.free = tegra_nand_ooblayout_free,
 };
 
 static irqreturn_t tegra_nand_irq(int irq, void *data)
@@ -341,6 +358,20 @@ static void tegra_nand_command(struct mtd_info *mtd, unsigned int command,
 		writel(value, nand->regs + CMD);
 		break;
 
+	case NAND_CMD_GET_FEATURES:
+		writel(NAND_CMD_GET_FEATURES, nand->regs + CMD_1);
+		writel(column & 0xff, nand->regs + ADDR_1);
+		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_CE(nand->cur_chip);
+		writel(value, nand->regs + CMD);
+		break;
+
+	case NAND_CMD_SET_FEATURES:
+		writel(NAND_CMD_SET_FEATURES, nand->regs + CMD_1);
+		writel(column & 0xff, nand->regs + ADDR_1);
+		value = CMD_GO | CMD_CLE | CMD_ALE | CMD_CE(nand->cur_chip);
+		writel(value, nand->regs + CMD);
+		break;
+
 	case NAND_CMD_RESET:
 		writel(NAND_CMD_RESET, nand->regs + CMD_1);
 
@@ -433,7 +464,9 @@ static int tegra_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	writel(nand->data_dma, nand->regs + DATA_PTR);
 
 	if (oob_required) {
-		writel(chip->ecc.layout->oobfree[0].length - 1,
+		struct mtd_oob_region oobfree;
+		mtd_ooblayout_free(mtd, 0, &oobfree);
+		writel(oobfree.length - 1,
 		       nand->regs + DMA_CFG_B);
 		writel(nand->oob_dma, nand->regs + TAG_PTR);
 	} else {
@@ -457,10 +490,13 @@ static int tegra_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	wait_for_completion(&nand->command_complete);
 	wait_for_completion(&nand->dma_complete);
 
-	if (oob_required)
+	if (oob_required) {
+		struct mtd_oob_region oobfree;
+		mtd_ooblayout_free(mtd, 0, &oobfree);
 		memcpy(chip->oob_poi,
-		       nand->oob_buf + chip->ecc.layout->oobfree[0].offset,
-		       chip->ecc.layout->oobfree[0].length);
+		       nand->oob_buf + oobfree.offset,
+		       oobfree.length);
+	}
 	memcpy(buf, nand->data_buf, mtd->writesize);
 
 	value = readl(nand->regs + CFG);
@@ -480,7 +516,7 @@ static int tegra_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 		for (i = 0; i < mtd->writesize / 4; i++) {
 			if (data[i] != 0xffffffff) {
 				mtd->ecc_stats.failed++;
-				return -EBADMSG;
+				return 0;
 			}
 		}
 		return 0;
@@ -507,7 +543,7 @@ static int tegra_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 }
 
 static int tegra_nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
-				 const uint8_t *buf, int oob_required)
+				 const uint8_t *buf, int oob_required, int page)
 {
 	struct tegra_nand *nand = to_tegra_nand(mtd);
 	unsigned long value;
@@ -522,10 +558,12 @@ static int tegra_nand_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 	writel(nand->data_dma, nand->regs + DATA_PTR);
 
 	if (oob_required) {
+		struct mtd_oob_region oobfree;
+		mtd_ooblayout_free(mtd, 0, &oobfree);
 		memcpy(nand->oob_buf,
-		       chip->oob_poi + chip->ecc.layout->oobfree[0].offset,
-		       chip->ecc.layout->oobfree[0].length);
-		writel(chip->ecc.layout->oobfree[0].length - 1,
+		       chip->oob_poi + oobfree.offset,
+		       oobfree.length);
+		writel(oobfree.length - 1,
 		       nand->regs + DMA_CFG_B);
 		writel(nand->oob_dma, nand->regs + TAG_PTR);
 	} else {
@@ -616,6 +654,12 @@ static void tegra_nand_setup_chiptiming(struct tegra_nand *nand)
 	tegra_nand_setup_timing(nand, mode);
 }
 
+static int calc_ecc_bytes(int step_size, int strength) {
+	return DIV_ROUND_UP(2 * 9 * strength, 8);
+}
+
+NAND_ECC_CAPS_SINGLE(ecc_caps, calc_ecc_bytes, 512, 4, 6, 8);
+
 static int tegra_nand_probe(struct platform_device *pdev)
 {
 	struct reset_control *rst;
@@ -651,8 +695,7 @@ static int tegra_nand_probe(struct platform_device *pdev)
 	if (IS_ERR(nand->clk))
 		return PTR_ERR(nand->clk);
 
-	nand->wp_gpio = gpiod_get_optional(&pdev->dev, "wp-gpios",
-					   GPIOD_OUT_HIGH);
+	nand->wp_gpio = gpiod_get(&pdev->dev, "wp", GPIOD_OUT_HIGH);
 	if (IS_ERR(nand->wp_gpio))
 		return PTR_ERR(nand->wp_gpio);
 
@@ -673,7 +716,7 @@ static int tegra_nand_probe(struct platform_device *pdev)
 	init_completion(&nand->command_complete);
 	init_completion(&nand->dma_complete);
 
-	mtd = &nand->mtd;
+	mtd = &nand->chip.mtd;
 	mtd->name = "tegra_nand";
 	mtd->owner = THIS_MODULE;
 	mtd->priv = &nand->chip;
@@ -692,7 +735,7 @@ static int tegra_nand_probe(struct platform_device *pdev)
 	writel(0, nand->regs + CFG);
 
 	chip = &nand->chip;
-	chip->flash_node = pdev->dev.of_node;
+	nand_set_flash_node(chip, pdev->dev.of_node);
 	chip->options = NAND_NO_SUBPAGE_WRITE;
 	chip->cmdfunc = tegra_nand_command;
 	chip->select_chip = tegra_nand_select_chip;
@@ -719,9 +762,6 @@ static int tegra_nand_probe(struct platform_device *pdev)
 	if (!nand->oob_buf)
 		return -ENOMEM;
 
-	chip->ecc.mode = NAND_ECC_HW;
-	chip->ecc.size = 512;
-	chip->ecc.bytes = mtd->oobsize;
 	chip->ecc.read_page = tegra_nand_read_page;
 	chip->ecc.write_page = tegra_nand_write_page;
 
@@ -731,38 +771,59 @@ static int tegra_nand_probe(struct platform_device *pdev)
 	if (chip->options & NAND_BUSWIDTH_16)
 		value |= CFG_BUS_WIDTH_16;
 
+	mtd_set_ooblayout(mtd, &tegra_nand_ooblayout_ops);
+
+#if defined CUSTOM_HACK_ECC
+	if ((chip->ecc.mode != NAND_ECC_HW) || (chip->ecc.size != 512)) {
+		return -EINVAL;
+	}
+
+	err = nand_check_ecc_caps(chip, &ecc_caps,
+				  mtd_ooblayout_count_eccbytes(mtd));
+
+	if (err)
+		return err;
+#else
+	chip->ecc.mode = NAND_ECC_HW;
+	chip->ecc.size = 512;
+
 	switch (mtd->oobsize) {
 	case 16:
-		chip->ecc.layout = &tegra_nand_oob_16;
 		chip->ecc.strength = 1;
-		value |= CFG_TAG_BYTE_SIZE(tegra_nand_oob_16.oobfree[0].length
-			 - 1);
 		break;
 	case 64:
-		chip->ecc.layout = &tegra_nand_oob_64;
 		chip->ecc.strength = 8;
-		value |= CFG_ECC_SEL | CFG_TVAL_8 |
-			 CFG_TAG_BYTE_SIZE(tegra_nand_oob_64.oobfree[0].length
-			 - 1);
 		break;
 	case 128:
-		chip->ecc.layout = &tegra_nand_oob_128;
 		chip->ecc.strength = 8;
-		value |= CFG_ECC_SEL | CFG_TVAL_8 |
-			 CFG_TAG_BYTE_SIZE(tegra_nand_oob_128.oobfree[0].length
-			 - 1);
 		break;
 	case 224:
-		chip->ecc.layout = &tegra_nand_oob_224;
 		chip->ecc.strength = 8;
-		value |= CFG_ECC_SEL | CFG_TVAL_8 |
-			 CFG_TAG_BYTE_SIZE(tegra_nand_oob_224.oobfree[0].length
-			 - 1);
 		break;
 	default:
 		dev_err(&pdev->dev, "unhandled OOB size %d\n", mtd->oobsize);
 		return -ENODEV;
 	}
+
+	chip->ecc.bytes = mtd_ooblayout_count_eccbytes(mtd)/(mtd->writesize/chip->ecc.size);
+#endif
+	switch (chip->ecc.strength) {
+	case 1:
+		break;
+	case 4:
+		value |= CFG_ECC_SEL | CFG_TVAL_4;
+		break;
+	case 6:
+		value |= CFG_ECC_SEL | CFG_TVAL_6;
+		break;
+	case 8:
+		value |= CFG_ECC_SEL | CFG_TVAL_8;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	value |= CFG_TAG_BYTE_SIZE(mtd_ooblayout_count_freebytes(mtd) - 1);
 
 	switch (mtd->writesize) {
 	case 256:
@@ -793,11 +854,7 @@ static int tegra_nand_probe(struct platform_device *pdev)
 	if (err)
 		return err;
 
-	err = mtd_device_parse_register(mtd, NULL,
-					&(struct mtd_part_parser_data) {
-						.of_node = pdev->dev.of_node,
-					},
-					NULL, 0);
+	err = mtd_device_register(mtd, NULL, 0);
 	if (err)
 		return err;
 
@@ -810,7 +867,7 @@ static int tegra_nand_remove(struct platform_device *pdev)
 {
 	struct tegra_nand *nand = platform_get_drvdata(pdev);
 
-	nand_release(&nand->mtd);
+	nand_release(&nand->chip.mtd);
 
 	clk_disable_unprepare(nand->clk);
 

@@ -459,7 +459,13 @@
 	nand@70008000 {
 		status = "okay";
 		nand-bus-width = <8>;
+#if 0
 		nand-on-flash-bbt;
+#endif
+		nand-ecc-mode = "hw";
+		nand-ecc-strength = <4>;
+		nand-ecc-step-size = <512>;
+
 		wp-gpios = <&gpio TEGRA_GPIO(S, 0) GPIO_ACTIVE_HIGH>;
 	};
 
