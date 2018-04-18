@@ -567,6 +567,7 @@ struct usb_gadget {
 	unsigned			a_hnp_support:1;
 	unsigned			a_alt_hnp_support:1;
 	unsigned			quirk_ep_out_aligned_size:1;
+	unsigned			quirk_avoids_skb_reserve:1;
 	unsigned			is_selfpowered:1;
 };
 #define work_to_gadget(w)	(container_of((w), struct usb_gadget, work))
@@ -609,6 +610,16 @@ usb_ep_align_maybe(struct usb_gadget *g, struct usb_ep *ep, size_t len)
 static inline int gadget_is_dualspeed(struct usb_gadget *g)
 {
 	return g->max_speed >= USB_SPEED_HIGH;
+}
+
+/**
+ * gadget_avoids_skb_reserve - return true iff the hardware would like to avoid
+ *	skb_reserve to improve performance.
+ * @g: controller to check for quirk
+ */
+static inline int gadget_avoids_skb_reserve(struct usb_gadget *g)
+{
+	return g->quirk_avoids_skb_reserve;
 }
 
 /**
