@@ -1,5 +1,3 @@
-/dts-v1/;
-
 #include "tegra20-colibri-512.dtsi"
 
 / {
@@ -92,52 +90,6 @@
 
 	usb-phy@c5008000 {
 		status = "okay";
-	};
-
-	gmi@70009000 {
-		ranges = <4 0 0xd0000000 0xfffffff>;
-		status = "okay";
-
-		bus@4,0 {
-			compatible = "simple-bus";
-			#address-cells = <1>;
-			#size-cells = <1>;
-			ranges = <0 4 0 0x80100>;
-
-			nvidia,snor-mux-mode;
-			nvidia,snor-adv-active-high;
-
-			can@0 {
-				compatible = "nxp,sja1000";
-				reg = <0 0x100>;
-				interrupt-parent = <&gpio>;
-				interrupts = <TEGRA_GPIO(B, 5) IRQ_TYPE_EDGE_RISING>;
-				nxp,external-clock-frequency = <24000000>;
-				nxp,tx-output-config = <0x16>;
-				nxp,clock-out-frequency = <24000000>;
-				reg-io-width = <2>;
-			};
-
-			can@40000 {
-				compatible = "nxp,sja1000";
-				reg = <0x40000 0x100>;
-				interrupt-parent = <&gpio>;
-				interrupts = <TEGRA_GPIO(A, 6) IRQ_TYPE_EDGE_RISING>;
-				nxp,external-clock-frequency = <24000000>;
-				nxp,tx-output-config = <0x16>;
-				reg-io-width = <2>;
-			};
-
-			can@80000 {
-				compatible = "nxp,sja1000";
-				reg = <0x80000 0x100>;
-				interrupt-parent = <&gpio>;
-				interrupts = <TEGRA_GPIO(N, 0) IRQ_TYPE_EDGE_RISING>;
-				nxp,external-clock-frequency = <24000000>;
-				nxp,tx-output-config = <0x16>;
-				reg-io-width = <2>;
-			};
-		};
 	};
 
 	/* SPI4: Colibri SSP */

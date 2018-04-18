@@ -567,7 +567,8 @@ dtb-$(CONFIG_MACH_SUN9I) += \
 dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
 	tegra20-harmony.dtb \
 	tegra20-iris-512.dtb \
-	tegra20-mx4-mil.dtb \
+	tegra20-mx4-mil-p1b.dtb \
+	tegra20-mx4-mil-p1c.dtb \
 	tegra20-medcom-wide.dtb \
 	tegra20-paz00.dtb \
 	tegra20-plutux.dtb \

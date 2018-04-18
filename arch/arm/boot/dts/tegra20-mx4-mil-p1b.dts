@@ -1,0 +1,41 @@
+/dts-v1/;
+
+#include "tegra20-mx4-mil.dtsi"
+
+/ {
+
+	model = "Toradex Colibri T20 256MB on MX-4 MIL P1B";
+	compatible = "hostmobility,mx4-mil", "toradex,colibri_t20-512", "nvidia,tegra20";
+
+	gmi@70009000 {
+		ranges = <4 0 0xd0000000 0xfffffff>;
+		status = "okay";
+
+		bus@4,0 {
+			compatible = "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 4 0 0x00380>;
+
+			can@300 {
+				compatible = "nxp,sja1000";
+				reg = <0x300 0x40>;
+				interrupt-parent = <&gpio>;
+				interrupts = <TEGRA_GPIO(B, 5) IRQ_TYPE_EDGE_RISING>;
+				nxp,external-clock-frequency = <24000000>;
+				nxp,tx-output-config = <0x16>;
+				reg-io-width = <1>;
+			};
+
+			can@340 {
+				compatible = "nxp,sja1000";
+				reg = <0x340 0x40>;
+				interrupt-parent = <&gpio>;
+				interrupts = <TEGRA_GPIO(A, 6) IRQ_TYPE_EDGE_RISING>;
+				nxp,external-clock-frequency = <24000000>;
+				nxp,tx-output-config = <0x16>;
+				reg-io-width = <1>;
+			};
+		};
+	};
+};
