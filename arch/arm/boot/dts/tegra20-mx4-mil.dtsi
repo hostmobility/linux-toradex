@@ -29,14 +29,6 @@
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 
-			uartb {
-				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-			};
-
-			uartc {
-				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-			};
-
 			uartd {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
