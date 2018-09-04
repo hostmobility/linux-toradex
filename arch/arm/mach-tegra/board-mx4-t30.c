@@ -32,6 +32,7 @@
 #include <linux/spi-tegra.h>
 #include <linux/spi/spi.h>
 #include <linux/tegra_uart.h>
+#include <linux/gpio.h>
 
 #include <mach/io_dpd.h>
 #include <mach/mx4_t30_iomap.h>
@@ -40,6 +41,10 @@
 #include <mach/tegra_fiq_debugger.h>
 #include <mach/thermal.h>
 #include <mach/usb_phy.h>
+
+#include <linux/irq.h>
+#include <linux/irqdesc.h>
+#include <linux/module.h>
 
 #include "board-mx4-t30.h"
 #include "board.h"
@@ -301,6 +306,18 @@ static void __init sja1000_init(void)
 	gpio_request_one(TEGRA_CAN5_INT, GPIOF_DIR_IN, "CAN5-INT");
 	gpio_request_one(TEGRA_CAN6_INT, GPIOF_DIR_IN, "CAN6-INT");
 
+	printk(KERN_INFO "gpio %d can 1 - irq %d\n", TEGRA_CAN_INT, gpio_to_irq(TEGRA_CAN_INT));
+	printk(KERN_INFO "gpio %d can 2 - irq %d\n", TEGRA_CAN2_INT, gpio_to_irq(TEGRA_CAN2_INT));
+	printk(KERN_INFO "gpio %d can 3 - irq %d\n", TEGRA_CAN3_INT, gpio_to_irq(TEGRA_CAN3_INT));
+	printk(KERN_INFO "gpio %d can 4 - irq %d\n", TEGRA_CAN4_INT, gpio_to_irq(TEGRA_CAN4_INT));
+	printk(KERN_INFO "gpio %d can 5 - irq %d\n", TEGRA_CAN5_INT, gpio_to_irq(TEGRA_CAN5_INT));
+	printk(KERN_INFO "gpio %d can 6 - irq %d\n", TEGRA_CAN6_INT, gpio_to_irq(TEGRA_CAN6_INT));
+
+	struct irq_desc *irq = irq_to_desc(64);
+	printk(KERN_INFO "irq %d name %p %p %s\n", irq->irq_data->irq, irq, irq->owner, irq->owner->name);
+	irq = irq_to_desc(67);
+	printk(KERN_INFO "irq %d name %p %p %s\n", irq->irq_data->irq, irq, irq->owner, irq->owner->name);
+
 	colibri_can_resource[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
 	colibri_can_resource[1].end		= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
 
@@ -475,6 +492,7 @@ static struct gpio colibri_t30_gpios[] = {
 	{TEGRA_GPIO_PJ1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D0"},
 	{TEGRA_GPIO_PE7,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D1"},
 	{TEGRA_GPIO_PF1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D2"},
+	{TEGRA_GPIO_PW2,	GPIOF_IN,	        "MODEM-WAKEUP"},
 };
 
 static void colibri_t30_gpio_init(void)
