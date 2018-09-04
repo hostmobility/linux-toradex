@@ -483,6 +483,7 @@ static struct gpio colibri_t30_gpios[] = {
 	{TEGRA_GPIO_PJ1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D0"},
 	{TEGRA_GPIO_PE7,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D1"},
 	{TEGRA_GPIO_PF1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D2"},
+	{TEGRA_GPIO_PW2,	GPIOF_IN,	        "MODEM-WAKEUP"},
 };
 
 static void colibri_t30_gpio_init(void)
