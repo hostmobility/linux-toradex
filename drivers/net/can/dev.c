@@ -358,6 +358,10 @@ void can_restart(unsigned long data)
 	struct can_frame *cf;
 	int err;
 
+	if(!priv->restart_initiated) {
+		return;
+	}
+
 	BUG_ON(netif_carrier_ok(dev));
 
 	/*
@@ -389,6 +393,9 @@ restart:
 	netif_carrier_on(dev);
 	if (err)
 		dev_err(dev->dev.parent, "Error %d during restart", err);
+
+	priv->restart_initiated = 0;
+	priv->error_buserr = 0;
 }
 
 int can_restart_now(struct net_device *dev)
@@ -404,6 +411,7 @@ int can_restart_now(struct net_device *dev)
 	if (priv->state != CAN_STATE_BUS_OFF)
 		return -EBUSY;
 
+	priv->restart_initiated = 1;
 	/* Runs as soon as possible in the timer context */
 	mod_timer(&priv->restart_timer, jiffies);
 
@@ -426,9 +434,13 @@ void can_bus_off(struct net_device *dev)
 	netif_carrier_off(dev);
 	priv->can_stats.bus_off++;
 
-	if (priv->restart_ms)
-		mod_timer(&priv->restart_timer,
-			  jiffies + (priv->restart_ms * HZ) / 1000);
+	if (priv->restart_ms) {
+		if(!priv->restart_initiated) {
+			priv->restart_initiated = 1; // avoid reschedule the timer many times in a future
+			mod_timer(&priv->restart_timer,
+				jiffies + (priv->restart_ms * HZ) / 1000);
+		}
+	}
 }
 EXPORT_SYMBOL_GPL(can_bus_off);
 
@@ -541,6 +553,9 @@ int open_candev(struct net_device *dev)
 	if (!netif_carrier_ok(dev))
 		netif_carrier_on(dev);
 
+	priv->restart_initiated = 0;
+	priv->error_buserr = 0;
+
 	setup_timer(&priv->restart_timer, can_restart, (unsigned long)dev);
 
 	return 0;
@@ -557,8 +572,17 @@ void close_candev(struct net_device *dev)
 {
 	struct can_priv *priv = netdev_priv(dev);
 
-	if (del_timer_sync(&priv->restart_timer))
-		dev_put(dev);
+	priv->error_buserr = 0;
+	priv->restart_initiated = 0;
+	if(timer_pending(&priv->restart_timer)) {
+		mod_timer(&priv->restart_timer, jiffies);
+	}
+	if (del_timer_sync(&priv->restart_timer)) {
+		// Old code was calling dev_put() before?!?!?!? This resulted into use_count=-1
+		//dev_put(dev);
+		//printk(KERN_INFO "close_candev: timer still in use during del_timer\n");
+	}
+	
 	can_flush_echo_skb(dev);
 }
 EXPORT_SYMBOL_GPL(close_candev);
