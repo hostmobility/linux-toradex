@@ -53,7 +53,7 @@
 
 #define SJA1000_ECHO_SKB_MAX	1 /* the SJA1000 has one TX buffer object */
 
-#define SJA1000_MAX_IRQ 100	/* max. number of interrupts handled in ISR */
+#define SJA1000_MAX_IRQ 5	/* max. number of interrupts handled in ISR */
 
 /* SJA1000 registers - manual section 6.4 (Pelican Mode) */
 #define REG_MOD		0x00
