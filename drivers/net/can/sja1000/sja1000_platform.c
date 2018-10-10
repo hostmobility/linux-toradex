@@ -38,7 +38,7 @@ MODULE_LICENSE("GPL v2");
 
 static DEFINE_SPINLOCK(snor_bus_lock);
 
-static unsigned long cnt = 0;
+unsigned long sja1000_cnt = 0;
 
 static u8 sp_read_reg8(const struct sja1000_priv *priv, int reg)
 {
@@ -65,7 +65,7 @@ static void sp_write_reg8(const struct sja1000_priv *priv, int reg, u8 val)
 
 static u8 sp_read_reg16(const struct sja1000_priv *priv, int reg)
 {
-	printk(KERN_INFO "sja1000 read16\n");
+	sja1000_cnt++;
 	return ioread8(priv->reg_base + reg * 2);
 }
 
@@ -76,7 +76,7 @@ static void sp_write_reg16(const struct sja1000_priv *priv, int reg, u8 val)
 
 static u8 sp_read_reg32(const struct sja1000_priv *priv, int reg)
 {
-	printk(KERN_INFO "sja1000 read32\n");
+	sja1000_cnt++;
 	return ioread8(priv->reg_base + reg * 4);
 }
 
@@ -100,6 +100,8 @@ static int sp_probe(struct platform_device *pdev)
 		err = -ENODEV;
 		goto exit;
 	}
+
+	printk(KERN_INFO "sja1000_cnt addr %p\n", &sja1000_cnt);
 
 	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	res_irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
