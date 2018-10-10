@@ -38,6 +38,8 @@ MODULE_LICENSE("GPL v2");
 
 static DEFINE_SPINLOCK(snor_bus_lock);
 
+static unsigned long cnt = 0;
+
 static u8 sp_read_reg8(const struct sja1000_priv *priv, int reg)
 {
 	u8 value;
@@ -63,6 +65,7 @@ static void sp_write_reg8(const struct sja1000_priv *priv, int reg, u8 val)
 
 static u8 sp_read_reg16(const struct sja1000_priv *priv, int reg)
 {
+	printk(KERN_INFO "sja1000 read16\n");
 	return ioread8(priv->reg_base + reg * 2);
 }
 
@@ -73,6 +76,7 @@ static void sp_write_reg16(const struct sja1000_priv *priv, int reg, u8 val)
 
 static u8 sp_read_reg32(const struct sja1000_priv *priv, int reg)
 {
+	printk(KERN_INFO "sja1000 read32\n");
 	return ioread8(priv->reg_base + reg * 4);
 }
 
