@@ -388,7 +388,6 @@ static int sja1000_err(struct net_device *dev, uint8_t isrc, uint8_t status)
 	struct sk_buff *skb;
 	enum can_state state = priv->can.state;
 	uint8_t ecc, alc;
-	uint8_t force_restart = 0;
 
 	skb = alloc_can_err_skb(dev, &cf);
 	if (skb == NULL)
@@ -444,18 +443,6 @@ static int sja1000_err(struct net_device *dev, uint8_t isrc, uint8_t status)
 		/* Error occurred during transmission? */
 		if ((ecc & ECC_DIR) == 0)
 			cf->data[2] |= CAN_ERR_PROT_TX;
-
-		if(priv->can.error_buserr++ == 1000) {
-			uint8_t rxerr = priv->read_reg(priv, REG_RXERR);
-			uint8_t txerr = priv->read_reg(priv, REG_TXERR);
-			if((rxerr >= 125) || (txerr >= 125)) {
-				if(!priv->can.restart_initiated) {
-					// Extra protection if (isrc & IRQ_EI) was lost with bus_off
-					force_restart = 1;
-				}
-			}
-			priv->can.error_buserr = 0;
-		}
 	}
 	if (isrc & IRQ_EPI) {
 		/* error passive interrupt */
@@ -499,21 +486,6 @@ static int sja1000_err(struct net_device *dev, uint8_t isrc, uint8_t status)
 
 	netif_rx(skb);
 
-	if(force_restart) {
-		if(!priv->can.restart_initiated) {
-			if(priv->can.restart_ms) {
-				can_bus_off(dev); // trig automatic restart (if restart-ms > 0)
-				// restart_initiated is now set. And restart_timer is set
-			} else {
-				// Not really correct to do this, but we have to stop the flooding messages.
-				can_bus_off(dev); // Since restart_ms==0, restart will not be rescheduled automatically
-				priv->can.state = CAN_STATE_BUS_OFF;
-				can_restart_now(dev); // Force manual restart (if restart-ms is 0) state must be CAN_STATE_BUS_OFF
-				// restart_initiated is now set. And restart_timer is set
-				return -EINTR; // Make sure interrupt-loop exit
-			}
-		}
-	}
 	stats->rx_packets++;
 	stats->rx_bytes += cf->can_dlc;
 
@@ -559,8 +531,6 @@ irqreturn_t sja1000_interrupt(int irq, void *dev_id)
 		}
 		if (isrc & IRQ_RI) {
 			/* receive interrupt */
-			priv->can.error_buserr = 0;
-			// reset error-counter when something receieved. It might be error-frames from the bus, but no major flooding
 			while (status & SR_RBS) {
 				sja1000_rx(dev);
 				status = priv->read_reg(priv, REG_SR);
@@ -690,12 +660,6 @@ EXPORT_SYMBOL_GPL(register_sja1000dev);
 
 void unregister_sja1000dev(struct net_device *dev)
 {
-	struct sja1000_priv *priv = netdev_priv(dev);
-
-	priv->can.restart_initiated = 0;
-	if(timer_pending(&priv->can.restart_timer)) {
-		mod_timer(&priv->can.restart_timer, jiffies);
-	}
 	set_reset_mode(dev);
 	unregister_candev(dev);
 }
