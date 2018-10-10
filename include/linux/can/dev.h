@@ -41,8 +41,6 @@ struct can_priv {
 	u32 ctrlmode;
 	u32 ctrlmode_supported;
 
-	u32 error_buserr;	/* Used for extra protection in case busoff is needed */
-	u32 restart_initiated;	/* Used for extra protection in case busoff is needed */
 	int restart_ms;
 	struct timer_list restart_timer;
 
