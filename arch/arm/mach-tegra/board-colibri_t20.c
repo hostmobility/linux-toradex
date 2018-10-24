@@ -21,6 +21,7 @@
 #include <linux/i2c-tegra.h>
 #include <linux/input.h>
 #include <linux/input/fusion_F0710A.h>
+#include <linux/platform_data/atmel_mxt_ts.h>
 #include <linux/io.h>
 #include <linux/leds_pwm.h>
 #include <linux/lm95245.h>
@@ -520,8 +521,10 @@ static struct gpio colibri_t20_gpios[] = {
 	{TEGRA_GPIO_PK0,	GPIOF_IN,	"SODIMM pin 150"},
 //multiplexed OWR
 	{TEGRA_GPIO_PK1,	GPIOF_IN,	"SODIMM pin 152"},
-#if !defined(MECS_TELLURIUM) || (!defined(CONFIG_CAN_MCP251X) && \
-				 !defined(CONFIG_CAN_MCP251X_MODULE))
+#if (!defined(MECS_TELLURIUM) || (!defined(CONFIG_CAN_MCP251X) && \
+                                 !defined(CONFIG_CAN_MCP251X_MODULE))) && \
+	(!defined(CONFIG_TOUCHSCREEN_ATMEL_MXT) && \
+	!defined(CONFIG_TOUCHSCREEN_ATMEL_MXT_MODULE))
 //conflicts with CAN reset on MECS Tellurium xPOD1 CAN
 	{TEGRA_GPIO_PK4,	GPIOF_IN,	"SODIMM pin 106"},
 #endif
@@ -636,6 +639,22 @@ static struct fusion_f0710a_init_data colibri_fusion_pdata = {
 	.gpio_reset = TEGRA_GPIO_PA6,	/* SO-DIMM 30: Reset interrupt */
 };
 
+/*
+ * Atmel touch screen GPIOs (using Toradex display/touch adapter)
+ * Aster X3-4, SODIMM pin 107 , pen down interrupt
+ * gpio_request muxes the GPIO function automatically, we only have to make
+ * sure input/output muxing is done and the GPIO is freed here.
+ */
+static struct mxt_platform_data colibri_atmel_pdata = {
+	.suspend_mode = MXT_SUSPEND_T9_CTRL,
+	.irqflags = IRQF_TRIGGER_FALLING,
+#ifdef USE_CAPACITIVE_TOUCH_ADAPTER
+	.gpio_reset = TEGRA_GPIO_PA6,
+#else
+	.gpio_reset = TEGRA_GPIO_PK4,
+#endif
+};
+
 /* I2C */
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
@@ -649,6 +668,16 @@ static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
 		/* TouchRevolution Fusion 7 and 10 multi-touch controller */
 		I2C_BOARD_INFO("fusion_F0710A", 0x10),
 		.platform_data = &colibri_fusion_pdata,
+	},
+	{
+		/* Atmel MAX TS 7 multi-touch controller */
+		I2C_BOARD_INFO("atmel_mxt_ts", 0x4a),
+		.platform_data = &colibri_atmel_pdata,
+#ifdef USE_CAPACITIVE_TOUCH_ADAPTER
+		.irq = TEGRA_GPIO_TO_IRQ( TEGRA_GPIO_PB5 ),
+#else
+		.irq = TEGRA_GPIO_TO_IRQ( TEGRA_GPIO_PK3 ),
+#endif
 	},
 };
 
@@ -693,7 +722,7 @@ static struct i2c_board_info colibri_t20_i2c_bus4_board_info[] __initdata = {
 static struct tegra_i2c_platform_data colibri_t20_dvc_platform_data = {
 	.adapter_nr	= 4,
 	.arb_recovery	= arb_lost_recovery,
-	.bus_clk_rate	= {400000, 0},
+	.bus_clk_rate	= {100000, 0},
 	.bus_count	= 1,
 	.is_dvc		= true,
 	.scl_gpio	= {PWR_I2C_SCL, 0},
@@ -803,26 +832,29 @@ int __init colibri_t20_sdhci_init(void)
 /* NAND */
 
 static struct tegra_nand_chip_parms nand_chip_parms[] = {
-	/* Micron MT29F4G08ABBDAH4 */
+	/*
+	 * Micron MT29F4G08ABBDAH4 on Colibri T20 256MB V1.2a intermediate and
+	 * Micron MT29F4G08ABBFAH4 on Colibri T20 256MB IT V1.2b
+	 */
 	[0] = {
 		.vendor_id		= 0x2C,
 		.device_id		= 0xAC,
 		.read_id_fourth_byte	= 0x15,
 		.capacity		= 512,
 		.timing = {
-			.trp		= 12,
+			.trp		= 15,
 			.trh		= 10,	/* tREH */
-			.twp		= 12,
+			.twp		= 15,
 			.twh		= 10,
-			.tcs		= 20,	/* Max(tCS, tCH, tALS, tALH) */
+			.tcs		= 25,	/* Max(tCS, tCH, tALS, tALH) */
 			.twhr		= 80,
-			.tcr_tar_trr	= 20,	/* Max(tCR, tAR, tRR) */
+			.tcr_tar_trr	= 30,	/* Max(tCR, tAR, tRR) */
 			.twb		= 100,
-			.trp_resp	= 12,	/* tRP */
-			.tadl		= 70,
+			.trp_resp	= 15,	/* tRP */
+			.tadl		= 100,
 		},
 	},
-	/* Micron MT29F4G08ABBEAH4 */
+	/* Micron MT29F4G08ABBEAH4 on Colibri T20 256MB V1.2a new */
 	[1] = {
 		.vendor_id		= 0x2C,
 		.device_id		= 0xAC,
@@ -841,7 +873,7 @@ static struct tegra_nand_chip_parms nand_chip_parms[] = {
 			.tadl		= 100,
 		},
 	},
-	/* Micron MT29F8G08ABCBB on Colibri T20 before V1.2 */
+	/* Micron MT29F8G08ABCBB on Colibri T20 V1.1 aka old */
 	[2] = {
 		.vendor_id		= 0x2C,
 		.device_id		= 0x38,
@@ -861,7 +893,7 @@ static struct tegra_nand_chip_parms nand_chip_parms[] = {
 			.tadl		= 70,
 		},
 	},
-	/* Micron MT29F8G08ADBDAH4 */
+	/* Micron MT29F8G08ADBDAH4 on Colibri T20 512MB V1.2a intermediate */
 	[3] = {
 		.vendor_id		= 0x2C,
 		.device_id		= 0xA3,
@@ -880,7 +912,7 @@ static struct tegra_nand_chip_parms nand_chip_parms[] = {
 			.tadl		= 70,
 		},
 	},
-	/* Micron MT29F8G08ABBCA */
+	/* Micron MT29F8G08ABBCA on Colibri T20 512MB V1.2a new */
 	[4] = {
 		.vendor_id		= 0x2C,
 		.device_id		= 0xA3,
@@ -899,7 +931,7 @@ static struct tegra_nand_chip_parms nand_chip_parms[] = {
 			.tadl		= 100,
 		},
 	},
-	/* Samsung K9K8G08U0B */
+	/* Samsung K9K8G08U0B on Colibri T20 512MB 3.3V TSOP test */
 	[5] = {
 		.vendor_id		= 0xec,
 		.device_id		= 0xd3,
@@ -918,6 +950,63 @@ static struct tegra_nand_chip_parms nand_chip_parms[] = {
 			.twb		= 100,
 			.trp_resp	= 12,	/* tRP */
 			.tadl		= 70,
+		},
+	},
+	/* Toshiba TC58NYG2S0HBAI4 on Colibri T20 256MB IT V1.2b */
+	[6] = {
+		.vendor_id		= 0x98,
+		.device_id		= 0xAC,
+		.read_id_fourth_byte	= 0x26,
+		.capacity		= 512,
+		.timing = {
+			.trp		= 12,
+			.trh		= 10,	/* tREH */
+			.twp		= 12,
+			.twh		= 10,
+			.tcs		= 20,	/* Max(tCS, tCH, tALS, tALH) */
+			.twhr		= 60,
+			.tcr_tar_trr	= 25,	/* Max(tCR, tAR, tRR) */
+			.twb		= 100,
+			.trp_resp	= 12,	/* tRP */
+			.tadl		= 100,
+		},
+	},
+	/* ISSI IS34MW04G084 on Colibri T20 256MB IT V1.2b */
+	[7] = {
+		.vendor_id		= 0xC8,
+		.device_id		= 0xAC,
+		.read_id_fourth_byte	= 0x15,
+		.capacity		= 512,
+		.timing = {
+			.trp		= 25,
+			.trh		= 15,	/* tREH */
+			.twp		= 25,
+			.twh		= 15,
+			.tcs		= 35,	/* Max(tCS, tCH, tALS, tALH) */
+			.twhr		= 60,
+			.tcr_tar_trr	= 45,	/* Max(tCR, tAR, tRR) */
+			.twb		= 100,
+			.trp_resp	= 25,	/* tRP */
+			.tadl		= 100,
+		},
+	},
+	/* Toshiba TH58NYG3S0HBAI4 on Colibri T20 512MB IT V1.2b */
+	[8] = {
+		.vendor_id		= 0x98,
+		.device_id		= 0xA3,
+		.read_id_fourth_byte	= 0x26,
+		.capacity		= 1024,
+		.timing = {
+			.trp		= 12,
+			.trh		= 10,	/* tREH */
+			.twp		= 12,
+			.twh		= 10,
+			.tcs		= 20,	/* Max(tCS, tCH, tALS, tALH) */
+			.twhr		= 60,
+			.tcr_tar_trr	= 25,	/* Max(tCR, tAR, tRR) */
+			.twb		= 100,
+			.trp_resp	= 12,	/* tRP */
+			.tadl		= 100,
 		},
 	},
 };

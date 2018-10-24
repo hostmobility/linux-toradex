@@ -274,7 +274,7 @@ static __initdata struct tegra_pingroup_config colibri_t30_pinmux[] = {
 //multiplexed GMI_IORDY
 	DEFAULT_PINMUX(GMI_WAIT, GMI, NORMAL, TRISTATE, OUTPUT),
 //GPIO PU6: MMC_CD
-	DEFAULT_PINMUX(GMI_WP_N, RSVD1, NORMAL, NORMAL, INPUT),
+	DEFAULT_PINMUX(GMI_WP_N, RSVD1, PULL_UP, NORMAL, INPUT),
 //gated, multiplexed LCD_CS1_N or LCD_WR_N
 	DEFAULT_PINMUX(GMI_WR_N, GMI, NORMAL, NORMAL, INPUT),
 #endif /* COLIBRI_T30_V10 */
@@ -324,7 +324,7 @@ static __initdata struct tegra_pingroup_config colibri_t30_pinmux[] = {
 
 //GPIO V0: touch pendown int
 	DEFAULT_PINMUX(GPIO_PV0, RSVD, NORMAL, NORMAL, INPUT),
-	DEFAULT_PINMUX(GPIO_PV1, RSVD, NORMAL, NORMAL, INPUT),
+	DEFAULT_PINMUX(GPIO_PV1, RSVD, PULL_DOWN, NORMAL, INPUT),
 #ifdef COLIBRI_T30_VI
 //multiplexed VI_D0
 	DEFAULT_PINMUX(GPIO_PV2, RSVD1, PULL_DOWN, TRISTATE, OUTPUT),

@@ -16,6 +16,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c-tegra.h>
 #include <linux/input/fusion_F0710A.h>
+#include <linux/platform_data/atmel_mxt_ts.h>
 #include <linux/input.h>
 #include <linux/io.h>
 #include <linux/leds.h>
@@ -279,6 +280,38 @@ static struct platform_device apalis_t30_ov5640_soc_camera_device = {
 	.id	= 4,
 	.name	= "soc-camera-pdrv",
 };
+
+/* 2nd OV5640, assuming its SCCB_ID got moved from 0x3c to 0x3d */
+static struct i2c_board_info apalis_t30_ov5640_camera_i2c_device2 = {
+	I2C_BOARD_INFO("ov5640", 0x3D),
+};
+
+static struct tegra_camera_platform_data ov5640_platform_data2 = {
+	.continuous_capture	= 1,
+	.continuous_clk		= 0,
+	.flip_v			= 0,
+	.flip_h			= 0,
+	.lanes			= 2,
+	.port			= TEGRA_CAMERA_PORT_CSI_B,
+	.vi_freq		= 24000000,
+};
+
+static struct soc_camera_link ov5640_iclink2 = {
+	.board_info	= &apalis_t30_ov5640_camera_i2c_device2,
+	.bus_id		= -1, /* This must match the .id of tegra_vi01_device */
+	.i2c_adapter_id	= 2,
+	.module_name	= "ov5640",
+	.power		= apalis_t30_ov5640_power,
+	.priv		= &ov5640_platform_data2,
+};
+
+static struct platform_device apalis_t30_ov5640_soc_camera_device2 = {
+	.dev = {
+		.platform_data = &ov5640_iclink2,
+	},
+	.id	= 5,
+	.name	= "soc-camera-pdrv",
+};
 #endif /* ONFIG_SOC_CAMERA_OV5640 | CONFIG_SOC_CAMERA_OV5640_MODULE */
 
 #if defined(CONFIG_SOC_CAMERA_OV7670SOC) || \
@@ -309,7 +342,7 @@ static struct platform_device soc_camera_ov7670soc = {
 	.dev = {
 		.platform_data = &iclink_ov7670soc,
 	},
-	.id	= 5,
+	.id	= 6,
 	.name	= "soc-camera-pdrv",
 };
 #endif /* CONFIG_SOC_CAMERA_OV7670SOC | CONFIG_SOC_CAMERA_OV7670SOC_MODULE */
@@ -342,7 +375,7 @@ static struct platform_device soc_camera_tvp5150soc = {
 	.dev = {
 		.platform_data = &iclink_tvp5150soc,
 	},
-	.id	= 6,
+	.id	= 7,
 	.name	= "soc-camera-pdrv",
 };
 #endif /* CONFIG_SOC_CAMERA_TVP5150 | CONFIG_SOC_CAMERA_TVP5150_MODULE */
@@ -374,7 +407,7 @@ static struct platform_device soc_camera_s2d13p04 = {
 	.dev = {
 		.platform_data = &iclink_s2d13p04,
 	},
-	.id	= 7,
+	.id	= 8,
 	.name	= "soc-camera-pdrv",
 };
 #endif /* CONFIG_SOC_CAMERA_S2D13P04 | CONFIG_SOC_CAMERA_S2D13P04_MODULE */
@@ -458,7 +491,7 @@ static struct tegra_clk_init_table apalis_t30_clk_init_table[] __initdata = {
 	{"i2s4",		"pll_a_out0",	0,		false},
 	{"pll_a",		NULL,		564480000,	true},
 	{"pll_m",		NULL,		0,		false},
-	{"pwm",			"pll_p",	3187500,	false},
+	{"pwm",			"pll_p",	25500000,	false},
 	{"spdif_out",		"pll_a_out0",	0,		false},
 	{"vi",			"pll_p",	0,		false},
 	{"vi_sensor",		"pll_p",	24000000,	true},
@@ -475,8 +508,10 @@ static struct gpio apalis_t30_gpios[] = {
 #ifndef POWER_GPIO
 	{APALIS_GPIO5,		GPIOF_IN,		"GPIO5 X1-9"},
 #endif
-#ifndef FORCE_OFF_GPIO
-	{APALIS_GPIO6,		GPIOF_IN,		"GPIO6 X1-11"},
+#if  !defined(CONFIG_TOUCHSCREEN_ATMEL_MXT) \
+	&& !defined(CONFIG_TOUCHSCREEN_ATMEL_MXT_MODULE) \
+	&& !defined(FORCE_OFF_GPIO)
+	{APALIS_GPIO6,		GPIOF_OUT_INIT_HIGH,		"GPIO6 X1-11"},
 #endif
 	/* GPIO7 is used by PCIe driver on Evaluation board */
 /*	{APALIS_GPIO7,		GPIOF_IN,		"GPIO7 X1-13"}, */
@@ -546,6 +581,19 @@ static int pinmux_fusion_pins(void)
 	return 0;
 }
 
+/*
+ * Atmel touch screen GPIOs (using Toradex display/touch adapter)
+ * Apalis GPIO 5, MXM-11, Ixora X27-17, pen down interrupt
+ * Apalis GPIO 6, MXM-13, Ixora X27-18, reset
+ * gpio_request muxes the GPIO function automatically, we only have to make
+ * sure input/output muxing is done and the GPIO is freed here.
+ */
+static struct mxt_platform_data apalis_atmel_pdata = {
+	.suspend_mode = MXT_SUSPEND_T9_CTRL,
+	.irqflags = IRQF_TRIGGER_FALLING,
+	.gpio_reset = APALIS_GPIO6,
+};
+
 /* I2C */
 
 /* Make sure that the pinmuxing enable the 'open drain' feature for pins used
@@ -562,6 +610,12 @@ static struct i2c_board_info apalis_t30_i2c_bus1_board_info[] __initdata = {
 		/* TouchRevolution Fusion 7 and 10 multi-touch controller */
 		I2C_BOARD_INFO("fusion_F0710A", 0x10),
 			.platform_data = &apalis_fusion_pdata,
+	},
+	{
+		/* Atmel MAX TS 7 multi-touch controller */
+		I2C_BOARD_INFO("atmel_mxt_ts", 0x4a),
+			.platform_data = &apalis_atmel_pdata,
+			.irq = TEGRA_GPIO_TO_IRQ( APALIS_GPIO5 ),
 	},
 };
 
@@ -664,7 +718,7 @@ static struct i2c_board_info apalis_t30_i2c_bus5_board_info[] __initdata = {
 static struct tegra_i2c_platform_data apalis_t30_i2c5_platform_data = {
 	.adapter_nr	= 4,
 	.arb_recovery	= arb_lost_recovery,
-	.bus_clk_rate	= {400000, 0},
+	.bus_clk_rate	= {100000, 0},
 	.bus_count	= 1,
 	.scl_gpio	= {PWR_I2C_SCL, 0},
 	.sda_gpio	= {PWR_I2C_SDA, 0},
@@ -1018,6 +1072,11 @@ static void __init apalis_t30_spi_init(void)
 
 static void *apalis_t30_alert_data;
 static void (*apalis_t30_alert_func)(void *);
+static int apalis_t30_crit_edge_local;
+static int apalis_t30_crit_edge_remote;
+static int apalis_t30_crit_hysteresis;
+static int apalis_t30_crit_limit_local;
+static int apalis_t30_crit_limit_remote;
 static int apalis_t30_low_edge;
 static int apalis_t30_low_hysteresis;
 static int apalis_t30_low_limit;
@@ -1127,17 +1186,39 @@ static irqreturn_t thermd_alert_irq(int irq, void *data)
 /* Gets both entered by THERMD_ALERT GPIO interrupt as well as re-scheduled. */
 static void thermd_alert_work_func(struct work_struct *work)
 {
-	int temp = 0;
+	int temp_local = 0;
+	int temp_remote = 0;
 
-	lm95245_get_remote_temp(lm95245_device, &temp);
+	lm95245_get_local_temp(lm95245_device, &temp_local);
+	lm95245_get_remote_temp(lm95245_device, &temp_remote);
 
 	/* This emulates NCT1008 low limit behaviour */
-	if (!apalis_t30_low_edge && temp <= apalis_t30_low_limit) {
+	if (!apalis_t30_low_edge && temp_remote <= apalis_t30_low_limit) {
 		apalis_t30_alert_func(apalis_t30_alert_data);
 		apalis_t30_low_edge = 1;
-	} else if (apalis_t30_low_edge && temp > apalis_t30_low_limit +
+	} else if (apalis_t30_low_edge && temp_remote > apalis_t30_low_limit +
 						 apalis_t30_low_hysteresis) {
 		apalis_t30_low_edge = 0;
+	}
+
+	if (!apalis_t30_crit_edge_local &&
+	    temp_local >= apalis_t30_crit_limit_local) {
+		printk(KERN_ALERT "Module reaching critical shutdown "
+				  "temperature nT_CRIT\n");
+		apalis_t30_crit_edge_local = 1;
+	} else if (apalis_t30_crit_edge_local && temp_local <
+		   apalis_t30_crit_limit_local - apalis_t30_crit_hysteresis) {
+		apalis_t30_crit_edge_local = 0;
+	}
+
+	if (!apalis_t30_crit_edge_remote &&
+	    temp_remote >= apalis_t30_crit_limit_remote) {
+		printk(KERN_ALERT "SoC reaching critical shutdown "
+				  "temperature nT_CRIT\n");
+		apalis_t30_crit_edge_remote = 1;
+	} else if (apalis_t30_crit_edge_remote && temp_remote <
+		   apalis_t30_crit_limit_remote - apalis_t30_crit_hysteresis) {
+		apalis_t30_crit_edge_remote = 0;
 	}
 
 	/* Avoid unbalanced enable for IRQ 367 */
@@ -1276,6 +1357,11 @@ static void lm95245_probe_callback(struct device *dev)
 
 static void apalis_t30_thermd_alert_init(void)
 {
+	apalis_t30_crit_edge_local = 0;
+	apalis_t30_crit_edge_remote = 0;
+	apalis_t30_crit_hysteresis = 3000;
+	apalis_t30_crit_limit_local = 90000;
+	apalis_t30_crit_limit_remote = 110000;
 	apalis_t30_low_edge = 0;
 	apalis_t30_low_hysteresis = 3000;
 	apalis_t30_low_limit = 0;
@@ -1662,6 +1748,7 @@ static void __init apalis_t30_init(void)
 #if defined(CONFIG_SOC_CAMERA_OV5640) || \
 		defined(CONFIG_SOC_CAMERA_OV5640_MODULE)
 	platform_device_register(&apalis_t30_ov5640_soc_camera_device);
+	platform_device_register(&apalis_t30_ov5640_soc_camera_device2);
 #endif
 #if defined(CONFIG_SOC_CAMERA_OV7670SOC) || \
 		defined(CONFIG_SOC_CAMERA_OV7670SOC_MODULE)

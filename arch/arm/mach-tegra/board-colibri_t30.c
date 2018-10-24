@@ -19,6 +19,7 @@
 #include <linux/i2c-tegra.h>
 #include <linux/input.h>
 #include <linux/input/fusion_F0710A.h>
+#include <linux/platform_data/atmel_mxt_ts.h>
 #include <linux/io.h>
 #include <linux/leds_pwm.h>
 #include <linux/lm95245.h>
@@ -464,7 +465,7 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 	{"nor",		"pll_p",	86500000,	true},
 	{"pll_a",	NULL,		564480000,	true},
 	{"pll_m",	NULL,		0,		false},
-	{"pwm",		"pll_p",	3187500,	false},
+	{"pwm",		"pll_p",	25500000,	false},
 	{"spdif_out",	"pll_a_out0",	0,		false},
 	{"vi",		"pll_p",	0,		false},
 	{NULL,		NULL,		0,		0},
@@ -607,6 +608,22 @@ static struct fusion_f0710a_init_data colibri_fusion_pdata = {
 	.gpio_reset = TEGRA_GPIO_PA6,	/* SO-DIMM 30: Reset interrupt */
 };
 
+/*
+ * Atmel touch screen GPIOs (using Toradex display/touch adapter)
+ * Aster X3-4, SODIMM pin 107 , pen down interrupt
+ * gpio_request muxes the GPIO function automatically, we only have to make
+ * sure input/output muxing is done and the GPIO is freed here.
+ */
+static struct mxt_platform_data colibri_atmel_pdata = {
+	.suspend_mode = MXT_SUSPEND_T9_CTRL,
+	.irqflags = IRQF_TRIGGER_FALLING,
+#ifdef USE_CAPACITIVE_TOUCH_ADAPTER
+	.gpio_reset = TEGRA_GPIO_PA6,
+#else
+	.gpio_reset = TEGRA_GPIO_PK4,
+#endif
+};
+
 /* I2C */
 
 /* Make sure that the pinmuxing enable the 'open drain' feature for pins used
@@ -623,6 +640,16 @@ static struct i2c_board_info colibri_t30_i2c_bus1_board_info[] __initdata = {
 		/* TouchRevolution Fusion 7 and 10 multi-touch controller */
 		I2C_BOARD_INFO("fusion_F0710A", 0x10),
 		.platform_data = &colibri_fusion_pdata,
+	},
+	{
+		/* Atmel MAX TS 7 multi-touch controller */
+		I2C_BOARD_INFO("atmel_mxt_ts", 0x4a),
+			.platform_data = &colibri_atmel_pdata,
+#ifdef USE_CAPACITIVE_TOUCH_ADAPTER
+			.irq = TEGRA_GPIO_TO_IRQ( TEGRA_GPIO_PB5 ),
+#else
+			 .irq = TEGRA_GPIO_TO_IRQ( TEGRA_GPIO_PK3 ),
+#endif
 	},
 };
 
@@ -713,7 +740,7 @@ static struct i2c_board_info colibri_t30_i2c_bus5_board_info[] __initdata = {
 static struct tegra_i2c_platform_data colibri_t30_i2c5_platform_data = {
 	.adapter_nr	= 4,
 	.arb_recovery	= arb_lost_recovery,
-	.bus_clk_rate	= {400000, 0},
+	.bus_clk_rate	= {100000, 0},
 	.bus_count	= 1,
 	.scl_gpio	= {PWR_I2C_SCL, 0},
 	.sda_gpio	= {PWR_I2C_SDA, 0},
@@ -975,11 +1002,16 @@ static void __init colibri_t30_spi_init(void)
 
 static void *colibri_t30_alert_data;
 static void (*colibri_t30_alert_func)(void *);
-static int colibri_t30_low_edge = 0;
-static int colibri_t30_low_hysteresis = 3000;
-static int colibri_t30_low_limit = 0;
-static struct device *lm95245_device = NULL;
-static int thermd_alert_irq_disabled = 0;
+static int colibri_t30_crit_edge_local;
+static int colibri_t30_crit_edge_remote;
+static int colibri_t30_crit_hysteresis;
+static int colibri_t30_crit_limit_local;
+static int colibri_t30_crit_limit_remote;
+static int colibri_t30_low_edge;
+static int colibri_t30_low_hysteresis;
+static int colibri_t30_low_limit;
+static struct device *lm95245_device;
+static int thermd_alert_irq_disabled;
 struct work_struct thermd_alert_work;
 struct workqueue_struct *thermd_alert_workqueue;
 
@@ -1084,17 +1116,40 @@ static irqreturn_t thermd_alert_irq(int irq, void *data)
 /* Gets both entered by THERMD_ALERT GPIO interrupt as well as re-scheduled. */
 static void thermd_alert_work_func(struct work_struct *work)
 {
-	int temp = 0;
+	int temp_local = 0;
+	int temp_remote = 0;
 
-	lm95245_get_remote_temp(lm95245_device, &temp);
+	lm95245_get_local_temp(lm95245_device, &temp_local);
+	lm95245_get_remote_temp(lm95245_device, &temp_remote);
 
 	/* This emulates NCT1008 low limit behaviour */
-	if (!colibri_t30_low_edge && temp <= colibri_t30_low_limit) {
+	if (!colibri_t30_low_edge && temp_remote <= colibri_t30_low_limit) {
 		colibri_t30_alert_func(colibri_t30_alert_data);
 		colibri_t30_low_edge = 1;
-	} else if (colibri_t30_low_edge && temp > colibri_t30_low_limit +
-						  colibri_t30_low_hysteresis) {
+	} else if (colibri_t30_low_edge && temp_remote > colibri_t30_low_limit +
+						 colibri_t30_low_hysteresis) {
 		colibri_t30_low_edge = 0;
+	}
+
+	if (!colibri_t30_crit_edge_local &&
+	    temp_local >= colibri_t30_crit_limit_local) {
+		printk(KERN_ALERT "Module reaching critical shutdown "
+				  "temperature nT_CRIT\n");
+		colibri_t30_crit_edge_local = 1;
+	} else if (colibri_t30_crit_edge_local && temp_local <
+		   colibri_t30_crit_limit_local - colibri_t30_crit_hysteresis) {
+		colibri_t30_crit_edge_local = 0;
+	}
+
+	if (!colibri_t30_crit_edge_remote &&
+	    temp_remote >= colibri_t30_crit_limit_remote) {
+		printk(KERN_ALERT "SoC reaching critical shutdown "
+				  "temperature nT_CRIT\n");
+		colibri_t30_crit_edge_remote = 1;
+	} else if (colibri_t30_crit_edge_remote && temp_remote <
+		   colibri_t30_crit_limit_remote - colibri_t30_crit_hysteresis)
+	{
+		colibri_t30_crit_edge_remote = 0;
 	}
 
 	/* Avoid unbalanced enable for IRQ 367 */
@@ -1113,46 +1168,53 @@ static int lm95245_get_temp(void *_data, long *temp)
 {
 	struct device *lm95245_device = _data;
 	int lm95245_temp = 0;
+
 	lm95245_get_remote_temp(lm95245_device, &lm95245_temp);
 	*temp = lm95245_temp;
+
 	return 0;
 }
 
 static int lm95245_get_temp_low(void *_data, long *temp)
 {
 	*temp = 0;
+
 	return 0;
 }
 
 /* Our temperature sensor only allows triggering an interrupt on over-
    temperature shutdown aka the high limit we therefore need to setup a
    workqueue to catch leaving the low limit. */
-static int lm95245_set_limits(void *_data,
-			long lo_limit_milli,
-			long hi_limit_milli)
+static int lm95245_set_limits(void *_data, long lo_limit_milli,
+			      long hi_limit_milli)
 {
 	struct device *lm95245_device = _data;
+
 	colibri_t30_low_limit = lo_limit_milli;
-	if (lm95245_device) lm95245_set_remote_os_limit(lm95245_device,
-							hi_limit_milli);
+	if (lm95245_device)
+		lm95245_set_remote_os_limit(lm95245_device, hi_limit_milli);
+
 	return 0;
 }
 
-static int lm95245_set_alert(void *_data,
-				void (*alert_func)(void *),
-				void *alert_data)
+static int lm95245_set_alert(void *_data, void (*alert_func)(void *),
+			     void *alert_data)
 {
 	lm95245_device = _data;
 	colibri_t30_alert_func = alert_func;
 	colibri_t30_alert_data = alert_data;
+
 	return 0;
 }
 
 static int lm95245_set_shutdown_temp(void *_data, long shutdown_temp)
 {
 	struct device *lm95245_device = _data;
-	if (lm95245_device) lm95245_set_remote_critical_limit(lm95245_device,
-							      shutdown_temp);
+
+	if (lm95245_device)
+		lm95245_set_remote_critical_limit(lm95245_device,
+						  shutdown_temp);
+
 	return 0;
 }
 
@@ -1162,8 +1224,10 @@ static int lm95245_get_itemp(void *dev_data, long *temp)
 {
 	struct device *lm95245_device = dev_data;
 	int lm95245_temp = 0;
+
 	lm95245_get_local_temp(lm95245_device, &lm95245_temp);
 	*temp = lm95245_temp;
+
 	return 0;
 }
 #endif /* CONFIG_TEGRA_SKIN_THROTTLE */
@@ -1173,7 +1237,7 @@ static void lm95245_probe_callback(struct device *dev)
 	struct tegra_thermal_device *lm95245_remote;
 
 	lm95245_remote = kzalloc(sizeof(struct tegra_thermal_device),
-					GFP_KERNEL);
+				 GFP_KERNEL);
 	if (!lm95245_remote) {
 		pr_err("unable to allocate thermal device\n");
 		return;
@@ -1194,8 +1258,9 @@ static void lm95245_probe_callback(struct device *dev)
 #ifdef CONFIG_TEGRA_SKIN_THROTTLE
 	{
 		struct tegra_thermal_device *lm95245_local;
+
 		lm95245_local = kzalloc(sizeof(struct tegra_thermal_device),
-						GFP_KERNEL);
+					GFP_KERNEL);
 		if (!lm95245_local) {
 			kfree(lm95245_local);
 			pr_err("unable to allocate thermal device\n");
@@ -1216,13 +1281,24 @@ static void lm95245_probe_callback(struct device *dev)
 		pr_err("%s: unable to register THERMD_ALERT interrupt\n",
 		       __func__);
 
-	//initalize the local temp limit
-	if(dev)
+	/* initialise the local temp limit */
+	if (dev)
 		lm95245_set_local_shared_os__critical_limit(dev, TCRIT_LOCAL);
 }
 
 static void colibri_t30_thermd_alert_init(void)
 {
+	colibri_t30_crit_edge_local = 0;
+	colibri_t30_crit_edge_remote = 0;
+	colibri_t30_crit_hysteresis = 3000;
+	colibri_t30_crit_limit_local = 90000;
+	colibri_t30_crit_limit_remote = 110000;
+	colibri_t30_low_edge = 0;
+	colibri_t30_low_hysteresis = 3000;
+	colibri_t30_low_limit = 0;
+	lm95245_device = NULL;
+	thermd_alert_irq_disabled = 0;
+
 	gpio_request(THERMD_ALERT, "THERMD_ALERT");
 	gpio_direction_input(THERMD_ALERT);
 

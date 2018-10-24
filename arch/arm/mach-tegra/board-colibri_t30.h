@@ -79,7 +79,8 @@
 #define STMPE811_IRQ_END	(STMPE811_IRQ_BASE + 22)
 
 #define TDIODE_OFFSET	(10000)	/* in millicelsius */
-#define TCRIT_LOCAL 95000 /* board temperature which switches off PMIC in millicelsius*/
+/* module temperature which switches off PMIC in millicelsius */
+#define TCRIT_LOCAL	95000
 
 /* External peripheral act as gpio */
 /* TPS6591x GPIOs */
@@ -100,6 +101,10 @@
 /* TPS6591x IRQs */
 #define TPS6591X_IRQ_BASE	STMPE811_IRQ_END
 #define TPS6591X_IRQ_END	(TPS6591X_IRQ_BASE + 18)
+
+/* Uncoment line bellow to enable support for
+ * Capacitive Touch Adapter */
+//#define USE_CAPACITIVE_TOUCH_ADAPTER
 
 int colibri_t30_regulator_init(void);
 int colibri_t30_suspend_init(void);
