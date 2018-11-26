@@ -95,6 +95,14 @@ static struct platform_device colibri_t30_audio_sgtl5000_device = {
 	},
 };
 
+#ifdef COLIBRI_T30_VI
+/* Camera */
+static struct platform_device tegra_camera = {
+	.name	= "tegra_camera",
+	.id	= -1,
+};
+#endif
+
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
 static struct resource colibri_can_resource[] = {
 	[0] =   {
