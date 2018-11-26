@@ -1540,9 +1540,6 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 #if defined(CONFIG_TEGRA_AVP)
 	&tegra_avp_device,
 #endif
-#ifdef CONFIG_TEGRA_CAMERA
-	&tegra_camera,
-#endif
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_SE)
 	&tegra_se_device,
 #endif
