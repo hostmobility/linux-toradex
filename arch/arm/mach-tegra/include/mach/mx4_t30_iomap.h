@@ -44,7 +44,7 @@
 #define MX4_CT_WIFI_LED				TEGRA_GPIO_PAA6
 #define MX4_WIFI_RED				TEGRA_GPIO_PB2
 
-#define MX4_WAKE_UP_CPU				TEGRA_GPIO_PZ3
+#define MX4_WAKE_UP_CPU				TEGRA_GPIO_PU0
 #define MX4_DATA_READY_PIC			TEGRA_GPIO_PV1
 
 #define MMC_CD		-1 /* Not connected */
