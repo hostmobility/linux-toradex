@@ -2458,7 +2458,7 @@ int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
 		* the controller context. So, set MMC_PM_KEEP_POWER flag.
 		*/
 		if (mmc_card_can_sleep(mmc) &&
-		    !(mmc->caps & MMC_CAP2_NO_SLEEP_CMD))
+			!(mmc->caps & MMC_CAP2_NO_SLEEP_CMD))
 			mmc->pm_flags = MMC_PM_KEEP_POWER;
 
 		ret = mmc_suspend_host(host->mmc);

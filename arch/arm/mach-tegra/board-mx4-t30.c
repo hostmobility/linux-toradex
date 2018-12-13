@@ -27,6 +27,7 @@
 #include <linux/mma845x.h>
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/platform_device.h>
+#include <linux/pps_gen_gpio.h>
 #include <linux/serial_8250.h>
 #include <linux/spi-tegra.h>
 #include <linux/spi/spi.h>
@@ -357,7 +358,7 @@ static struct tegra_clk_init_table colibri_t30_clk_init_table[] __initdata = {
 	{"i2s2",	"pll_a_out0",	0,		false},
 	{"i2s3",	"pll_a_out0",	0,		false},
 	{"i2s4",	"pll_a_out0",	0,		false},
-	{"nor",		"pll_p",	86500000,	true},
+	{"nor",		"pll_p",	102000000,	true},
 	{"pll_a",	NULL,		564480000,	true},
 	{"pll_m",	NULL,		0,		false},
 	{"pwm",		"pll_p",	3187500,	false},
@@ -422,7 +423,7 @@ static struct gpio colibri_t30_gpios[] = {
 #endif
 #ifndef COLIBRI_T30_VI
 	{TEGRA_GPIO_PW5,	GPIOF_IN,	"SODIMM pin 75"},
-	//conflicts with BL_ON
+	//WLAN_CD
 	//{TEGRA_GPIO_PV2,	GPIOF_IN,	"SODIMM pin 71"},
 	{TEGRA_GPIO_PV3,	GPIOF_IN,	"SODI-85, Iris X16-18"},
 #endif
@@ -459,15 +460,22 @@ static struct gpio colibri_t30_gpios[] = {
 #endif
 #ifndef CONFIG_KEYBOARD_GPIO
 //conflicts with volume down key
-	{TEGRA_GPIO_PCC6,	GPIOF_IN,	"SODIMM pin 24"},
+	//{TEGRA_GPIO_PCC6,	GPIOF_IN,	"SODIMM pin 24"},
 //conflicts with volume up key
-	{TEGRA_GPIO_PDD7,	GPIOF_IN,	"SODIMM pin 22"},
+	//{TEGRA_GPIO_PDD7,	GPIOF_IN,	"SODIMM pin 22"},
 #endif
 #ifndef COLIBRI_T30_VI
 	{TEGRA_GPIO_PDD5,	GPIOF_IN,	"SODIMM pin 69"},
 	{TEGRA_GPIO_PDD6,	GPIOF_IN,	"SODIMM pin 65"},
 #endif
-
+	{TEGRA_GPIO_PM6,	GPIOF_OUT_INIT_HIGH,	"FR-MCU-IN"},
+	{TEGRA_GPIO_PH0,	GPIOF_OUT_INIT_HIGH,	"FR-ETH2-WAKE"},
+	{TEGRA_GPIO_PH6,	GPIOF_OUT_INIT_HIGH,	"FR-ETH-WAKE"},
+	{TEGRA_GPIO_PH7,	GPIOF_OUT_INIT_LOW,	"nFR-RST"},
+	{TEGRA_GPIO_PJ1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D0"},
+	{TEGRA_GPIO_PE7,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D1"},
+	{TEGRA_GPIO_PF1,	GPIOF_OUT_INIT_LOW,	"SSP-CAN-CS-D2"},
+	{TEGRA_GPIO_PW2,	GPIOF_IN,	        "MODEM-WAKEUP"},
 };
 
 static void colibri_t30_gpio_init(void)
@@ -668,6 +676,18 @@ static struct platform_device colibri_t30_keys_device = {
 #endif /* CONFIG_KEYBOARD_GPIO */
 
 
+static struct pps_gen_gpio_platform_data pps_gpio_pdata = {
+	.gpio = TEGRA_GPIO_PM7,
+};
+
+static struct platform_device pps_gpio_device = {
+	.name 		= "pps_gen_gpio",
+	.id 		= -1,
+	.dev		= {
+		.platform_data = &pps_gpio_pdata,
+	}
+};
+
 static struct gpio_led status_leds[] = {
 	[0] =  {
 		/* WIFI-GREEN on MX-4 T20/T30 */
@@ -727,8 +747,30 @@ static struct tegra_sdhci_platform_data colibri_t30_sdcard_platform_data = {
 	.no_1v8		= 1,
 };
 
+#define WLAN_EN		TEGRA_GPIO_PO0
+#define WLAN_CD		TEGRA_GPIO_PV2
+#define BT_EN		TEGRA_GPIO_PCC6
+
+static struct tegra_sdhci_platform_data colibri_t30_wifi_platform_data = {
+	.cd_gpio	= -1,
+	.ddr_clk_limit	= 52000000,
+	.is_8bit	= 0,
+	.power_gpio	= -1,
+	.tap_delay	= 0x0f,
+	.wp_gpio	= -1,
+	.no_1v8		= 1,
+};
+
 static void __init colibri_t30_sdhci_init(void)
 {
+	gpio_request(WLAN_EN, "WLAN_EN");
+	gpio_export(WLAN_EN, true);
+	gpio_direction_output(WLAN_EN, 1);
+
+	gpio_request(BT_EN, "BT_EN");
+	gpio_export(BT_EN, true);
+	gpio_direction_output(BT_EN, 0);
+
 	/* register eMMC first */
 	tegra_sdhci_device4.dev.platform_data =
 #ifdef COLIBRI_T30_SDMMC4B
@@ -743,6 +785,10 @@ static void __init colibri_t30_sdhci_init(void)
 			&colibri_t30_sdcard_platform_data;
 	platform_device_register(&tegra_sdhci_device2);
 #endif
+
+	tegra_sdhci_device1.dev.platform_data =
+			&colibri_t30_wifi_platform_data;
+	platform_device_register(&tegra_sdhci_device1);
 }
 
 
@@ -781,6 +827,16 @@ static struct spi_board_info tegra_spi_devices[] __initdata = {
 		.mode			= SPI_MODE_1,
 		.platform_data		= NULL,
 	},
+	{
+		.bus_num		= 1,		/* SPI2 */
+		.chip_select		= 0,
+		.controller_data	= &spidev_controller_data,
+		.irq			= 0,
+		.max_speed_hz		= 50000000,
+		.modalias		= "spidev",
+		.mode			= SPI_MODE_1,
+		.platform_data		= NULL,
+	},
 };
 
 static void __init colibri_t30_register_spidev(void)
@@ -794,6 +850,7 @@ static void __init colibri_t30_register_spidev(void)
 
 static struct platform_device *colibri_t30_spi_devices[] __initdata = {
 	&tegra_spi_device1,
+	&tegra_spi_device2,
 };
 
 static struct spi_clk_parent spi_parent_clk[] = {
@@ -831,6 +888,7 @@ static void __init colibri_t30_spi_init(void)
 	colibri_t30_spi_pdata.parent_clk_list = spi_parent_clk;
 	colibri_t30_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk);
 	tegra_spi_device1.dev.platform_data = &colibri_t30_spi_pdata;
+	tegra_spi_device2.dev.platform_data = &colibri_t30_spi_pdata;
 	platform_add_devices(colibri_t30_spi_devices,
 				ARRAY_SIZE(colibri_t30_spi_devices));
 }
@@ -1101,6 +1159,7 @@ static struct platform_device *colibri_t30_uart_devices[] __initdata = {
 	&tegra_uarta_device, /* Colibri UART_A (formerly FFUART) */
 	&tegra_uartd_device, /* Colibri UART_B (formerly BTUART) */
 	&tegra_uartb_device, /* Colibri UART_C (formerly STDUART) */
+	&tegra_uartc_device, /* UART 3 -> FR-MCU */
 };
 
 static struct uart_clk_parent uart_parent_clk[] = {
@@ -1180,6 +1239,7 @@ static void __init colibri_t30_uart_init(void)
 	colibri_t30_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
 	tegra_uarta_device.dev.platform_data = &colibri_t30_uart_pdata;
 	tegra_uartb_device.dev.platform_data = &colibri_t30_uart_pdata;
+	tegra_uartc_device.dev.platform_data = &colibri_t30_uart_pdata;
 	tegra_uartd_device.dev.platform_data = &colibri_t30_uart_pdata;
 
 	/* Register low speed only if it is selected */
@@ -1493,6 +1553,7 @@ static struct platform_device *colibri_t30_devices[] __initdata = {
 	&colibri_t30_keys_device,
 #endif
 	&colibri_t30_wifi_leds,
+	&pps_gpio_device,
 	&tegra_ahub_device,
 	&tegra_dam_device0,
 	&tegra_dam_device1,
