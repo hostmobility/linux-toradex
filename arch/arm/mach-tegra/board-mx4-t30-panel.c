@@ -330,12 +330,10 @@ static struct nvhost_device colibri_t30_disp2_device = {
 	},
 };
 #else /* CONFIG_TEGRA_DC */
-#ifndef COLIBRI_T30_VI
 static int colibri_t30_disp1_check_fb(struct device *dev, struct fb_info *info)
 {
 	return 0;
 }
-#endif
 #endif /* CONFIG_TEGRA_DC */
 
 #if defined(CONFIG_TEGRA_NVMAP)
