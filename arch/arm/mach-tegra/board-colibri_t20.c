@@ -1130,21 +1130,13 @@ static struct platform_device tegra_nand_device = {
 static struct gpio_led status_leds[] = {
 	[0] =  {
 		/* Global on switch for LEDs */
-		.name = "mx4-ct-wifi",
-		.default_trigger = "netdev",
-		.gpio = (MX4_CT_WIFI_LED),
-		.active_low = 0,
-		.default_state = LEDS_GPIO_DEFSTATE_OFF,
-	},
-	[1] =  {
-		/* Global on switch for LEDs */
 		.name = "mx4-wifi",
 		.default_trigger = "netdev",
 		.gpio = (MX4_WIFI_LED),
 		.active_low = 0,
 		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
-	[2] =  {
+	[1] =  {
 		/* WIFI-RED on MX-4 T20 */
 		.name = "mx4-wifi-red",
 		.default_trigger = "none",
