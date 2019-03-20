@@ -48,7 +48,7 @@
 			};
 
 			uarta {
-				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				nvidia,tristate = <TEGRA_PIN_ENABLE>;
 			};
 
 			/* a.k.a uartb */
