@@ -91,6 +91,7 @@
 	};
 
 	serial@70006000 {
+		compatible = "nvidia,tegra20-hsuart";
 		status = "okay";
 	};
 
