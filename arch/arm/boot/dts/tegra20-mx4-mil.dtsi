@@ -95,17 +95,17 @@
 	};
 
 	serial@70006040 {
-		//compatible = "nvidia,tegra20-hsuart";
+		compatible = "nvidia,tegra20-hsuart";
 		status = "okay";
 	};
 
 	serial@70006200 {
-		//compatible = "nvidia,tegra20-hsuart";
+		compatible = "nvidia,tegra20-hsuart";
 		status = "okay";
 	};
 
 	serial@70006300 {
-		//compatible = "nvidia,tegra20-hsuart";
+		compatible = "nvidia,tegra20-hsuart";
 		status = "okay";
 	};
 
