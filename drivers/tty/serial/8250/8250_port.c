@@ -1756,7 +1756,7 @@ static void serial8250_read_char(struct uart_8250_port *up, unsigned char lsr)
 unsigned char serial8250_rx_chars(struct uart_8250_port *up, unsigned char lsr)
 {
 	struct uart_port *port = &up->port;
-	int max_count = 256;
+	int max_count = 32;
 
 	do {
 		serial8250_read_char(up, lsr);
