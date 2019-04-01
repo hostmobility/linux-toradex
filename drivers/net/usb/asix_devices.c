@@ -20,6 +20,7 @@
  */
 
 #include "asix.h"
+#include <linux/ctype.h>
 
 #define PHY_MODE_MARVELL	0x0000
 #define MII_MARVELL_LED_CTRL	0x0018
@@ -43,6 +44,49 @@
 
 #define AX88772A_PHY16H		0x16
 #define AX88772A_PHY16H_DEFAULT 0x4044
+
+static char g_mac_addr[1][ETH_ALEN];
+static int g_usr_mac = 0;
+static int g_mac_alloc[1] = {-1};
+
+/* Retrieve user set MAC address */
+static int setup_mac(char *macstr, int mac_nr) 
+{
+	int i, j;
+	unsigned char result, value;
+
+	for (i = 0; i < ETH_ALEN; i++) {
+		result = 0;
+
+		if (i != 5 && *(macstr + 2) != ':')
+			return -1;
+
+		for (j = 0; j < 2; j++) {
+			if (isxdigit(*macstr)
+			    && (value =
+				isdigit(*macstr) ? *macstr -
+				'0' : toupper(*macstr) - 'A' + 10) < 16) {
+				result = result * 16 + value;
+				macstr++;
+			} else
+				return -1;
+		}
+
+		macstr++;
+		g_mac_addr[mac_nr][i] = result;
+	}
+
+	g_usr_mac = 1;
+
+	return 0;
+}
+static int __init setup_asix_mac(char *macstr)
+{
+    g_mac_alloc[0] = setup_mac(macstr, 0);
+    return g_mac_alloc[0];
+}
+
+__setup("asix_mac=", setup_asix_mac);
 
 struct ax88172_int_data {
 	__le16 res1;
@@ -691,6 +735,8 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
 	u32 phyid;
 	struct asix_common_private *priv;
 
+	u8 default_asix_mac[ETH_ALEN] = { 0x00, 0x0e, 0xc6, 0x87, 0x72, 0x01 };
+	
 	usbnet_get_endpoints(dev,intf);
 
 	/* Get the MAC address */
@@ -711,7 +757,30 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
 		return ret;
 	}
 
+	/* Check for default ASIX MAC (e.g. 00:0e:c6:87:72:01) in case of no EEPROM being present */
+	if (!memcmp(buf, default_asix_mac, ETH_ALEN)) {
+		if (g_usr_mac && (g_usr_mac < 2)) {
+			/* Get user set MAC address */
+            if (!g_mac_alloc[0]) {
+                g_mac_alloc[0] = 1;
+                memcpy(buf, g_mac_addr[0], ETH_ALEN);
+                g_usr_mac++;
+            }
+            else {
+                /* No user configured mac free. Use default asix mac. */
+                memcpy(buf, default_asix_mac, ETH_ALEN);
+            }
+
+		} else netdev_dbg(dev->net, "using default ASIX MAC, %d", g_usr_mac);
+	}
 	asix_set_netdev_dev_addr(dev, buf);
+
+	/* Set the MAC address */
+	// if ((ret = asix_write_cmd (dev, AX_CMD_WRITE_NODE_ID,
+	// 		0, 0, ETH_ALEN, buf)) < 0) {
+	// 	deverr(dev, "set MAC address failed: %d", ret);
+	// 	goto err_out;
+	// }
 
 	/* Initialize MII structure */
 	dev->mii.dev = dev->net;
@@ -764,6 +833,13 @@ static int ax88772_bind(struct usbnet *dev, struct usb_interface *intf)
 
 static void ax88772_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
+	/* Check for user set MAC address */
+	if (!memcmp(dev->net->dev_addr, g_mac_addr[0], ETH_ALEN))
+	{
+		/* Release user set MAC address */
+		g_mac_alloc[0] = 0;
+		g_usr_mac--;
+	}
 	asix_rx_fixup_common_free(dev->driver_priv);
 	kfree(dev->driver_priv);
 }
