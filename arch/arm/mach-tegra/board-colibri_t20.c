@@ -824,6 +824,11 @@ static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
 		I2C_BOARD_INFO("pcf85063", 0x51),
 	},
 #endif
+#ifdef CONFIG_AD525X_DPOT
+    	{
+		I2C_BOARD_INFO("ad5246", 0x2E),
+	},
+#endif
 #ifdef CONFIG_MXC_MMA845X
 	{
 		I2C_BOARD_INFO("mma845x", 0x1C),
