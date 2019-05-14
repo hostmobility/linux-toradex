@@ -43,9 +43,6 @@
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 			
-			i2c1 {
-				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-			};
 			sdio4 {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
