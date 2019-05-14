@@ -43,6 +43,19 @@
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 			
+			/* ACC-INT1 */
+			pwm {
+				nvidia,pins = "sdc";
+				nvidia,function = "pwm";
+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+			};
+			
+			i2c1 {
+				nvidia,pull = <TEGRA_PIN_PULL_UP>;
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
 			sdio4 {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
@@ -121,8 +134,10 @@
 		mma8452q@1c {
 			compatible = "fsl,mma8452";
 			reg = <0x1c>;
+			clock-frequency = <100000>;
 			interrupt-parent = <&gpio>;
-			interrupts = <TEGRA_GPIO(B, 6) GPIO_ACTIVE_LOW>;
+			interrupt-names = "INT1";
+			interrupts = <TEGRA_GPIO(B, 6) GPIO_ACTIVE_HIGH>;
 		};
 	};
 
