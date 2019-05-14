@@ -42,7 +42,10 @@
 			i2cddc {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
-
+			
+			i2c1 {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
 			sdio4 {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
@@ -112,13 +115,15 @@
 	i2c_ddc: i2c@7000c400 {
 		status = "okay";
 		
+	};
+	
+	i2c1: i2c@7000c000 {
+		status = "okay";
 		acc: mma8452q@1c {
 			compatible = "fsl,mma8452";
 			reg = <0x1c>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_acc>;
-			interrupt-parent = <&gpio1>;
-			interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+			interrupt-parent = <&gpio>;
+			interrupts = <TEGRA_GPIO(B, 6) IRQ_TYPE_EDGE_FALLING>;
 		};
 	};
 
