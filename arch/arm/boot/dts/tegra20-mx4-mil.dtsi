@@ -111,6 +111,15 @@
 
 	i2c_ddc: i2c@7000c400 {
 		status = "okay";
+		
+		acc: mma8452q@1c {
+			compatible = "fsl,mma8452";
+			reg = <0x1c>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_acc>;
+			interrupt-parent = <&gpio1>;
+			interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
+		};
 	};
 
 	usb@c5000000 {
