@@ -117,13 +117,15 @@
 		
 	};
 	
-	i2c1: i2c@7000c000 {
+	i2c@7000c000 {
 		status = "okay";
-		acc: mma8452q@1c {
+		clock-frequency = <100000>;
+		
+		mma8452q@1c {
 			compatible = "fsl,mma8452";
 			reg = <0x1c>;
 			interrupt-parent = <&gpio>;
-			interrupts = <TEGRA_GPIO(B, 6) IRQ_TYPE_EDGE_FALLING>;
+			interrupts = <TEGRA_GPIO(B, 6) GPIO_ACTIVE_LOW>;
 		};
 	};
 
