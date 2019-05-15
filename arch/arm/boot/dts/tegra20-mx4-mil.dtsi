@@ -42,7 +42,19 @@
 			i2cddc {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
-
+			
+			/* ACC-INT1 */
+			acc_int1 {
+				nvidia,pins = "sdc";
+				nvidia,function = "sdio3";
+				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+			};
+			
+			i2c1 {
+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+			};
 			sdio4 {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
@@ -111,6 +123,21 @@
 
 	i2c_ddc: i2c@7000c400 {
 		status = "okay";
+		
+	};
+	
+	i2c@7000c000 {
+		status = "okay";
+		clock-frequency = <100000>;
+		
+		mma8452q@1c {
+			compatible = "fsl,mma8452";
+			reg = <0x1c>;
+			clock-frequency = <100000>;
+			interrupt-parent = <&gpio>;
+			interrupt-names = "INT1";
+			interrupts = <TEGRA_GPIO(B, 6) GPIO_ACTIVE_HIGH>;
+		};
 	};
 
 	usb@c5000000 {
