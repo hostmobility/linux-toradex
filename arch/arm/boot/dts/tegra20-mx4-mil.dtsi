@@ -65,6 +65,7 @@
 
 			/* a.k.a uartb */
 			irda {
+				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 
@@ -112,7 +113,6 @@
 	};
 
 	serial@70006200 {
-		compatible = "nvidia,tegra20-hsuart";
 		status = "okay";
 	};
 
