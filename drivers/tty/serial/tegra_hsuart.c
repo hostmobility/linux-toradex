@@ -62,8 +62,8 @@
 #define TEGRA_UART_IRDA_CSR	0x8
 #define TEGRA_UART_SIR_ENABLED	0x80
 
-#define TX_FORCE_PIO 1
-#define RX_FORCE_PIO 1
+#define TX_FORCE_PIO 0
+#define RX_FORCE_PIO 0
 
 const int dma_req_sel[] = {
 	TEGRA_DMA_REQ_SEL_UARTA,
@@ -953,6 +953,7 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 
 static int tegra_startup(struct uart_port *u)
 {
+	bool disable_dma_hack = false;
 	struct tegra_uart_port *t = container_of(u,
 		struct tegra_uart_port, uport);
 	int ret = 0;
@@ -961,8 +962,23 @@ static int tegra_startup(struct uart_port *u)
 	t = container_of(u, struct tegra_uart_port, uport);
 	sprintf(t->port_name, "tegra_uart_%d", u->line);
 
+	switch (u->line)
+	{
+		case 0: //t20=j1708=UartA=ttyHS0=uart0
+		case 1: //t20=RS485=UartC=ttyHS1=uart2
+			disable_dma_hack = false;
+			break;
+		case 2: //t20=rs232-1=UartB=ttyHS2=uart4
+		case 3: //t20=rs232-2=UartD=ttyHS3=uart3
+			disable_dma_hack = true;
+			break;
+		default:
+			disable_dma_hack = false;
+			break;
+	}
+
 	t->use_tx_dma = false;
-	if (!TX_FORCE_PIO) {
+	if (!TX_FORCE_PIO && !disable_dma_hack) {
 		t->tx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT,
 					"uart_tx_%d", u->line);
 		if (t->tx_dma)
@@ -990,7 +1006,7 @@ static int tegra_startup(struct uart_port *u)
 	t->tx_in_progress = 0;
 
 	t->use_rx_dma = false;
-	if (!RX_FORCE_PIO && t->rx_dma_req.virt_addr) {
+	if (!RX_FORCE_PIO && t->rx_dma_req.virt_addr && !disable_dma_hack) {
 		if (!tegra_uart_init_rx_dma(t))
 			t->use_rx_dma = true;
 	}
