@@ -63,15 +63,12 @@
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 
-			/* a.k.a uartb */
-			irda {
+			uartc {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 
-			uartc {
-				nvidia,pins = "uca";
-				nvidia,function = "uartc";
-				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+			/* a.k.a uartb */
+			irda {
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
 
