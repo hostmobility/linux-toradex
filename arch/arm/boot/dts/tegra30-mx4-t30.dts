@@ -11,6 +11,7 @@
 		serial0 = &uarta;
 		serial1 = &uartb;
 		serial2 = &uartd;
+		mmc0 = "/sdhci@78000600"; /* eMMC */
 	};
 
 	pinmux@70000868 {
@@ -52,15 +53,6 @@
 				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
 				nvidia,tristate = <TEGRA_PIN_ENABLE>;
 				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
-			};
-
-			/* multiplexed with SDMMC3_DAT4 gated GMI_WR_N*/
-			lcd_wr_n_pz3 {
-				nvidia,pins = "lcd_wr_n_pz3";
-				nvidia,function = "rsvd";
-				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-				nvidia,tristate = <TEGRA_PIN_ENABLE>;
-				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 			};
 
 			/* CAN-1-INT */
@@ -115,7 +107,11 @@
 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
 			};
 
-			/* Thermal alert, need to be disabled */
+			/*
+			 * THERMD_ALERT#, unlatched I2C address pin of LM95245
+			 * temperature sensor therefore requires disabling for
+			 * now
+			 */
 			lcd_dc1_pd2 {
 				nvidia,pins = "lcd_dc1_pd2";
 				nvidia,function = "rsvd3";
@@ -169,8 +165,7 @@
 						"ulpi_data3_po4",
 						"ulpi_data4_po5",
 						"ulpi_data5_po6",
-						"ulpi_data6_po7",
-						"ulpi_data7_po0";
+						"ulpi_data6_po7";
 				nvidia,function = "uarta";
 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
@@ -217,6 +212,71 @@
 				nvidia,pull = <TEGRA_PIN_PULL_UP>;
 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
 			};
+
+			mmc1_pins_default: pinmux_mmc1_pins_default {
+				sdmmc1_clk_pz0 {
+					nvidia,pins = "sdmmc1_clk_pz0";
+					nvidia,function = "sdmmc1";
+					nvidia,pull = <TEGRA_PIN_PULL_UP>; /*0*/
+					nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				};
+				sdmmc1_cmd_pz1 {
+					nvidia,pins = "sdmmc1_cmd_pz1",
+							"sdmmc1_dat0_py7",
+							"sdmmc1_dat1_py6",
+							"sdmmc1_dat2_py5",
+							"sdmmc1_dat3_py4";
+					nvidia,function = "sdmmc1";
+					nvidia,pull = <TEGRA_PIN_PULL_UP>;/*3*/
+					nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				};
+			};
+
+			mmc1_pins_sleep: pinmux_mmc1_pins_sleep {
+				sdmmc1_clk_pz0 {
+					nvidia,pins = "sdmmc1_clk_pz0";
+					nvidia,function = "sdmmc1";
+					nvidia,pull = <TEGRA_PIN_PULL_UP>; /*7*/
+					nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				};
+				sdmmc1_cmd_pz1 {
+					nvidia,pins = "sdmmc1_cmd_pz1",
+							"sdmmc1_dat0_py7",
+							"sdmmc1_dat1_py6",
+							"sdmmc1_dat2_py5",
+							"sdmmc1_dat3_py4";
+					nvidia,function = "sdmmc1";
+					nvidia,pull = <TEGRA_PIN_PULL_UP>;/*7*/
+					nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				};
+			};
+
+			wlan_pins_default: pinmux_wlan_pins_default {
+				/*WLAN EN*/
+				ulpi_data7_po0 {
+					nvidia,pins =	"ulpi_data7_po0";
+					nvidia,function = "sdmmc1";
+					nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+					nvidia,tristate = <TEGRA_PIN_DISABLE>;
+				};
+				/*WLAN IRQ*/
+				pex_l2_prsnt_n_pdd7 {
+					nvidia,pins =	"pex_l2_prsnt_n_pdd7";
+					nvidia,function = "sdmmc1";
+					nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+					nvidia,tristate = <TEGRA_PIN_DISABLE>;
+					nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+				};
+				/* BT EN, not used */
+				pex_l2_rst_n_pcc6 {
+					nvidia,pins =	"pex_l2_rst_n_pcc6";
+					nvidia,function = "sdmmc1";
+					nvidia,pull = <TEGRA_PIN_PULL_UP>;
+					nvidia,tristate = <TEGRA_PIN_DISABLE>;
+					nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+				};
+			};
+
 		};
 	};
 
@@ -379,6 +439,18 @@
 		vbus-supply = <&usbh_vbus_reg>;
 	};
 
+	wlan_en_reg: fixedregulator@2 {
+		compatible = "regulator-fixed";
+		regulator-name = "wlan-en-regulator";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		startup-delay-us = <70000>;
+
+		/* WLAN_EN GPIO for this board - Tegra BankO, pin0 */
+		gpio = <&gpio TEGRA_GPIO(O, 0) GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+	};
+
 	regulators {
 		sys_5v0_reg: regulator@1 {
 			compatible = "regulator-fixed";
@@ -407,6 +479,27 @@
 			regulator-max-microvolt = <5000000>;
 			gpio = <&gpio TEGRA_GPIO(W, 2) GPIO_ACTIVE_LOW>;
 			vin-supply = <&sys_5v0_reg>;
+		};
+	};
+
+	mmc1 {
+		status = "okay";
+		vmmc-supply = <&wlan_en_reg>;
+		bus-width = <4>;
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&mmc1_pins_default &wlan_pins_default>;
+		ti,non-removable;
+		ti,needs-special-hs-handling;
+		cap-power-off-card;
+		keep-power-in-suspend;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+		wlcore: wlcore@0 {
+			compatible = "ti,wl1835";
+			reg = <2>;
+			interrupt-parent = <&gpio>;
+			interrupts = <TEGRA_GPIO(O, 0) IRQ_TYPE_EDGE_RISING>;
 		};
 	};
 };
