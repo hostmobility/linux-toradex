@@ -439,17 +439,6 @@
 		vbus-supply = <&usbh_vbus_reg>;
 	};
 
-	wlan_en_reg: fixedregulator@2 {
-		compatible = "regulator-fixed";
-		regulator-name = "wlan-en-regulator";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-		startup-delay-us = <70000>;
-
-		/* WLAN_EN GPIO for this board - Tegra BankO, pin0 */
-		gpio = <&gpio TEGRA_GPIO(O, 0) GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-	};
 
 	regulators {
 		sys_5v0_reg: regulator@1 {
@@ -479,6 +468,19 @@
 			regulator-max-microvolt = <5000000>;
 			gpio = <&gpio TEGRA_GPIO(W, 2) GPIO_ACTIVE_LOW>;
 			vin-supply = <&sys_5v0_reg>;
+		};
+
+		wlan_en_reg: regulator@4 {
+			compatible = "regulator-fixed";
+			reg = <4>;
+			regulator-name = "wlan-en-regulator";
+			regulator-min-microvolt = <1800000>;
+			regulator-max-microvolt = <1800000>;
+			startup-delay-us = <70000>;
+
+			/* WLAN_EN GPIO for this board - Tegra BankO, pin0 */
+			gpio = <&gpio TEGRA_GPIO(O, 0) GPIO_ACTIVE_HIGH>;
+			enable-active-high;
 		};
 	};
 
