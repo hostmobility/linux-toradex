@@ -459,6 +459,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
 	imx7d-colibri-eval-v3.dtb \
 	imx7d-colibri-emmc-eval-v3.dtb \
 	imx7s-colibri-eval-v3.dtb \
+	mx4-d71.dtb \
 	imx7d-sdb.dtb \
 	imx7d-sdb-epdc.dtb \
 	imx7d-sdb-gpmi-weim.dtb \
