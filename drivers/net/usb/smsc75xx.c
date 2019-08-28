@@ -1273,7 +1273,7 @@ static int smsc75xx_reset(struct usbnet *dev)
 		}
 
 		buf &= ~(LED_GPIO_CFG_LED2_FUN_SEL | LED_GPIO_CFG_LED10_FUN_SEL);
-		buf |= LED_GPIO_CFG_LEDGPIO_EN | LED_GPIO_CFG_LED2_FUN_SEL;
+		buf |= LED_GPIO_CFG_LEDGPIO_EN | LED_GPIO_CFG_LED2_FUN_SEL | LED_GPIO_CFG_LED10_FUN_SEL;
 
 		ret = smsc75xx_write_reg(dev, LED_GPIO_CFG, buf);
 		if (ret < 0) {
