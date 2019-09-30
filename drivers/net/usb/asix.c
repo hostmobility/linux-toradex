@@ -42,11 +42,10 @@
 #include "axusbnet.c"
 #include "asix.h"
 
-#define DRV_VERSION	"4.17.0"
+#define DRV_VERSION	"4.23.0"
 
 static char version[] =
 KERN_INFO "ASIX USB Ethernet Adapter:v" DRV_VERSION
-	" " __TIME__ " " __DATE__ "\n"
 	"    http://www.asix.com.tw\n";
 
 static char g_mac_addr[2][ETH_ALEN];
@@ -72,6 +71,7 @@ static void ax8817x_mdio_write_le(struct net_device *netdev, int phy_id,
 				  int loc, int val);
 static int ax8817x_mdio_read_le(struct net_device *netdev, int phy_id, int loc);
 static int ax88772b_set_csums(struct usbnet *dev);
+static int ax88772b_external_phyinit(struct usbnet *dev);
 
 /* Retrieve user set MAC address */
 static int setup_mac(char *macstr, int mac_nr)
@@ -170,13 +170,17 @@ static int ax8817x_set_mac_addr(struct net_device *net, void *p)
 {
 	struct usbnet *dev = netdev_priv(net);
 	struct sockaddr *addr = p;
+	int ret;
 
 	memcpy(net->dev_addr, addr->sa_data, ETH_ALEN);
 
 	/* Set the MAC address */
-	return ax8817x_write_cmd(dev, AX88772_CMD_WRITE_NODE_ID,
+	ret = ax8817x_write_cmd(dev, AX88772_CMD_WRITE_NODE_ID,
 				 0, 0, ETH_ALEN, net->dev_addr);
-
+	if (ret < 0)
+		return ret;
+	
+	return 0;
 }
 
 static void ax88178_status(struct usbnet *dev, struct urb *urb)
@@ -540,7 +544,7 @@ static void ax8817x_set_multicast(struct net_device *net)
 			mc_list = mc_list->next;
 		}
 #else
-		struct netdev_hw_addr *ha;
+		struct netdev_hw_addr *ha = NULL;
 		memset(data->multi_filter, 0, AX_MCAST_FILTER_SIZE);
 		netdev_for_each_mc_addr(ha, net) {
 			crc_bits = ether_crc(ETH_ALEN, ha->addr) >> 26;
@@ -600,7 +604,7 @@ static void ax88178_set_multicast(struct net_device *net)
 			mc_list = mc_list->next;
 		}
 #else
-		struct netdev_hw_addr *ha;
+		struct netdev_hw_addr *ha = NULL;
 		memset(data->multi_filter, 0, AX_MCAST_FILTER_SIZE);
 		netdev_for_each_mc_addr(ha, net) {
 			crc_bits = ether_crc(ETH_ALEN, ha->addr) >> 26;
@@ -660,7 +664,7 @@ static void ax88772b_set_multicast(struct net_device *net)
 			mc_list = mc_list->next;
 		}
 #else
-		struct netdev_hw_addr *ha;
+		struct netdev_hw_addr *ha = NULL;
 		memset(data->multi_filter, 0, AX_MCAST_FILTER_SIZE);
 		netdev_for_each_mc_addr(ha, net) {
 			crc_bits = ether_crc(ETH_ALEN, ha->addr) >> 26;
@@ -681,7 +685,7 @@ static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u16 *res, ret;
-	u8 smsr;
+	u8* smsr;
 	int i = 0;
 
 	res = kmalloc(2, GFP_ATOMIC);
@@ -690,12 +694,13 @@ static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
 
 	do {
 		ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
-
+		
 		msleep(1);
 
-		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, &smsr);
-	} while (!(smsr & AX_HOST_EN) && (i++ < 30));
-
+		smsr = (u8*) res;
+		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, smsr);
+	} while (!(*smsr & AX_HOST_EN) && (i++ < 30));
+	
 	ax8817x_read_cmd(dev, AX_CMD_READ_MII_REG, phy_id, (__u16)loc, 2, res);
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, NULL);
 
@@ -742,21 +747,23 @@ ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, int val)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u16 *res;
-	u8 smsr;
+	u8* smsr;
 	int i = 0;
 
 	res = kmalloc(2, GFP_ATOMIC);
 	if (!res)
 		return;
-	*res = val;
+	smsr = (u8 *) res;
 
 	do {
 		ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
 
 		msleep(1);
 
-		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, &smsr);
-	} while (!(smsr & AX_HOST_EN) && (i++ < 30));
+		ax8817x_read_cmd(dev, AX_CMD_READ_STATMNGSTS_REG, 0, 0, 1, smsr);
+	} while (!(*smsr & AX_HOST_EN) && (i++ < 30));	
+	
+	*res = val;
 
 	ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG, phy_id,
 			  (__u16)loc, 2, res);
@@ -860,7 +867,6 @@ static int ax88772b_suspend(struct usb_interface *intf,
 	struct ax88772b_data *ax772b_data = (struct ax88772b_data *)dev->priv;
 	u16 *tmp16;
 	u8 *opt;
-//	u32 tmp32;
 
 	tmp16 = kmalloc(2, GFP_ATOMIC);
 	if (!tmp16)
@@ -868,11 +874,11 @@ static int ax88772b_suspend(struct usb_interface *intf,
 	opt = (u8 *)tmp16;
 #if 0
 	/* Read Wake-up Frame Array Register (Mask Wakeup Timer) */
-	ax8817x_read_cmd(dev, AX_CMD_READ_WKFARY, 0x0b, 0, 4, &tmp32);
+	ax8817x_read_cmd(dev, AX_CMD_READ_WKFARY, 0x11, 0, 4, &tmp32);
 	tmp32 &= 0xFFF0FFFF;
 	/* 8 second */
-	tmp32 |= 0xFFF2FFFF;
-	ax8817x_write_cmd(dev, AX_CMD_WRITE_WKFARY, 0x0b, 0, 4, &tmp32);
+	tmp32 |= 0x00020000;
+	ax8817x_write_cmd(dev, AX_CMD_WRITE_WKFARY, 0x11, 0, 4, &tmp32);
 #endif
 	/* Preserve BMCR for restoring */
 	ax772b_data->presvd_phy_bmcr = ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, MII_BMCR);
@@ -890,6 +896,7 @@ static int ax88772b_suspend(struct usb_interface *intf,
 		ax8817x_write_cmd(dev, AX_CMD_SW_RESET,
 				  AX_SWRESET_IPRL | AX_SWRESET_IPPD,
 				  0, 0, NULL);
+				  
 	} else {
 
 		if (ax772b_data->psc & AX_SWRESET_WOLLP) {
@@ -1159,7 +1166,11 @@ static int access_eeprom_mac(struct usbnet *dev, u8 *buf, u8 offset, bool wflag)
 
 	if (!wflag) {
 		if (ret < 0) {
-			netdev_dbg(dev->net, "Failed to read MAC address from EEPROM: %d\n", ret);
+			#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 34)
+				netdev_dbg(dev->net, "Failed to read MAC address from EEPROM: %d\n", ret);
+			#else
+				devdbg(dev, "Failed to read MAC address from EEPROM: %d\n", ret);
+			#endif
 			return ret;
 		}
 		memcpy(dev->net->dev_addr, buf, ETH_ALEN);
@@ -1205,15 +1216,15 @@ static int ax8817x_check_ether_addr(struct usbnet *dev)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
 		dev->net->addr_assign_type |= NET_ADDR_RANDOM;
 #endif
-		random_ether_addr(dev->net->dev_addr);
+		random_ether_addr(dev->net->dev_addr); 
 #endif
 		*tmp = 0;
 		*(tmp + 1) = 0x0E;
 		*(tmp + 2) = 0xC6;
 		*(tmp + 3) = 0x8F;
 
-		return -EADDRNOTAVAIL;
-	}
+		return -EADDRNOTAVAIL;	
+	} 
 	return 0;
 }
 
@@ -1275,7 +1286,7 @@ static int ax8817x_get_mac(struct usbnet *dev, u8* buf)
 	/* Set the MAC address */
 	ax8817x_write_cmd (dev, AX88772_CMD_WRITE_NODE_ID, 0, 0,
 			   ETH_ALEN, dev->net->dev_addr);
-
+	
 	if (ret < 0) {
 		deverr(dev, "Failed to write MAC address: %d", ret);
 		goto out;
@@ -1805,7 +1816,7 @@ static int ax88772a_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (ret < 0) {
 		deverr(dev, "Get HW address failed: %d", ret);
 		goto out2;
-	}
+	}	
 
 	/* make sure the driver can enable sw mii operation */
 	ret = ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, NULL);
@@ -1863,7 +1874,7 @@ static int ax88772a_bind(struct usbnet *dev, struct usb_interface *intf)
 		if (tmp32 != (AX88772A_IPG2_DEFAULT << 16 |
 			AX88772A_IPG1_DEFAULT << 8 | AX88772A_IPG0_DEFAULT)) {
 			printk("Non-authentic ASIX product\nASIX does not support it\n");
-			ret = -ENODEV;
+			ret = -ENODEV;		
 			goto out2;
 		}
 	}
@@ -2029,20 +2040,18 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	struct ax8817x_data *data = (struct ax8817x_data *)&dev->data;
 	struct ax88772b_data *ax772b_data;
 	u16 *tmp16;
+	u8  *tmp8;
 	u8 tempphyselect;
 	bool internalphy;
 
 	printk(version);
-
 	axusbnet_get_endpoints(dev, intf);
-
 	buf = kmalloc(6, GFP_KERNEL);
 	if (!buf) {
 		deverr(dev, "Cannot allocate memory for buffer");
 		return -ENOMEM;
 	}
 	tmp16 = (u16 *)buf;
-
 	ax772b_data = kmalloc(sizeof(*ax772b_data), GFP_KERNEL);
 	if (!ax772b_data) {
 		deverr(dev, "Cannot allocate memory for AX88772B data");
@@ -2051,7 +2060,6 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	}
 	memset(ax772b_data, 0, sizeof(*ax772b_data));
 	dev->priv = ax772b_data;
-
 	ax772b_data->ax_work = create_singlethread_workqueue("ax88772b");
 	if (!ax772b_data->ax_work) {
 		kfree(buf);
@@ -2065,15 +2073,18 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 #else
 	INIT_WORK(&ax772b_data->check_link, ax88772b_link_reset);
 #endif
+
+	tmp8 = (u8 *)buf;
 	ret = ax8817x_read_cmd(dev, AX_CMD_SW_PHY_STATUS,
-			       0, 0, 1, &tempphyselect);
+			       0, 0, 1, tmp8);
+
 	if (ret < 0) {
 		deverr(dev,
 		       "read SW interface selection status register failed: %d\n",
 		       ret);
 		goto err_out;
 	}
-
+	tempphyselect = *tmp8;
 	tempphyselect &= 0x0C;
 
 	if (tempphyselect == AX_PHYSEL_SSRMII) {
@@ -2097,7 +2108,7 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_GPIOS, AXGPIOS_RSE,
 				0, 0, NULL);
 	if (ret < 0) {
-		deverr(dev, "Failed to enable GPIO finction: %d", ret);
+		deverr(dev, "Failed to enable GPIO function: %d", ret);
 		goto err_out;
 	}
 	msleep(5);
@@ -2202,6 +2213,14 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 	data->suspend = ax88772b_suspend;
 	data->resume = ax88772b_resume;
 
+	if ((ax772b_data->OperationMode == OPERATION_MAC_MODE) &&
+	    (ax772b_data->PhySelect == 0x00)) {
+		if (ax88772b_external_phyinit(dev) != 0x00) {
+			deverr(dev, "Failed to initial the external phy");
+			goto err_out;
+		}
+	}
+
 	if (ax772b_data->OperationMode == OPERATION_PHY_MODE)
 		ax8817x_mdio_write_le(dev->net, dev->mii.phy_id
 						, MII_BMCR, 0x3900);
@@ -2215,7 +2234,7 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 		*tmp16 = ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, 0x12);
 		ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, 0x12,
 					((*tmp16 & 0xFF9F) | 0x0040));
-	}
+	}	
 
 	ax8817x_mdio_write_le(dev->net, dev->mii.phy_id, MII_ADVERTISE,
 			ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
@@ -2249,7 +2268,7 @@ static int ax88772b_bind(struct usbnet *dev, struct usb_interface *intf)
 		if (tmp32 != (AX88772A_IPG2_DEFAULT << 16 |
 			AX88772A_IPG1_DEFAULT << 8 | AX88772A_IPG0_DEFAULT)) {
 			printk("Non-authentic ASIX product\nASIX does not support it\n");
-			ret = -ENODEV;
+			ret = -ENODEV;		
 			goto err_out;
 		}
 	}
@@ -2320,12 +2339,66 @@ err_out:
 	return ret;
 }
 
+static int ax88772b_external_phyinit(struct usbnet *dev) {
+	struct ax88772b_data *ax772b_data = (struct ax88772b_data *)dev->priv;
+	u16 phyid1, phyid2;
+
+	phyid1 = ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, 0x02);
+	phyid2 = ax8817x_mdio_read_le(dev->net, dev->mii.phy_id, 0x03);
+	ax772b_data->ext_phy_oui = EXTPHY_ID_MASK_OUI(phyid1, phyid2);
+	ax772b_data->ext_phy_model = EXTPHY_ID_MASK_MODEL(phyid2);
+
+	if (ax772b_data->ext_phy_oui == EXTPHY_BROADCOM_OUI) { 
+		if(ax772b_data->ext_phy_model == EXTPHY_BCM89811_MODEL) {			
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x0, 0x8000);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0028);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0028);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0028);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0028);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0028);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0028);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1F, 0x0c00);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1E, 0x030A);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1F, 0x3440);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1E, 0x0166);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1F, 0x0020);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x012D);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x9B52);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x012E);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0xA04D);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0123);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x00c0);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0154);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x81C4);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0811);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x0000);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x01D3);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x0064);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x01C1);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0xA5F7);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0028);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x0400);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x001D);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x3411);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0820);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x0401);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x002F);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0xF167);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1e, 0x0045);
+			ax88772b_mdio_write_le(dev->net, dev->mii.phy_id, 0x1f, 0x0500);
+			return 0;
+		}
+	}
+
+	return 0;
+}
+
 static void ax88772b_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct ax88772b_data *ax772b_data = (struct ax88772b_data *)dev->priv;
 
 	if (ax772b_data) {
-		/* Check for user set MAC address */
+				/* Check for user set MAC address */
 		if (!memcmp(dev->net->dev_addr, g_mac_addr[0], ETH_ALEN))
         {
 			/* Release user set MAC address */
@@ -3245,7 +3318,7 @@ static int ax88772_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 	u8  *head;
 	u32  header;
 	char *packet;
-	struct sk_buff *ax_skb;
+	struct sk_buff *ax_skb = NULL;
 	u16 size;
 
 	head = (u8 *) skb->data;
@@ -3289,7 +3362,7 @@ static int ax88772_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 #ifndef RX_SKB_COPY
 		ax_skb = skb_clone(skb, GFP_ATOMIC);
 #else
-		ax_skb = alloc_skb(size + NET_IP_ALIGN, GFP_ATOMIC);
+		ax_skb = alloc_skb(size + NET_IP_ALIGN, GFP_ATOMIC);	
 		skb_reserve(ax_skb, NET_IP_ALIGN);
 #endif
 		if (ax_skb) {
@@ -3408,7 +3481,7 @@ ax88772b_rx_checksum(struct sk_buff *skb, struct ax88772b_rx_header *rx_hdr)
 static int ax88772b_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 {
 	struct ax88772b_rx_header rx_hdr;
-	struct sk_buff *ax_skb;
+	struct sk_buff *ax_skb = NULL;
 	struct ax88772b_data *ax772b_data = (struct ax88772b_data *)dev->priv;
 
 	while (skb->len > 0) {
@@ -3448,7 +3521,7 @@ static int ax88772b_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 		ax_skb = skb_clone(skb, GFP_ATOMIC);
 #else
 		ax_skb = alloc_skb(rx_hdr.len + NET_IP_ALIGN, GFP_ATOMIC);
-		skb_reserve(ax_skb, NET_IP_ALIGN);
+		skb_reserve(ax_skb, NET_IP_ALIGN);	
 #endif
 		if (ax_skb) {
 #ifndef RX_SKB_COPY
@@ -3464,7 +3537,7 @@ static int ax88772b_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 
 #else
 			skb_put(ax_skb, rx_hdr.len);
-			memcpy(ax_skb->data, skb->data + sizeof(struct ax88772b_rx_header), rx_hdr.len);
+			memcpy(ax_skb->data, skb->data + sizeof(struct ax88772b_rx_header), rx_hdr.len); 
 #endif
 
 			ax_skb->truesize = rx_hdr.len + sizeof(struct sk_buff);
@@ -3649,7 +3722,7 @@ static void ax88772_link_reset(struct work_struct *work)
 
 			if (ax772_data->presvd_phy_advertise && ax772_data->presvd_phy_bmcr) {
 				ax88772_restore_bmcr_anar(dev);
-
+				
 			} else {
 				ax8817x_mdio_write_le(dev->net, dev->mii.phy_id,
 						      MII_ADVERTISE,
@@ -3865,7 +3938,13 @@ static void ax88772b_link_reset(struct work_struct *work)
 		if (!(bmcr & BMCR_FULLDPLX))
 			mode &= ~AX88772_MEDIUM_FULL_DUPLEX;
 		if (!(bmcr & BMCR_SPEED100))
-			mode &= ~AX88772_MEDIUM_100MB;
+			mode &= ~AX88772_MEDIUM_100MB;	
+
+		if (ax772b_data->ext_phy_oui == EXTPHY_BROADCOM_OUI) {
+			if(ax772b_data->ext_phy_model == EXTPHY_BCM89811_MODEL) {
+				mode = AX88772_MEDIUM_DEFAULT;
+			}
+		}
 
 		ax8817x_write_cmd(dev, AX_CMD_WRITE_MEDIUM_MODE, mode,
 				  0, 0, NULL);
@@ -3921,7 +4000,7 @@ static void ax88772b_link_reset(struct work_struct *work)
 	}
 
 	ax772b_data->Event = AX_NOP;
-
+	
 	return;
 }
 
@@ -4093,7 +4172,23 @@ static const struct driver_info dlink_dub_e100b_info = {
 	.reset	= ax88772b_reset,
 };
 
-static const struct driver_info dlink_dub_e100b_772b_info = {
+static const struct driver_info dlink_dub_e100_772b_info = {
+	.description = "D-Link DUB-E100 USB 2.0 Fast Ethernet Adapter",
+	.bind	= ax88772b_bind,
+	.unbind = ax88772b_unbind,
+	.status = ax88772b_status,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
+	.stop	= ax88772b_stop,
+	.flags	= FLAG_ETHER | FLAG_FRAMING_AX | FLAG_HW_IP_ALIGNMENT | FLAG_AVOID_UNLINK_URBS,
+#else
+	.flags	= FLAG_ETHER | FLAG_FRAMING_AX | FLAG_HW_IP_ALIGNMENT,
+#endif
+	.rx_fixup = ax88772b_rx_fixup,
+	.tx_fixup = ax88772b_tx_fixup,
+	.reset	= ax88772b_reset,
+};
+
+static const struct driver_info dlink_dub_e100_772c_info = {
 	.description = "D-Link DUB-E100 USB 2.0 Fast Ethernet Adapter",
 	.bind	= ax88772b_bind,
 	.unbind = ax88772b_unbind,
@@ -4200,8 +4295,12 @@ static const struct usb_device_id products[] = {
 	.driver_info =  (unsigned long) &dlink_dub_e100b_info,
 }, {
 	/* DLink DUB-E100 (AX88772B)*/
-	USB_DEVICE(0x2001, 0x1a02),
-	.driver_info =  (unsigned long) &dlink_dub_e100b_772b_info,
+	USB_DEVICE_VER(0x2001, 0x1a02, 0, 1),
+	.driver_info =  (unsigned long) &dlink_dub_e100_772b_info,
+}, {
+	/* DLink DUB-E100 (AX88772C)*/
+	USB_DEVICE_VER(0x2001, 0x1a02, 0, 2),
+	.driver_info =  (unsigned long) &dlink_dub_e100_772c_info,
 }, {
 	/* Intellinet, ST Lab USB Ethernet */
 	USB_DEVICE(0x0b95, 0x1720),

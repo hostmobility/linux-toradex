@@ -368,6 +368,13 @@ struct {unsigned short size, byte_cnt, threshold; } AX88772B_BULKIN_SIZE[] = {
 #define CICADA_EXTPAGE_EN		0x0001
 #define CICADA_EXTPAGE_DIS		0x0000
 
+/* External ethernet phy */
+#define EXTPHY_ID_MASK_OUI(phyid1, phyid2) ((phyid1 << 6) | ((phyid2 & 0xFC00) >> 10))
+#define EXTPHY_ID_MASK_MODEL(phyid2) ((phyid2 & 0x3F0) >> 4) 
+
+#define EXTPHY_BROADCOM_OUI		0x2B8094
+#define EXTPHY_BCM89811_MODEL		0x02
+
 struct {unsigned short value, offset; } CICADA_FAMILY_HWINIT[] = {
 	{0x0001, 0x001f}, {0x1c25, 0x0017}, {0x2a30, 0x001f}, {0x234c, 0x0010},
 	{0x2a30, 0x001f}, {0x0212, 0x0008}, {0x52b5, 0x001f}, {0xa7fa, 0x0000},
@@ -440,6 +447,9 @@ struct ax88772b_data {
 	u8 OperationMode:1;
 	u16 presvd_phy_advertise;
 	u16 presvd_phy_bmcr;
+
+	u32 ext_phy_oui;
+	u8  ext_phy_model;
 };
 
 /* define for MAC or PHY mode */

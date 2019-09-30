@@ -37,6 +37,7 @@ struct usbnet {
 	wait_queue_head_t	*wait;
 	/* struct mutex		phy_mutex; */
 	unsigned char		suspend_count;
+	unsigned char           pkt_cnt, pkt_err;
 
 	/* i/o info: pipes etc */
 	unsigned		in, out;
@@ -70,6 +71,7 @@ struct usbnet {
 #		define EVENT_STS_SPLIT	3
 #		define EVENT_LINK_RESET	4
 #		define EVENT_RX_PAUSED	5
+#		define EVENT_RX_KILL    10
 
 	void			*priv;	/* point to minidriver private data */
 	unsigned char		rx_size;
@@ -167,7 +169,8 @@ struct cdc_state {
 enum skb_state {
 	illegal = 0,
 	tx_start, tx_done,
-	rx_start, rx_done, rx_cleanup
+	rx_start, rx_done, rx_cleanup,
+	unlink_start
 };
 
 struct skb_data {	/* skb->cb is one of these */

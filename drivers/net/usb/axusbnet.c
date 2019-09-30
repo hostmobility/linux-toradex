@@ -276,19 +276,32 @@ static struct net_device_stats *axusbnet_get_stats(struct net_device *net)
  * completion callbacks.  2.5 should have fixed those bugs...
  */
 
-static void
-defer_bh(struct usbnet *dev, struct sk_buff *skb, struct sk_buff_head *list)
+static enum skb_state defer_bh(struct usbnet *dev, struct sk_buff *skb,
+                struct sk_buff_head *list, enum skb_state state)
 {
-	unsigned long		flags;
+        unsigned long           flags;
+        enum skb_state          old_state;
+        struct skb_data *entry = (struct skb_data *) skb->cb;
 
-	spin_lock_irqsave(&list->lock, flags);
-	__skb_unlink(skb, list);
-	spin_unlock(&list->lock);
-	spin_lock(&dev->done.lock);
-	__skb_queue_tail(&dev->done, skb);
-	if (dev->done.qlen == 1)
-		tasklet_schedule(&dev->bh);
-	spin_unlock_irqrestore(&dev->done.lock, flags);
+        spin_lock_irqsave(&list->lock, flags);
+        old_state = entry->state;
+        entry->state = state;
+        __skb_unlink(skb, list);
+
+        /* defer_bh() is never called with list == &dev->done.
+         * spin_lock_nested() tells lockdep that it is OK to take
+         * dev->done.lock here with list->lock held.
+         */
+        spin_lock_nested(&dev->done.lock, SINGLE_DEPTH_NESTING);
+
+        __skb_queue_tail(&dev->done, skb);
+        if (dev->done.qlen == 1)
+                tasklet_schedule(&dev->bh);
+
+        spin_unlock(&dev->done.lock);
+        spin_unlock_irqrestore(&list->lock, flags);
+	
+        return old_state;
 }
 
 /* some work can't be done in tasklets, so we use keventd
@@ -322,6 +335,12 @@ static void rx_submit(struct usbnet *dev, struct urb *urb, gfp_t flags)
 	size_t			size = dev->rx_urb_size;
 	struct driver_info	*info = dev->driver_info;
 	u8			align;
+
+	/* prevent rx skb allocation when error ratio is high */
+	if (test_bit(EVENT_RX_KILL, &dev->flags)) {
+		    usb_free_urb(urb);
+		    return;
+	}
 
 #if (AX_FORCE_BUFF_ALIGN)
 	align = 0;
@@ -436,9 +455,10 @@ static void rx_complete(struct urb *urb)
 	struct skb_data		*entry = (struct skb_data *) skb->cb;
 	struct usbnet		*dev = entry->dev;
 	int			urb_status = urb->status;
+	enum skb_state          state;
 
 	skb_put(skb, urb->actual_length);
-	entry->state = rx_done;
+	state = rx_done;
 	entry->urb = NULL;
 
 	switch (urb_status) {
@@ -484,7 +504,7 @@ static void rx_complete(struct urb *urb)
 				devdbg(dev, "rx throttle %d", urb_status);
 		}
 block:
-		entry->state = rx_cleanup;
+		state = rx_cleanup;
 		entry->urb = urb;
 		urb = NULL;
 		break;
@@ -495,18 +515,30 @@ block:
 		/* FALLTHROUGH */
 
 	default:
-		entry->state = rx_cleanup;
+		state = rx_cleanup;
 		dev->stats.rx_errors++;
 		if (netif_msg_rx_err(dev))
 			devdbg(dev, "rx status %d", urb_status);
 		break;
 	}
 
-	defer_bh(dev, skb, &dev->rxq);
+	/* stop rx if packet error rate is high */
+        if (++dev->pkt_cnt > 30) {
+                dev->pkt_cnt = 0;
+                dev->pkt_err = 0;
+        } else {
+                if (state == rx_cleanup)
+                        dev->pkt_err++;
+                if (dev->pkt_err > 20)
+                        set_bit(EVENT_RX_KILL, &dev->flags);
+        }
+
+	state = defer_bh(dev, skb, &dev->rxq, state);
 
 	if (urb) {
 		if (netif_running(dev->net) &&
-		    !test_bit(EVENT_RX_HALT, &dev->flags)) {
+		    !test_bit(EVENT_RX_HALT, &dev->flags) &&
+			 state != unlink_start) {
 			rx_submit(dev, urb, GFP_ATOMIC);
 			return;
 		}
@@ -559,31 +591,50 @@ static void intr_complete(struct urb *urb)
 
 /* unlink pending rx/tx; completion handlers do all other cleanup */
 
-static int unlink_urbs(struct usbnet *dev, struct sk_buff_head *q)
+static int unlink_urbs (struct usbnet *dev, struct sk_buff_head *q)
 {
-	unsigned long		flags;
-	struct sk_buff		*skb, *skbnext;
-	int			count = 0;
+        unsigned long           flags;
+        struct sk_buff          *skb = NULL;
+        int                     count = 0;
 
-	spin_lock_irqsave(&q->lock, flags);
-	skb_queue_walk_safe(q, skb, skbnext) {
-		struct skb_data		*entry;
-		struct urb		*urb;
-		int			retval;
+        spin_lock_irqsave (&q->lock, flags);
+        while (!skb_queue_empty(q)) {
+                struct skb_data         *entry;
+                struct urb              *urb;
+                int                     retval;
 
-		entry = (struct skb_data *) skb->cb;
-		urb = entry->urb;
+                skb_queue_walk(q, skb) {
+                        entry = (struct skb_data *) skb->cb;
+                        if (entry->state != unlink_start)
+                                goto found;
+                }
+                break;
+found:
+                entry->state = unlink_start;
+                urb = entry->urb;
 
-		/* during some PM-driven resume scenarios, */
-		/* these (async) unlinks complete immediately */
-		retval = usb_unlink_urb(urb);
-		if (retval != -EINPROGRESS && retval != 0)
-			devdbg(dev, "unlink urb err, %d", retval);
-		else
-			count++;
-	}
-	spin_unlock_irqrestore(&q->lock, flags);
-	return count;
+                /*
+                 * Get reference count of the URB to avoid it to be
+                 * freed during usb_unlink_urb, which may trigger
+                 * use-after-free problem inside usb_unlink_urb since
+                 * usb_unlink_urb is always racing with .complete
+                 * handler(include defer_bh).
+                 */
+                usb_get_urb(urb);
+                spin_unlock_irqrestore(&q->lock, flags);
+                // during some PM-driven resume scenarios,
+                // these (async) unlinks complete immediately
+                retval = usb_unlink_urb (urb);
+                if (retval != -EINPROGRESS && retval != 0)
+                        printk(DEBUG "unlink urb err, %d\n", retval);
+                else
+                        count++;
+                usb_put_urb(urb);
+                spin_lock_irqsave(&q->lock, flags);
+        }
+        spin_unlock_irqrestore (&q->lock, flags);
+
+        return count;
 }
 
 /* Flush all pending rx urbs */
@@ -606,9 +657,8 @@ static
 int axusbnet_stop(struct net_device *net)
 {
 	struct usbnet		*dev = netdev_priv(net);
-	struct driver_info	*info = dev->driver_info;
-	int			temp;
-	int			retval;
+	struct driver_info	*info = dev->driver_info;	
+	
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 18)
 	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(unlink_wakeup);
 #else
@@ -626,6 +676,7 @@ int axusbnet_stop(struct net_device *net)
 	/* allow minidriver to stop correctly (wireless devices to turn off
 	 * radio etc) */
 	if (info->stop) {
+		int retval;
 		retval = info->stop(dev);
 		if (retval < 0 && netif_msg_ifdown(dev))
 			devinfo(dev,
@@ -636,6 +687,7 @@ int axusbnet_stop(struct net_device *net)
 	}
 
 	if (!(info->flags & FLAG_AVOID_UNLINK_URBS)) {
+		int temp;
 		/* ensure there are no more active urbs */
 		add_wait_queue(&unlink_wakeup, &wait);
 		dev->wait = &unlink_wakeup;
@@ -715,6 +767,11 @@ int axusbnet_open(struct net_device *net)
 			goto done;
 		}
 	}
+
+	/* reset rx error state */
+    dev->pkt_cnt = 0;
+    dev->pkt_err = 0;
+	clear_bit(EVENT_RX_KILL, &dev->flags);
 
 	netif_start_queue(net);
 	if (netif_msg_ifup(dev)) {
@@ -919,12 +976,11 @@ static void kevent(struct work_struct *work)
 	}
 
 	if (test_bit(EVENT_LINK_RESET, &dev->flags)) {
-		struct driver_info	*info = dev->driver_info;
-		int			retval = 0;
+		struct driver_info	*info = dev->driver_info;	
 
 		clear_bit(EVENT_LINK_RESET, &dev->flags);
-
 		if (info->link_reset) {
+			int retval;
 			retval = info->link_reset(dev);
 			if (retval < 0) {
 				devinfo(dev,
@@ -992,7 +1048,7 @@ static void tx_complete(struct urb *urb)
 
 	urb->dev = NULL;
 	entry->state = tx_done;
-	defer_bh(dev, skb, &dev->txq);
+	(void) defer_bh(dev, skb, &dev->txq, tx_done);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1001,8 +1057,11 @@ static
 void axusbnet_tx_timeout(struct net_device *net)
 {
 	struct usbnet *dev = netdev_priv(net);
+	struct driver_info	*info = dev->driver_info;
 
-	unlink_urbs(dev, &dev->txq);
+	if (!(info->flags & FLAG_AVOID_UNLINK_URBS)) {
+		unlink_urbs(dev, &dev->txq);
+	}	
 	tasklet_schedule(&dev->bh);
 
 	/* FIXME: device recovery -- reset? */
@@ -1076,7 +1135,11 @@ axusbnet_start_xmit(struct sk_buff *skb, struct net_device *net)
 			devdbg(dev, "tx: submit urb err %d", retval);
 		break;
 	case 0:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0)
 		net->trans_start = jiffies;
+#else		
+		netif_trans_update(net);
+#endif
 		__skb_queue_tail(&dev->txq, skb);
 		if (dev->txq.qlen >= TX_QLEN(dev))
 			netif_stop_queue(net);
@@ -1101,12 +1164,19 @@ drop:
 /*-------------------------------------------------------------------------*/
 
 /* tasklet (work deferred from completions, in_irq) or timer */
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 static void axusbnet_bh(unsigned long param)
+#else
+static void axusbnet_bh (struct timer_list *t)
+#endif
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 	struct usbnet		*dev = (struct usbnet *) param;
+#else
+	struct usbnet		*dev = from_timer(dev, t, delay);
+#endif	
 	struct sk_buff		*skb;
-	struct skb_data		*entry;
+	struct skb_data		*entry = NULL;
 
 	while ((skb = skb_dequeue(&dev->done))) {
 		entry = (struct skb_data *) skb->cb;
@@ -1125,6 +1195,9 @@ static void axusbnet_bh(unsigned long param)
 		}
 	}
 
+	/* restart RX again after disabling due to high error rate */
+         clear_bit(EVENT_RX_KILL, &dev->flags);
+
 	/* waiting for all pending urbs to complete? */
 	if (dev->wait) {
 		if ((dev->txq.qlen + dev->rxq.qlen + dev->done.qlen) == 0)
@@ -1139,7 +1212,7 @@ static void axusbnet_bh(unsigned long param)
 		int	qlen = RX_QLEN(dev);
 
 		if (temp < qlen) {
-			struct urb	*urb;
+			struct urb	*urb = NULL;
 			int		i;
 
 			/* don't refill the queue all at once */
@@ -1250,17 +1323,26 @@ axusbnet_probe(struct usb_interface *udev, const struct usb_device_id *prod)
 	skb_queue_head_init(&dev->rxq);
 	skb_queue_head_init(&dev->txq);
 	skb_queue_head_init(&dev->done);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 	dev->bh.func = axusbnet_bh;
 	dev->bh.data = (unsigned long) dev;
+#else
+	dev->bh.func = (void (*)(unsigned long))axusbnet_bh;
+	dev->bh.data = (unsigned long)&dev->delay;
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 20)
 	INIT_WORK(&dev->kevent, kevent, dev);
 #else
 	INIT_WORK(&dev->kevent, kevent);
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
 	dev->delay.function = axusbnet_bh;
 	dev->delay.data = (unsigned long) dev;
 	init_timer(&dev->delay);
+#else
+	timer_setup(&dev->delay, axusbnet_bh, 0);
+#endif
 	/* mutex_init(&dev->phy_mutex); */
 
 	dev->net = net;
