@@ -586,13 +586,6 @@ static struct i2c_board_info colibri_t30_i2c_bus5_board_info[] __initdata = {
 		I2C_BOARD_INFO("sgtl5000", 0x0a),
 	},
 	{
-		/* STMPE811 touch screen controller */
-		I2C_BOARD_INFO("stmpe", 0x41),
-			.flags = I2C_CLIENT_WAKE,
-			.platform_data = &stmpe811_data,
-			.type = "stmpe811",
-	},
-	{
 		/* LM95245 temperature sensor
 		   Note: OVERT_N directly connected to PMIC PWRDN */
 		I2C_BOARD_INFO("lm95245", 0x4c),
@@ -619,6 +612,9 @@ static void __init colibri_t30_i2c_init(void)
 
 	i2c_register_board_info(0, colibri_t30_i2c_bus1_board_info,
 				ARRAY_SIZE(colibri_t30_i2c_bus1_board_info));
+	
+	i2c_register_board_info(4, colibri_t30_i2c_bus5_board_info,
+				ARRAY_SIZE(colibri_t30_i2c_bus5_board_info));
 
 }
 
