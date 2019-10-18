@@ -1579,7 +1579,7 @@ static void __init colibri_t30_init(void)
 	colibri_t30_sdhci_init();
 	colibri_t30_regulator_init();
 	colibri_t30_suspend_init();
-	colibri_t30_panel_init();
+//	colibri_t30_panel_init();
 //	colibri_t30_sensors_init();
 	colibri_t30_emc_init();
 	colibri_t30_register_spidev();
