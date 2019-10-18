@@ -542,28 +542,6 @@ static struct tegra_i2c_platform_data colibri_t30_i2c1_platform_data = {
 /* PWR_I2C: power I2C to audio codec, PMIC, temperature sensor and touch screen
 	    controller */
 
-/* STMPE811 touch screen controller */
-static struct stmpe_ts_platform_data stmpe811_ts_data = {
-	.adc_freq		= 1, /* 3.25 MHz ADC clock speed */
-	.ave_ctrl		= 3, /* 8 sample average control */
-	.fraction_z		= 7, /* 7 length fractional part in z */
-	.i_drive		= 1, /* 50 mA typical 80 mA max touchscreen
-					drivers current limit value */
-	.mod_12b		= 1, /* 12-bit ADC */
-	.ref_sel		= 0, /* internal ADC reference */
-	.sample_time		= 4, /* ADC converstion time: 80 clocks */
-	.settling		= 3, /* 1 ms panel driver settling time */
-	.touch_det_delay	= 5, /* 5 ms touch detect interrupt delay */
-};
-
-/* STMPE811 ADC controller */
-static struct stmpe_adc_platform_data stmpe811_adc_data = {
-	.sample_time		= 4, /* ADC converstion time: 80 clocks */
-	.mod_12b		= 1, /* 12-bit ADC */
-	.ref_sel		= 0, /* internal ADC reference */
-	.adc_freq		= 1, /* 3.25 MHz ADC clock speed */
-};
-
 
 static void lm95245_probe_callback(struct device *dev);
 
