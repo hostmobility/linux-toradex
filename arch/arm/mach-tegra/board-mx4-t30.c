@@ -620,13 +620,6 @@ static void __init colibri_t30_i2c_init(void)
 	i2c_register_board_info(0, colibri_t30_i2c_bus1_board_info,
 				ARRAY_SIZE(colibri_t30_i2c_bus1_board_info));
 
-	/* enable touch interrupt GPIO */
-	gpio_request(TOUCH_PEN_INT, "TOUCH_PEN_INT");
-	gpio_direction_input(TOUCH_PEN_INT);
-
-	colibri_t30_i2c_bus5_board_info[1].irq = gpio_to_irq(TOUCH_PEN_INT);
-	i2c_register_board_info(4, colibri_t30_i2c_bus5_board_info,
-				ARRAY_SIZE(colibri_t30_i2c_bus5_board_info));
 }
 
 
