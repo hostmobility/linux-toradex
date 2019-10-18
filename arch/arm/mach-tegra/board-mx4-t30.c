@@ -538,16 +538,6 @@ static struct tegra_i2c_platform_data colibri_t30_i2c1_platform_data = {
 
 /* GEN2_I2C: unused */
 
-/* DDC_CLOCK/DATA on X3 pin 15/16 (e.g. display EDID) */
-static struct tegra_i2c_platform_data colibri_t30_i2c4_platform_data = {
-	.adapter_nr	= 3,
-	.arb_recovery	= arb_lost_recovery,
-	.bus_clk_rate	= {10000, 10000},
-	.bus_count	= 1,
-	.scl_gpio	= {DDC_SCL, 0},
-	.sda_gpio	= {DDC_SDA, 0},
-	.slave_addr	= 0x00FC,
-};
 
 /* PWR_I2C: power I2C to audio codec, PMIC, temperature sensor and touch screen
 	    controller */
@@ -622,11 +612,9 @@ static struct tegra_i2c_platform_data colibri_t30_i2c5_platform_data = {
 static void __init colibri_t30_i2c_init(void)
 {
 	tegra_i2c_device1.dev.platform_data = &colibri_t30_i2c1_platform_data;
-	tegra_i2c_device4.dev.platform_data = &colibri_t30_i2c4_platform_data;
 	tegra_i2c_device5.dev.platform_data = &colibri_t30_i2c5_platform_data;
 
 	platform_device_register(&tegra_i2c_device1);
-	platform_device_register(&tegra_i2c_device4);
 	platform_device_register(&tegra_i2c_device5);
 
 	i2c_register_board_info(0, colibri_t30_i2c_bus1_board_info,
