@@ -564,14 +564,6 @@ static struct stmpe_adc_platform_data stmpe811_adc_data = {
 	.adc_freq		= 1, /* 3.25 MHz ADC clock speed */
 };
 
-static struct stmpe_platform_data stmpe811_data = {
-	.blocks		= STMPE_BLOCK_TOUCHSCREEN | STMPE_BLOCK_ADC,
-	.id		= 1,
-	.irq_base	= STMPE811_IRQ_BASE,
-	.irq_trigger	= IRQF_TRIGGER_FALLING,
-	.ts		= &stmpe811_ts_data,
-	.adc		= &stmpe811_adc_data,
-};
 
 static void lm95245_probe_callback(struct device *dev);
 
