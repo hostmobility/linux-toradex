@@ -172,7 +172,7 @@
 		};
 		pinctrl_can_int: can_int {
 			fsl,pins = <
-				VF610_PAD_PTB12__GPIO_34	0x22ed
+				VF610_PAD_PTA20__GPIO_10	0x22ed
 			>;
 		};
 
