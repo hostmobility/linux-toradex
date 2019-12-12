@@ -304,6 +304,22 @@ static void option_instat_callback(struct urb *urb);
 #define BANDRICH_PRODUCT_1012			0x1012
 
 #define QUALCOMM_VENDOR_ID			0x05C6
+/* These Quectel products use Qualcomm's vendor ID */
+#define QUECTEL_PRODUCT_UC20			0x9003
+#define QUECTEL_PRODUCT_UC15			0x9090
+/* These u-blox products use Qualcomm's vendor ID */
+#define UBLOX_PRODUCT_R410M			0x90b2
+/* These Yuga products use Qualcomm's vendor ID */
+#define YUGA_PRODUCT_CLM920_NC5			0x9625
+
+#define QUECTEL_VENDOR_ID			0x2c7c
+/* These Quectel products use Quectel's vendor ID */
+#define QUECTEL_PRODUCT_EC21			0x0121
+#define QUECTEL_PRODUCT_EC25			0x0125
+#define QUECTEL_PRODUCT_BG96			0x0296
+#define QUECTEL_PRODUCT_EP06			0x0306
+#define QUECTEL_PRODUCT_EM12			0x0512
+#define QUECTEL_PRODUCT_EG25			0x0125/*EC25?!*/
 
 #define CMOTECH_VENDOR_ID			0x16d8
 #define CMOTECH_PRODUCT_6008			0x6008
