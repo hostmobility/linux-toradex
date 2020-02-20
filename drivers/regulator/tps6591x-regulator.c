@@ -889,18 +889,24 @@ static int tps6591x_suspend(struct platform_device *pdev, pm_message_t state)
 	struct device *parent = to_tps6591x_dev(rdev);
 	int ret = 0;
 	uint8_t reg_val;
-
+	
+dev_err(&pdev->dev, "Enter suspend\n");
+	
 	if (ri->config_flags & LDO_LOW_POWER_ON_SUSPEND) {
+dev_err(&pdev->dev, "Enter suspend:%u\n", ri->config_flags);
 		ret = tps6591x_clr_bits(parent, ri->en1_reg.addr,
 				(1 << ri->en1_reg.shift_bits));
 		reg_val = ri->supply_reg.cache_val;
+dev_err(&pdev->dev, "reg_val:%u\n", reg_val);
 		reg_val = (reg_val & ~0x3) | (0x3);
+dev_err(&pdev->dev, "reg_val:%u\n", reg_val);
 		ret = tps6591x_write(parent, ri->supply_reg.addr, reg_val);
 		if (ret >= 0)
 			ri->supply_reg.cache_val = reg_val;
 		else
 			dev_err(&pdev->dev, "Error in updating the supply state\n");
 	}
+	dev_err(&pdev->dev, "Exit suspend\n");
 	return ret;
 }
 
