@@ -568,7 +568,7 @@ static struct gpio colibri_t20_gpios[] = {
 	/* Compact flash - These pins are not connected on T20*/
 	{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P29 - CF-READY"},
 	{TEGRA_GPIO_PT1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P75 - CF-RESET"},
-	{TEGRA_GPIO_PT3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P77 - CF-BVD2/MM_PXA300_CLK"},
+	{TEGRA_GPIO_PT3,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW ),	"MODEM_AUDIO_SWITCH"},
 /*
 	{TEGRA_GPIO_PD6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P81 - CF-nCD1+2"},
 */
