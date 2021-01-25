@@ -11,7 +11,8 @@
 
 / {
 	chosen {
-		bootargs = "console=ttyLP2,115200";
+		//bootargs = "console=ttyLP2,115200";
+		stdout-path = &uart2;
 	};
 
 	clk24m: clk24m {
