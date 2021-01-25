@@ -129,7 +129,7 @@
 		interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
 	};
 
-	rtc@51 {
+	rtc0: pcf85063@51 {
 		compatible = "nxp,pcf85063";
 		reg = <0x51>;
 	};
