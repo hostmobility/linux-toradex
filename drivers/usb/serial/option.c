@@ -233,6 +233,22 @@ static void option_instat_callback(struct urb *urb);
 #define BANDRICH_PRODUCT_1012			0x1012
 
 #define QUALCOMM_VENDOR_ID			0x05C6
+/* These Quectel products use Qualcomm's vendor ID */
+#define QUECTEL_PRODUCT_UC20			0x9003
+#define QUECTEL_PRODUCT_UC15			0x9090
+/* These u-blox products use Qualcomm's vendor ID */
+#define UBLOX_PRODUCT_R410M			0x90b2
+/* These Yuga products use Qualcomm's vendor ID */
+#define YUGA_PRODUCT_CLM920_NC5			0x9625
+
+#define QUECTEL_VENDOR_ID			0x2c7c
+/* These Quectel products use Quectel's vendor ID */
+#define QUECTEL_PRODUCT_EC21			0x0121
+#define QUECTEL_PRODUCT_EC25			0x0125
+#define QUECTEL_PRODUCT_BG96			0x0296
+#define QUECTEL_PRODUCT_EP06			0x0306
+#define QUECTEL_PRODUCT_EM12			0x0512
+#define QUECTEL_PRODUCT_EG25			0x0125
 
 #define CMOTECH_VENDOR_ID			0x16d8
 #define CMOTECH_PRODUCT_6001			0x6001
@@ -660,6 +676,16 @@ static const struct option_blacklist_info cinterion_rmnet2_blacklist = {
 };
 
 static const struct usb_device_id option_ids[] = {
+	{ USB_DEVICE(0x05C6, 0x9090) }, /* Quectel UC15 */
+    	{ USB_DEVICE(0x05C6, 0x9003) }, /* Quectel UC20 */
+    	{ USB_DEVICE(0x2C7C, 0x0125) }, /* Quectel EC25 */
+    	{ USB_DEVICE(0x2C7C, 0x0121) }, /* Quectel EC21 */
+    	{ USB_DEVICE(0x05C6, 0x9215) }, /* Quectel EC20 */
+    	{ USB_DEVICE(0x2C7C, 0x0191) }, /* Quectel EG91 */
+    	{ USB_DEVICE(0x2C7C, 0x0195) }, /* Quectel EG95 */
+	{ USB_DEVICE(0x2C7C, 0x0306) }, /* Quectel EG06/EP06/EM06 */
+    	{ USB_DEVICE(0x2C7C, 0x0296) }, /* Quectel BG96 */
+    	{ USB_DEVICE(0x2C7C, 0x0435) }, /* Quectel AG35 */
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_COLT) },
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_RICOLA) },
 	{ USB_DEVICE(OPTION_VENDOR_ID, OPTION_PRODUCT_RICOLA_LIGHT) },
@@ -2050,6 +2076,11 @@ static int option_probe(struct usb_serial *serial,
 				&serial->interface->cur_altsetting->desc;
 	struct usb_device_descriptor *dev_desc = &serial->dev->descriptor;
 	const struct option_blacklist_info *blacklist;
+
+  	//Quectel EC25&EC21&EG91&EG95&EG06&EP06&EM06&BG96/AG35's interface 4 can be used as USB network device
+    	if (serial->dev->descriptor.idVendor == cpu_to_le16(QUECTEL_VENDOR_ID)
+            && serial->interface->cur_altsetting->desc.bInterfaceNumber >= 4)
+	        return -ENODEV;
 
 	/* Never bind to the CD-Rom emulation interface	*/
 	if (iface_desc->bInterfaceClass == 0x08)

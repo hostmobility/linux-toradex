@@ -1408,6 +1408,10 @@ made_compressed_probe:
 		if (quirks & SEND_ZERO_PACKET)
 			snd->urb->transfer_flags |= URB_ZERO_PACKET;
 		snd->instance = acm;
+#if 1 //Added by Quectel for zero packet
+        	if (usb_dev->descriptor.idVendor == 0x1519 && usb_dev->descriptor.idProduct == 0x0020)
+            		snd->urb->transfer_flags |= URB_ZERO_PACKET;
+#endif
 	}
 
 	usb_set_intfdata(intf, acm);
