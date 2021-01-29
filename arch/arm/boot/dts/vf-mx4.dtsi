@@ -264,5 +264,11 @@
 				VF610_PAD_PTD4__GPIO_83			0x005e
 			>;
 		};
+		pinctrl_additionalgpio: additionalgpios {
+			fsl,pins = <
+				VF610_PAD_PTB28__GPIO_98	0x22cd /*100kpull down on mclr_reset pin and dse 20ohm*/
+	
+			>;
+		};
 	};
 };
