@@ -102,7 +102,7 @@
 };
 
 &usbdev0 {
-	dr_mode = "otg";
+	dr_mode = "peripheral";
 	disable-over-current;
 	status = "okay";
 };

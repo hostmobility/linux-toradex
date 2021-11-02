@@ -66,6 +66,14 @@
 			debounce-interval = <10>;
 		};
 	};
+	gpio-leds {
+		compatible = "gpio-leds";
+
+		Dummy-led {
+			label = "cloudbox:red:fail";
+			//gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+		};
+	};
 };
 
 &nfc {
@@ -82,7 +90,7 @@
 };
 
 &dspi0 {
-	status = "okay";
+	status = "disable";
 
 	mcp2515can: can@1 {
 		compatible = "microchip,mcp2515";
@@ -119,7 +127,7 @@
 };
 
 &i2c2 {
-	status = "okay";
+	status = "disable";
 
 	acc: mma8452q@1c {
 		compatible = "fsl,mma8452";
