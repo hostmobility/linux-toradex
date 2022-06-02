@@ -130,6 +130,7 @@ static int create_default_filesystem(struct ubifs_info *c)
 	 * orphan node.
 	 */
 	orph_lebs = UBIFS_MIN_ORPH_LEBS;
+#ifdef CONFIG_UBIFS_FS_DEBUG
 	if (c->leb_cnt - min_leb_cnt > 1)
 		/*
 		 * For debugging purposes it is better to have at least 2
@@ -137,6 +138,7 @@ static int create_default_filesystem(struct ubifs_info *c)
 		 * consolidations and would be stressed more.
 		 */
 		orph_lebs += 1;
+#endif
 
 	main_lebs = c->leb_cnt - UBIFS_SB_LEBS - UBIFS_MST_LEBS - log_lebs;
 	main_lebs -= orph_lebs;
@@ -194,7 +196,7 @@ static int create_default_filesystem(struct ubifs_info *c)
 	sup->rp_size = cpu_to_le64(tmp64);
 	sup->ro_compat_version = cpu_to_le32(UBIFS_RO_COMPAT_VERSION);
 
-	err = ubifs_write_node(c, sup, UBIFS_SB_NODE_SZ, 0, 0);
+	err = ubifs_write_node(c, sup, UBIFS_SB_NODE_SZ, 0, 0, UBI_LONGTERM);
 	kfree(sup);
 	if (err)
 		return err;
@@ -245,18 +247,19 @@ static int create_default_filesystem(struct ubifs_info *c)
 	mst->total_dirty = cpu_to_le64(tmp64);
 
 	/*  The indexing LEB does not contribute to dark space */
-	tmp64 = ((long long)(c->main_lebs - 1) * c->dark_wm);
+	tmp64 = (c->main_lebs - 1) * c->dark_wm;
 	mst->total_dark = cpu_to_le64(tmp64);
 
 	mst->total_used = cpu_to_le64(UBIFS_INO_NODE_SZ);
 
-	err = ubifs_write_node(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM, 0);
+	err = ubifs_write_node(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM, 0,
+			       UBI_UNKNOWN);
 	if (err) {
 		kfree(mst);
 		return err;
 	}
-	err = ubifs_write_node(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM + 1,
-			       0);
+	err = ubifs_write_node(c, mst, UBIFS_MST_NODE_SZ, UBIFS_MST_LNUM + 1, 0,
+			       UBI_UNKNOWN);
 	kfree(mst);
 	if (err)
 		return err;
@@ -279,7 +282,8 @@ static int create_default_filesystem(struct ubifs_info *c)
 	key_write_idx(c, &key, &br->key);
 	br->lnum = cpu_to_le32(main_first + DEFAULT_DATA_LEB);
 	br->len  = cpu_to_le32(UBIFS_INO_NODE_SZ);
-	err = ubifs_write_node(c, idx, tmp, main_first + DEFAULT_IDX_LEB, 0);
+	err = ubifs_write_node(c, idx, tmp, main_first + DEFAULT_IDX_LEB, 0,
+			       UBI_UNKNOWN);
 	kfree(idx);
 	if (err)
 		return err;
@@ -311,7 +315,8 @@ static int create_default_filesystem(struct ubifs_info *c)
 	ino->flags = cpu_to_le32(UBIFS_COMPR_FL);
 
 	err = ubifs_write_node(c, ino, UBIFS_INO_NODE_SZ,
-			       main_first + DEFAULT_DATA_LEB, 0);
+			       main_first + DEFAULT_DATA_LEB, 0,
+			       UBI_UNKNOWN);
 	kfree(ino);
 	if (err)
 		return err;
@@ -330,7 +335,8 @@ static int create_default_filesystem(struct ubifs_info *c)
 		return -ENOMEM;
 
 	cs->ch.node_type = UBIFS_CS_NODE;
-	err = ubifs_write_node(c, cs, UBIFS_CS_NODE_SZ, UBIFS_LOG_LNUM, 0);
+	err = ubifs_write_node(c, cs, UBIFS_CS_NODE_SZ, UBIFS_LOG_LNUM,
+			       0, UBI_UNKNOWN);
 	kfree(cs);
 
 	ubifs_msg("default file-system created");
@@ -391,8 +397,9 @@ static int validate_sb(struct ubifs_info *c, struct ubifs_sb_node *sup)
 	min_leb_cnt += c->lpt_lebs + c->orph_lebs + c->jhead_cnt + 6;
 
 	if (c->leb_cnt < min_leb_cnt || c->leb_cnt > c->vi.size) {
-		ubifs_err("bad LEB count: %d in superblock, %d on UBI volume, %d minimum required",
-			  c->leb_cnt, c->vi.size, min_leb_cnt);
+		ubifs_err("bad LEB count: %d in superblock, %d on UBI volume, "
+			  "%d minimum required", c->leb_cnt, c->vi.size,
+			  min_leb_cnt);
 		goto failed;
 	}
 
@@ -403,22 +410,13 @@ static int validate_sb(struct ubifs_info *c, struct ubifs_sb_node *sup)
 	}
 
 	if (c->main_lebs < UBIFS_MIN_MAIN_LEBS) {
-		ubifs_err("too few main LEBs count %d, must be at least %d",
-			  c->main_lebs, UBIFS_MIN_MAIN_LEBS);
+		err = 7;
 		goto failed;
 	}
 
-	max_bytes = (long long)c->leb_size * UBIFS_MIN_BUD_LEBS;
-	if (c->max_bud_bytes < max_bytes) {
-		ubifs_err("too small journal (%lld bytes), must be at least %lld bytes",
-			  c->max_bud_bytes, max_bytes);
-		goto failed;
-	}
-
-	max_bytes = (long long)c->leb_size * c->main_lebs;
-	if (c->max_bud_bytes > max_bytes) {
-		ubifs_err("too large journal size (%lld bytes), only %lld bytes available in the main area",
-			  c->max_bud_bytes, max_bytes);
+	if (c->max_bud_bytes < (long long)c->leb_size * UBIFS_MIN_BUD_LEBS ||
+	    c->max_bud_bytes > (long long)c->leb_size * c->main_lebs) {
+		err = 8;
 		goto failed;
 	}
 
@@ -452,6 +450,7 @@ static int validate_sb(struct ubifs_info *c, struct ubifs_sb_node *sup)
 		goto failed;
 	}
 
+	max_bytes = c->main_lebs * (long long)c->leb_size;
 	if (c->rp_size < 0 || max_bytes < c->rp_size) {
 		err = 14;
 		goto failed;
@@ -467,7 +466,7 @@ static int validate_sb(struct ubifs_info *c, struct ubifs_sb_node *sup)
 
 failed:
 	ubifs_err("bad superblock, error %d", err);
-	ubifs_dump_node(c, sup);
+	dbg_dump_node(c, sup);
 	return -EINVAL;
 }
 
@@ -510,7 +509,7 @@ int ubifs_write_sb_node(struct ubifs_info *c, struct ubifs_sb_node *sup)
 	int len = ALIGN(UBIFS_SB_NODE_SZ, c->min_io_size);
 
 	ubifs_prepare_node(c, sup, UBIFS_SB_NODE_SZ, 1);
-	return ubifs_leb_change(c, UBIFS_SB_LNUM, sup, len);
+	return ubifs_leb_change(c, UBIFS_SB_LNUM, sup, len, UBI_LONGTERM);
 }
 
 /**
@@ -547,9 +546,10 @@ int ubifs_read_superblock(struct ubifs_info *c)
 		ubifs_assert(!c->ro_media || c->ro_mount);
 		if (!c->ro_mount ||
 		    c->ro_compat_version > UBIFS_RO_COMPAT_VERSION) {
-			ubifs_err("on-flash format version is w%d/r%d, but software only supports up to version w%d/r%d",
-				  c->fmt_version, c->ro_compat_version,
-				  UBIFS_FORMAT_VERSION,
+			ubifs_err("on-flash format version is w%d/r%d, but "
+				  "software only supports up to version "
+				  "w%d/r%d", c->fmt_version,
+				  c->ro_compat_version, UBIFS_FORMAT_VERSION,
 				  UBIFS_RO_COMPAT_VERSION);
 			if (c->ro_compat_version <= UBIFS_RO_COMPAT_VERSION) {
 				ubifs_msg("only R/O mounting is possible");
@@ -682,7 +682,7 @@ static int fixup_leb(struct ubifs_info *c, int lnum, int len)
 	if (err)
 		return err;
 
-	return ubifs_leb_change(c, lnum, c->sbuf, len);
+	return ubifs_leb_change(c, lnum, c->sbuf, len, UBI_UNKNOWN);
 }
 
 /**
@@ -715,12 +715,8 @@ static int fixup_free_space(struct ubifs_info *c)
 		lnum = ubifs_next_log_lnum(c, lnum);
 	}
 
-	/*
-	 * Fixup the log head which contains the only a CS node at the
-	 * beginning.
-	 */
-	err = fixup_leb(c, c->lhead_lnum,
-			ALIGN(UBIFS_CS_NODE_SZ, c->min_io_size));
+	/* Fixup the current log head */
+	err = fixup_leb(c, c->lhead_lnum, c->lhead_offs);
 	if (err)
 		goto out;
 

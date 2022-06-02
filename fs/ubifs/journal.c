@@ -214,7 +214,7 @@ out:
 	err = ubifs_add_bud_to_log(c, jhead, lnum, offs);
 	if (err)
 		goto out_return;
-	err = ubifs_wbuf_seek_nolock(wbuf, lnum, offs);
+	err = ubifs_wbuf_seek_nolock(wbuf, lnum, offs, wbuf->dtype);
 	if (err)
 		goto out_unlock;
 
@@ -385,9 +385,9 @@ out:
 	if (err == -ENOSPC) {
 		/* This are some budgeting problems, print useful information */
 		down_write(&c->commit_sem);
-		dump_stack();
-		ubifs_dump_budg(c, &c->bi);
-		ubifs_dump_lprops(c);
+		dbg_dump_stack();
+		dbg_dump_budg(c, &c->bi);
+		dbg_dump_lprops(c);
 		cmt_retries = dbg_check_lprops(c);
 		up_write(&c->commit_sem);
 	}
@@ -697,8 +697,9 @@ int ubifs_jnl_write_data(struct ubifs_info *c, const struct inode *inode,
 	int dlen = COMPRESSED_DATA_NODE_BUF_SZ, allocated = 1;
 	struct ubifs_inode *ui = ubifs_inode(inode);
 
-	dbg_jnlk(key, "ino %lu, blk %u, len %d, key ",
-		(unsigned long)key_inum(c, key), key_block(c, key), len);
+	dbg_jnl("ino %lu, blk %u, len %d, key %s",
+		(unsigned long)key_inum(c, key), key_block(c, key), len,
+		DBGKEY(key));
 	ubifs_assert(len <= UBIFS_BLOCK_SIZE);
 
 	data = kmalloc(dlen, GFP_NOFS | __GFP_NOWARN);
@@ -1176,7 +1177,7 @@ int ubifs_jnl_truncate(struct ubifs_info *c, const struct inode *inode,
 		dn = (void *)trun + UBIFS_TRUN_NODE_SZ;
 		blk = new_size >> UBIFS_BLOCK_SHIFT;
 		data_key_init(c, &key, inum, blk);
-		dbg_jnlk(&key, "last block key ");
+		dbg_jnl("last block key %s", DBGKEY(&key));
 		err = ubifs_tnc_lookup(c, &key, dn);
 		if (err == -ENOENT)
 			dlen = 0; /* Not found (so it is a hole) */
@@ -1267,6 +1268,7 @@ out_free:
 	return err;
 }
 
+#ifdef CONFIG_UBIFS_FS_XATTR
 
 /**
  * ubifs_jnl_delete_xattr - delete an extended attribute.
@@ -1461,3 +1463,4 @@ out_free:
 	return err;
 }
 
+#endif /* CONFIG_UBIFS_FS_XATTR */

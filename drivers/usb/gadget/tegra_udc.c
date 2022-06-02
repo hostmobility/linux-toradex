@@ -2544,7 +2544,7 @@ static int tegra_udc_ep_setup(struct tegra_udc *udc)
 		.bmAttributes = USB_ENDPOINT_XFER_CONTROL,
 		.wMaxPacketSize =	USB_MAX_CTRL_PAYLOAD,
 	};
-	int i;
+	//int i;
 
 	/* setup QH and epctrl for ep0 */
 	ep0_setup(udc);
@@ -2559,14 +2559,14 @@ static int tegra_udc_ep_setup(struct tegra_udc *udc)
 
 	/* setup the udc->eps[] for non-control endpoints and link
 	 * to gadget.ep_list */
-	for (i = 1; i < (int)(udc->max_ep / 2); i++) {
+	/*for (i = 1; i < (int)(udc->max_ep / 2); i++) {
 		char name[14];
 
 		sprintf(name, "ep%dout", i);
 		struct_ep_setup(udc, i * 2, name, 1);
 		sprintf(name, "ep%din", i);
 		struct_ep_setup(udc, i * 2 + 1, name, 1);
-	}
+	}*/
 
 	return 0;
 }
