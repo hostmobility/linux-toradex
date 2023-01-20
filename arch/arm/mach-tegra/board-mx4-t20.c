@@ -1130,7 +1130,7 @@ static struct gpio_led status_leds[] = {
 		/* Global on switch for LEDs */
 		.name = "mx4-ct-wifi",
 		.default_trigger = "netdev",
-		.gpio = (MX4_CT_WIFI_LED),
+		.gpio = (MX4_WIFI_LED),
 		.active_low = 0,
 		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
