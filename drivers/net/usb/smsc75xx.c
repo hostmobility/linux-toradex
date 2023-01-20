@@ -26,9 +26,12 @@
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 #include <linux/usb.h>
+#include <linux/bitrev.h>
+#include <linux/crc16.h>
 #include <linux/crc32.h>
 #include <linux/usb/usbnet.h>
 #include <linux/slab.h>
+#include <linux/ctype.h>
 #include "smsc75xx.h"
 
 #define SMSC_CHIPNAME			"smsc75xx"
@@ -51,23 +54,26 @@
 #define USB_VENDOR_ID_SMSC		(0x0424)
 #define USB_PRODUCT_ID_LAN7500		(0x7500)
 #define USB_PRODUCT_ID_LAN7505		(0x7505)
+#define RXW_PADDING			2
+#define SUPPORTED_WAKE			(WAKE_PHY | WAKE_UCAST | WAKE_BCAST | \
+					 WAKE_MCAST | WAKE_ARP | WAKE_MAGIC)
 
-#define check_warn(ret, fmt, args...) \
-	({ if (ret < 0) netdev_warn(dev->net, fmt, ##args); })
-
-#define check_warn_return(ret, fmt, args...) \
-	({ if (ret < 0) { netdev_warn(dev->net, fmt, ##args); return ret; } })
-
-#define check_warn_goto_done(ret, fmt, args...) \
-	({ if (ret < 0) { netdev_warn(dev->net, fmt, ##args); goto done; } })
+#define SUSPEND_SUSPEND0		(0x01)
+#define SUSPEND_SUSPEND1		(0x02)
+#define SUSPEND_SUSPEND2		(0x04)
+#define SUSPEND_SUSPEND3		(0x08)
+#define SUSPEND_ALLMODES		(SUSPEND_SUSPEND0 | SUSPEND_SUSPEND1 | \
+					 SUSPEND_SUSPEND2 | SUSPEND_SUSPEND3)
 
 struct smsc75xx_priv {
 	struct usbnet *dev;
 	u32 rfe_ctl;
+	u32 wolopts;
 	u32 multicast_hash_table[DP_SEL_VHF_HASH_LEN];
 	struct mutex dataport_mutex;
 	spinlock_t rfe_ctl_lock;
 	struct work_struct set_multicast;
+	u8 suspend_flags;
 };
 
 struct usb_context {
@@ -75,12 +81,53 @@ struct usb_context {
 	struct usbnet *dev;
 };
 
-static int turbo_mode = true;
+static bool turbo_mode = true;
 module_param(turbo_mode, bool, 0644);
 MODULE_PARM_DESC(turbo_mode, "Enable multiple frames per Rx transaction");
 
-static int __must_check smsc75xx_read_reg(struct usbnet *dev, u32 index,
-					  u32 *data)
+static char g_mac_addr[1][ETH_ALEN];
+static int g_usr_mac = 0;
+static int g_mac_alloc[1] = {-1};
+
+/* Retrieve user set MAC address */
+static int setup_mac(char *macstr, int mac_nr) 
+{
+	int i, j;
+	unsigned char result, value;
+
+	for (i = 0; i < ETH_ALEN; i++) {
+		result = 0;
+
+		if (i != 5 && *(macstr + 2) != ':')
+			return -1;
+
+		for (j = 0; j < 2; j++) {
+			if (isxdigit(*macstr)
+			    && (value =
+				isdigit(*macstr) ? *macstr -
+				'0' : toupper(*macstr) - 'A' + 10) < 16) {
+				result = result * 16 + value;
+				macstr++;
+			} else
+				return -1;
+		}
+
+		macstr++;
+		g_mac_addr[mac_nr][i] = result;
+	}
+
+	g_usr_mac = 1;
+
+	return 0;
+}
+static int __init setup_smsc7500_mac(char *macstr)
+{
+    g_mac_alloc[0] = setup_mac(macstr, 0);
+    return g_mac_alloc[0];
+}
+
+static int __must_check __smsc75xx_read_reg(struct usbnet *dev, u32 index,
+					    u32 *data, int in_pm)
 {
 	u32 *buf = kmalloc(4, GFP_KERNEL);
 	int ret;
@@ -89,6 +136,13 @@ static int __must_check smsc75xx_read_reg(struct usbnet *dev, u32 index,
 
 	if (!buf)
 		return -ENOMEM;
+
+	if (!in_pm) {
+		if( usb_autopm_get_interface(dev->intf) < 0 ){
+			kfree(buf);
+			return -ENODEV;
+		}
+	}
 
 	ret = usb_control_msg(dev->udev, usb_rcvctrlpipe(dev->udev, 0),
 		USB_VENDOR_REQUEST_READ_REGISTER,
@@ -106,8 +160,8 @@ static int __must_check smsc75xx_read_reg(struct usbnet *dev, u32 index,
 	return ret;
 }
 
-static int __must_check smsc75xx_write_reg(struct usbnet *dev, u32 index,
-					   u32 data)
+static int __must_check __smsc75xx_write_reg(struct usbnet *dev, u32 index,
+					     u32 data, int in_pm)
 {
 	u32 *buf = kmalloc(4, GFP_KERNEL);
 	int ret;
@@ -119,6 +173,13 @@ static int __must_check smsc75xx_write_reg(struct usbnet *dev, u32 index,
 
 	*buf = data;
 	cpu_to_le32s(buf);
+
+	if (!in_pm) {
+		if( usb_autopm_get_interface(dev->intf) < 0 ){
+			kfree(buf);
+			return -ENODEV;
+		}
+	}
 
 	ret = usb_control_msg(dev->udev, usb_sndctrlpipe(dev->udev, 0),
 		USB_VENDOR_REQUEST_WRITE_REGISTER,
@@ -134,17 +195,45 @@ static int __must_check smsc75xx_write_reg(struct usbnet *dev, u32 index,
 	return ret;
 }
 
+static int __must_check smsc75xx_read_reg_nopm(struct usbnet *dev, u32 index,
+					       u32 *data)
+{
+	return __smsc75xx_read_reg(dev, index, data, 1);
+}
+
+static int __must_check smsc75xx_write_reg_nopm(struct usbnet *dev, u32 index,
+						u32 data)
+{
+	return __smsc75xx_write_reg(dev, index, data, 1);
+}
+
+static int __must_check smsc75xx_read_reg(struct usbnet *dev, u32 index,
+					  u32 *data)
+{
+	return __smsc75xx_read_reg(dev, index, data, 0);
+}
+
+static int __must_check smsc75xx_write_reg(struct usbnet *dev, u32 index,
+					   u32 data)
+{
+	return __smsc75xx_write_reg(dev, index, data, 0);
+}
+
 /* Loop until the read is completed with timeout
  * called with phy_mutex held */
-static int smsc75xx_phy_wait_not_busy(struct usbnet *dev)
+static __must_check int __smsc75xx_phy_wait_not_busy(struct usbnet *dev,
+						     int in_pm)
 {
 	unsigned long start_time = jiffies;
 	u32 val;
 	int ret;
 
 	do {
-		ret = smsc75xx_read_reg(dev, MII_ACCESS, &val);
-		check_warn_return(ret, "Error reading MII_ACCESS");
+		ret = __smsc75xx_read_reg(dev, MII_ACCESS, &val, in_pm);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error reading MII_ACCESS\n");
+			return ret;
+		}
 
 		if (!(val & MII_ACCESS_BUSY))
 			return 0;
@@ -153,7 +242,8 @@ static int smsc75xx_phy_wait_not_busy(struct usbnet *dev)
 	return -EIO;
 }
 
-static int smsc75xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
+static int __smsc75xx_mdio_read(struct net_device *netdev, int phy_id, int idx,
+				int in_pm)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u32 val, addr;
@@ -162,23 +252,35 @@ static int smsc75xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
 	mutex_lock(&dev->phy_mutex);
 
 	/* confirm MII not busy */
-	ret = smsc75xx_phy_wait_not_busy(dev);
-	check_warn_goto_done(ret, "MII is busy in smsc75xx_mdio_read");
+	ret = __smsc75xx_phy_wait_not_busy(dev, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "MII is busy in smsc75xx_mdio_read\n");
+		goto done;
+	}
 
 	/* set the address, index & direction (read from PHY) */
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
 	addr = ((phy_id << MII_ACCESS_PHY_ADDR_SHIFT) & MII_ACCESS_PHY_ADDR)
 		| ((idx << MII_ACCESS_REG_ADDR_SHIFT) & MII_ACCESS_REG_ADDR)
-		| MII_ACCESS_READ;
-	ret = smsc75xx_write_reg(dev, MII_ACCESS, addr);
-	check_warn_goto_done(ret, "Error writing MII_ACCESS");
+		| MII_ACCESS_READ | MII_ACCESS_BUSY;
+	ret = __smsc75xx_write_reg(dev, MII_ACCESS, addr, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing MII_ACCESS\n");
+		goto done;
+	}
 
-	ret = smsc75xx_phy_wait_not_busy(dev);
-	check_warn_goto_done(ret, "Timed out reading MII reg %02X", idx);
+	ret = __smsc75xx_phy_wait_not_busy(dev, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Timed out reading MII reg %02X\n", idx);
+		goto done;
+	}
 
-	ret = smsc75xx_read_reg(dev, MII_DATA, &val);
-	check_warn_goto_done(ret, "Error reading MII_DATA");
+	ret = __smsc75xx_read_reg(dev, MII_DATA, &val, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading MII_DATA\n");
+		goto done;
+	}
 
 	ret = (u16)(val & 0xFFFF);
 
@@ -187,8 +289,8 @@ done:
 	return ret;
 }
 
-static void smsc75xx_mdio_write(struct net_device *netdev, int phy_id, int idx,
-				int regval)
+static void __smsc75xx_mdio_write(struct net_device *netdev, int phy_id,
+				  int idx, int regval, int in_pm)
 {
 	struct usbnet *dev = netdev_priv(netdev);
 	u32 val, addr;
@@ -197,27 +299,62 @@ static void smsc75xx_mdio_write(struct net_device *netdev, int phy_id, int idx,
 	mutex_lock(&dev->phy_mutex);
 
 	/* confirm MII not busy */
-	ret = smsc75xx_phy_wait_not_busy(dev);
-	check_warn_goto_done(ret, "MII is busy in smsc75xx_mdio_write");
+	ret = __smsc75xx_phy_wait_not_busy(dev, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "MII is busy in smsc75xx_mdio_write\n");
+		goto done;
+	}
 
 	val = regval;
-	ret = smsc75xx_write_reg(dev, MII_DATA, val);
-	check_warn_goto_done(ret, "Error writing MII_DATA");
+	ret = __smsc75xx_write_reg(dev, MII_DATA, val, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing MII_DATA\n");
+		goto done;
+	}
 
 	/* set the address, index & direction (write to PHY) */
 	phy_id &= dev->mii.phy_id_mask;
 	idx &= dev->mii.reg_num_mask;
 	addr = ((phy_id << MII_ACCESS_PHY_ADDR_SHIFT) & MII_ACCESS_PHY_ADDR)
 		| ((idx << MII_ACCESS_REG_ADDR_SHIFT) & MII_ACCESS_REG_ADDR)
-		| MII_ACCESS_WRITE;
-	ret = smsc75xx_write_reg(dev, MII_ACCESS, addr);
-	check_warn_goto_done(ret, "Error writing MII_ACCESS");
+		| MII_ACCESS_WRITE | MII_ACCESS_BUSY;
+	ret = __smsc75xx_write_reg(dev, MII_ACCESS, addr, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing MII_ACCESS\n");
+		goto done;
+	}
 
-	ret = smsc75xx_phy_wait_not_busy(dev);
-	check_warn_goto_done(ret, "Timed out writing MII reg %02X", idx);
+	ret = __smsc75xx_phy_wait_not_busy(dev, in_pm);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Timed out writing MII reg %02X\n", idx);
+		goto done;
+	}
 
 done:
 	mutex_unlock(&dev->phy_mutex);
+}
+
+static int smsc75xx_mdio_read_nopm(struct net_device *netdev, int phy_id,
+				   int idx)
+{
+	return __smsc75xx_mdio_read(netdev, phy_id, idx, 1);
+}
+
+static void smsc75xx_mdio_write_nopm(struct net_device *netdev, int phy_id,
+				     int idx, int regval)
+{
+	__smsc75xx_mdio_write(netdev, phy_id, idx, regval, 1);
+}
+
+static int smsc75xx_mdio_read(struct net_device *netdev, int phy_id, int idx)
+{
+	return __smsc75xx_mdio_read(netdev, phy_id, idx, 0);
+}
+
+static void smsc75xx_mdio_write(struct net_device *netdev, int phy_id, int idx,
+				int regval)
+{
+	__smsc75xx_mdio_write(netdev, phy_id, idx, regval, 0);
 }
 
 static int smsc75xx_wait_eeprom(struct usbnet *dev)
@@ -228,7 +365,10 @@ static int smsc75xx_wait_eeprom(struct usbnet *dev)
 
 	do {
 		ret = smsc75xx_read_reg(dev, E2P_CMD, &val);
-		check_warn_return(ret, "Error reading E2P_CMD");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error reading E2P_CMD\n");
+			return ret;
+		}
 
 		if (!(val & E2P_CMD_BUSY) || (val & E2P_CMD_TIMEOUT))
 			break;
@@ -236,7 +376,7 @@ static int smsc75xx_wait_eeprom(struct usbnet *dev)
 	} while (!time_after(jiffies, start_time + HZ));
 
 	if (val & (E2P_CMD_TIMEOUT | E2P_CMD_BUSY)) {
-		netdev_warn(dev->net, "EEPROM read operation timeout");
+		netdev_warn(dev->net, "EEPROM read operation timeout\n");
 		return -EIO;
 	}
 
@@ -251,7 +391,10 @@ static int smsc75xx_eeprom_confirm_not_busy(struct usbnet *dev)
 
 	do {
 		ret = smsc75xx_read_reg(dev, E2P_CMD, &val);
-		check_warn_return(ret, "Error reading E2P_CMD");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error reading E2P_CMD\n");
+			return ret;
+		}
 
 		if (!(val & E2P_CMD_BUSY))
 			return 0;
@@ -259,7 +402,7 @@ static int smsc75xx_eeprom_confirm_not_busy(struct usbnet *dev)
 		udelay(40);
 	} while (!time_after(jiffies, start_time + HZ));
 
-	netdev_warn(dev->net, "EEPROM is busy");
+	netdev_warn(dev->net, "EEPROM is busy\n");
 	return -EIO;
 }
 
@@ -279,14 +422,20 @@ static int smsc75xx_read_eeprom(struct usbnet *dev, u32 offset, u32 length,
 	for (i = 0; i < length; i++) {
 		val = E2P_CMD_BUSY | E2P_CMD_READ | (offset & E2P_CMD_ADDR);
 		ret = smsc75xx_write_reg(dev, E2P_CMD, val);
-		check_warn_return(ret, "Error writing E2P_CMD");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error writing E2P_CMD\n");
+			return ret;
+		}
 
 		ret = smsc75xx_wait_eeprom(dev);
 		if (ret < 0)
 			return ret;
 
 		ret = smsc75xx_read_reg(dev, E2P_DATA, &val);
-		check_warn_return(ret, "Error reading E2P_DATA");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error reading E2P_DATA\n");
+			return ret;
+		}
 
 		data[i] = val & 0xFF;
 		offset++;
@@ -311,7 +460,10 @@ static int smsc75xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 	/* Issue write/erase enable command */
 	val = E2P_CMD_BUSY | E2P_CMD_EWEN;
 	ret = smsc75xx_write_reg(dev, E2P_CMD, val);
-	check_warn_return(ret, "Error writing E2P_CMD");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing E2P_CMD\n");
+		return ret;
+	}
 
 	ret = smsc75xx_wait_eeprom(dev);
 	if (ret < 0)
@@ -322,12 +474,18 @@ static int smsc75xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 		/* Fill data register */
 		val = data[i];
 		ret = smsc75xx_write_reg(dev, E2P_DATA, val);
-		check_warn_return(ret, "Error writing E2P_DATA");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error writing E2P_DATA\n");
+			return ret;
+		}
 
 		/* Send "write" command */
 		val = E2P_CMD_BUSY | E2P_CMD_WRITE | (offset & E2P_CMD_ADDR);
 		ret = smsc75xx_write_reg(dev, E2P_CMD, val);
-		check_warn_return(ret, "Error writing E2P_CMD");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error writing E2P_CMD\n");
+			return ret;
+		}
 
 		ret = smsc75xx_wait_eeprom(dev);
 		if (ret < 0)
@@ -346,7 +504,10 @@ static int smsc75xx_dataport_wait_not_busy(struct usbnet *dev)
 	for (i = 0; i < 100; i++) {
 		u32 dp_sel;
 		ret = smsc75xx_read_reg(dev, DP_SEL, &dp_sel);
-		check_warn_return(ret, "Error reading DP_SEL");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error reading DP_SEL\n");
+			return ret;
+		}
 
 		if (dp_sel & DP_SEL_DPRDY)
 			return 0;
@@ -354,7 +515,7 @@ static int smsc75xx_dataport_wait_not_busy(struct usbnet *dev)
 		udelay(40);
 	}
 
-	netdev_warn(dev->net, "smsc75xx_dataport_wait_not_busy timed out");
+	netdev_warn(dev->net, "smsc75xx_dataport_wait_not_busy timed out\n");
 
 	return -EIO;
 }
@@ -369,28 +530,49 @@ static int smsc75xx_dataport_write(struct usbnet *dev, u32 ram_select, u32 addr,
 	mutex_lock(&pdata->dataport_mutex);
 
 	ret = smsc75xx_dataport_wait_not_busy(dev);
-	check_warn_goto_done(ret, "smsc75xx_dataport_write busy on entry");
+	if (ret < 0) {
+		netdev_warn(dev->net, "smsc75xx_dataport_write busy on entry\n");
+		goto done;
+	}
 
 	ret = smsc75xx_read_reg(dev, DP_SEL, &dp_sel);
-	check_warn_goto_done(ret, "Error reading DP_SEL");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading DP_SEL\n");
+		goto done;
+	}
 
 	dp_sel &= ~DP_SEL_RSEL;
 	dp_sel |= ram_select;
 	ret = smsc75xx_write_reg(dev, DP_SEL, dp_sel);
-	check_warn_goto_done(ret, "Error writing DP_SEL");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing DP_SEL\n");
+		goto done;
+	}
 
 	for (i = 0; i < length; i++) {
 		ret = smsc75xx_write_reg(dev, DP_ADDR, addr + i);
-		check_warn_goto_done(ret, "Error writing DP_ADDR");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error writing DP_ADDR\n");
+			goto done;
+		}
 
 		ret = smsc75xx_write_reg(dev, DP_DATA, buf[i]);
-		check_warn_goto_done(ret, "Error writing DP_DATA");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error writing DP_DATA\n");
+			goto done;
+		}
 
 		ret = smsc75xx_write_reg(dev, DP_CMD, DP_CMD_WRITE);
-		check_warn_goto_done(ret, "Error writing DP_CMD");
+		if (ret < 0) {
+			netdev_warn(dev->net, "Error writing DP_CMD\n");
+			goto done;
+		}
 
 		ret = smsc75xx_dataport_wait_not_busy(dev);
-		check_warn_goto_done(ret, "smsc75xx_dataport_write timeout");
+		if (ret < 0) {
+			netdev_warn(dev->net, "smsc75xx_dataport_write timeout\n");
+			goto done;
+		}
 	}
 
 done:
@@ -411,14 +593,15 @@ static void smsc75xx_deferred_multicast_write(struct work_struct *param)
 	struct usbnet *dev = pdata->dev;
 	int ret;
 
-	netif_dbg(dev, drv, dev->net, "deferred multicast write 0x%08x",
-		pdata->rfe_ctl);
+	netif_dbg(dev, drv, dev->net, "deferred multicast write 0x%08x\n",
+		  pdata->rfe_ctl);
 
 	smsc75xx_dataport_write(dev, DP_SEL_VHF, DP_SEL_VHF_VLAN_LEN,
 		DP_SEL_VHF_HASH_LEN, pdata->multicast_hash_table);
 
 	ret = smsc75xx_write_reg(dev, RFE_CTL, pdata->rfe_ctl);
-	check_warn(ret, "Error writing RFE_CRL");
+	if (ret < 0)
+		netdev_warn(dev->net, "Error writing RFE_CRL\n");
 }
 
 static void smsc75xx_set_multicast(struct net_device *netdev)
@@ -438,15 +621,15 @@ static void smsc75xx_set_multicast(struct net_device *netdev)
 		pdata->multicast_hash_table[i] = 0;
 
 	if (dev->net->flags & IFF_PROMISC) {
-		netif_dbg(dev, drv, dev->net, "promiscuous mode enabled");
+		netif_dbg(dev, drv, dev->net, "promiscuous mode enabled\n");
 		pdata->rfe_ctl |= RFE_CTL_AM | RFE_CTL_AU;
 	} else if (dev->net->flags & IFF_ALLMULTI) {
-		netif_dbg(dev, drv, dev->net, "receive all multicast enabled");
+		netif_dbg(dev, drv, dev->net, "receive all multicast enabled\n");
 		pdata->rfe_ctl |= RFE_CTL_AM | RFE_CTL_DPF;
 	} else if (!netdev_mc_empty(dev->net)) {
 		struct netdev_hw_addr *ha;
 
-		netif_dbg(dev, drv, dev->net, "receive multicast hash filter");
+		netif_dbg(dev, drv, dev->net, "receive multicast hash filter\n");
 
 		pdata->rfe_ctl |= RFE_CTL_MHF | RFE_CTL_DPF;
 
@@ -456,7 +639,7 @@ static void smsc75xx_set_multicast(struct net_device *netdev)
 				(1 << (bitnum % 32));
 		}
 	} else {
-		netif_dbg(dev, drv, dev->net, "receive own packets only");
+		netif_dbg(dev, drv, dev->net, "receive own packets only\n");
 		pdata->rfe_ctl |= RFE_CTL_DPF;
 	}
 
@@ -484,18 +667,24 @@ static int smsc75xx_update_flowcontrol(struct usbnet *dev, u8 duplex,
 		if (cap & FLOW_CTRL_RX)
 			flow |= FLOW_RX_FCEN;
 
-		netif_dbg(dev, link, dev->net, "rx pause %s, tx pause %s",
-			(cap & FLOW_CTRL_RX ? "enabled" : "disabled"),
-			(cap & FLOW_CTRL_TX ? "enabled" : "disabled"));
+		netif_dbg(dev, link, dev->net, "rx pause %s, tx pause %s\n",
+			  (cap & FLOW_CTRL_RX ? "enabled" : "disabled"),
+			  (cap & FLOW_CTRL_TX ? "enabled" : "disabled"));
 	} else {
-		netif_dbg(dev, link, dev->net, "half duplex");
+		netif_dbg(dev, link, dev->net, "half duplex\n");
 	}
 
 	ret = smsc75xx_write_reg(dev, FLOW, flow);
-	check_warn_return(ret, "Error writing FLOW");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing FLOW\n");
+		return ret;
+	}
 
 	ret = smsc75xx_write_reg(dev, FCT_FLOW, fct_flow);
-	check_warn_return(ret, "Error writing FCT_FLOW");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing FCT_FLOW\n");
+		return ret;
+	}
 
 	return 0;
 }
@@ -507,21 +696,23 @@ static int smsc75xx_link_reset(struct usbnet *dev)
 	u16 lcladv, rmtadv;
 	int ret;
 
-	/* clear interrupt status */
-	ret = smsc75xx_mdio_read(dev->net, mii->phy_id, PHY_INT_SRC);
-	check_warn_return(ret, "Error reading PHY_INT_SRC");
+	/* write to clear phy interrupt status */
+	smsc75xx_mdio_write(dev->net, mii->phy_id, PHY_INT_SRC,
+		PHY_INT_SRC_CLEAR_ALL);
 
 	ret = smsc75xx_write_reg(dev, INT_STS, INT_STS_CLEAR_ALL);
-	check_warn_return(ret, "Error writing INT_STS");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing INT_STS\n");
+		return ret;
+	}
 
 	mii_check_media(mii, 1, 1);
 	mii_ethtool_gset(&dev->mii, &ecmd);
 	lcladv = smsc75xx_mdio_read(dev->net, mii->phy_id, MII_ADVERTISE);
 	rmtadv = smsc75xx_mdio_read(dev->net, mii->phy_id, MII_LPA);
 
-	netif_dbg(dev, link, dev->net, "speed: %u duplex: %d lcladv: %04x"
-		  " rmtadv: %04x", ethtool_cmd_speed(&ecmd),
-		  ecmd.duplex, lcladv, rmtadv);
+	netif_dbg(dev, link, dev->net, "speed: %u duplex: %d lcladv: %04x rmtadv: %04x\n",
+		  ethtool_cmd_speed(&ecmd), ecmd.duplex, lcladv, rmtadv);
 
 	return smsc75xx_update_flowcontrol(dev, ecmd.duplex, lcladv, rmtadv);
 }
@@ -531,21 +722,21 @@ static void smsc75xx_status(struct usbnet *dev, struct urb *urb)
 	u32 intdata;
 
 	if (urb->actual_length != 4) {
-		netdev_warn(dev->net,
-			"unexpected urb length %d", urb->actual_length);
+		netdev_warn(dev->net, "unexpected urb length %d\n",
+			    urb->actual_length);
 		return;
 	}
 
 	memcpy(&intdata, urb->transfer_buffer, 4);
 	le32_to_cpus(&intdata);
 
-	netif_dbg(dev, link, dev->net, "intdata: 0x%08X", intdata);
+	netif_dbg(dev, link, dev->net, "intdata: 0x%08X\n", intdata);
 
 	if (intdata & INT_ENP_PHY_INT)
 		usbnet_defer_kevent(dev, EVENT_LINK_RESET);
 	else
-		netdev_warn(dev->net,
-			"unexpected interrupt, intdata=0x%08X", intdata);
+		netdev_warn(dev->net, "unexpected interrupt, intdata=0x%08X\n",
+			    intdata);
 }
 
 static int smsc75xx_ethtool_get_eeprom_len(struct net_device *net)
@@ -569,12 +760,38 @@ static int smsc75xx_ethtool_set_eeprom(struct net_device *netdev,
 	struct usbnet *dev = netdev_priv(netdev);
 
 	if (ee->magic != LAN75XX_EEPROM_MAGIC) {
-		netdev_warn(dev->net,
-			"EEPROM: magic value mismatch: 0x%x", ee->magic);
+		netdev_warn(dev->net, "EEPROM: magic value mismatch: 0x%x\n",
+			    ee->magic);
 		return -EINVAL;
 	}
 
 	return smsc75xx_write_eeprom(dev, ee->offset, ee->len, data);
+}
+
+static void smsc75xx_ethtool_get_wol(struct net_device *net,
+				     struct ethtool_wolinfo *wolinfo)
+{
+	struct usbnet *dev = netdev_priv(net);
+	struct smsc75xx_priv *pdata = (struct smsc75xx_priv *)(dev->data[0]);
+
+	wolinfo->supported = SUPPORTED_WAKE;
+	wolinfo->wolopts = pdata->wolopts;
+}
+
+static int smsc75xx_ethtool_set_wol(struct net_device *net,
+				    struct ethtool_wolinfo *wolinfo)
+{
+	struct usbnet *dev = netdev_priv(net);
+	struct smsc75xx_priv *pdata = (struct smsc75xx_priv *)(dev->data[0]);
+	int ret;
+
+	pdata->wolopts = wolinfo->wolopts & SUPPORTED_WAKE;
+
+	ret = device_set_wakeup_enable(&dev->udev->dev, pdata->wolopts);
+	if (ret < 0)
+		netdev_warn(dev->net, "device_set_wakeup_enable error %d\n", ret);
+
+	return ret;
 }
 
 static const struct ethtool_ops smsc75xx_ethtool_ops = {
@@ -588,6 +805,8 @@ static const struct ethtool_ops smsc75xx_ethtool_ops = {
 	.get_eeprom_len	= smsc75xx_ethtool_get_eeprom_len,
 	.get_eeprom	= smsc75xx_ethtool_get_eeprom,
 	.set_eeprom	= smsc75xx_ethtool_set_eeprom,
+	.get_wol	= smsc75xx_ethtool_get_wol,
+	.set_wol	= smsc75xx_ethtool_set_wol,
 };
 
 static int smsc75xx_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
@@ -602,20 +821,30 @@ static int smsc75xx_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 
 static void smsc75xx_init_mac_address(struct usbnet *dev)
 {
-	/* try reading mac address from EEPROM */
+
+		/* try reading mac address from EEPROM */
 	if (smsc75xx_read_eeprom(dev, EEPROM_MAC_OFFSET, ETH_ALEN,
 			dev->net->dev_addr) == 0) {
 		if (is_valid_ether_addr(dev->net->dev_addr)) {
 			/* eeprom values are valid so use them */
-			netif_dbg(dev, ifup, dev->net,
-				"MAC address read from EEPROM");
-			return;
+			netif_dbg(dev, ifup, dev->net, "MAC address read from EEPROM");
+		} else {
+			__setup("asix_mac2=", setup_smsc7500_mac);
+			if (g_usr_mac && (g_usr_mac < 2) && !g_mac_alloc[0]) {
+				/* Get user set MAC address */
+				memcpy(dev->net->dev_addr, g_mac_addr[0], ETH_ALEN);
+				g_usr_mac++;
+			}
+			else {
+				netdev_warn(dev->net, "using random MAC address,\n please add a valid asix_mac2=mac address!");
+				/* no eeprom, or eeprom values are invalid. generate random MAC */
+				random_ether_addr(dev->net->dev_addr);
+				netif_dbg(dev, ifup, dev->net, "MAC address set to random_ether_addr");
+			}
 		}
-	}
 
-	/* no eeprom, or eeprom values are invalid. generate random MAC */
-	random_ether_addr(dev->net->dev_addr);
-	netif_dbg(dev, ifup, dev->net, "MAC address set to random_ether_addr");
+	}
+return;
 }
 
 static int smsc75xx_set_mac_address(struct usbnet *dev)
@@ -625,24 +854,34 @@ static int smsc75xx_set_mac_address(struct usbnet *dev)
 	u32 addr_hi = dev->net->dev_addr[4] | dev->net->dev_addr[5] << 8;
 
 	int ret = smsc75xx_write_reg(dev, RX_ADDRH, addr_hi);
-	check_warn_return(ret, "Failed to write RX_ADDRH: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write RX_ADDRH: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_write_reg(dev, RX_ADDRL, addr_lo);
-	check_warn_return(ret, "Failed to write RX_ADDRL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write RX_ADDRL: %d\n", ret);
+		return ret;
+	}
 
 	addr_hi |= ADDR_FILTX_FB_VALID;
 	ret = smsc75xx_write_reg(dev, ADDR_FILTX, addr_hi);
-	check_warn_return(ret, "Failed to write ADDR_FILTX: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write ADDR_FILTX: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_write_reg(dev, ADDR_FILTX + 4, addr_lo);
-	check_warn_return(ret, "Failed to write ADDR_FILTX+4: %d", ret);
+	if (ret < 0)
+		netdev_warn(dev->net, "Failed to write ADDR_FILTX+4: %d\n", ret);
 
-	return 0;
+	return ret;
 }
 
 static int smsc75xx_phy_initialize(struct usbnet *dev)
 {
-	int bmcr, timeout = 0;
+	int bmcr, ret, timeout = 0;
 
 	/* Initialize MII structure */
 	dev->mii.dev = dev->net;
@@ -650,6 +889,7 @@ static int smsc75xx_phy_initialize(struct usbnet *dev)
 	dev->mii.mdio_write = smsc75xx_mdio_write;
 	dev->mii.phy_id_mask = 0x1f;
 	dev->mii.reg_num_mask = 0x1f;
+	dev->mii.supports_gmii = 1;
 	dev->mii.phy_id = SMSC75XX_INTERNAL_PHY_ID;
 
 	/* reset phy and wait for reset to complete */
@@ -658,28 +898,38 @@ static int smsc75xx_phy_initialize(struct usbnet *dev)
 	do {
 		msleep(10);
 		bmcr = smsc75xx_mdio_read(dev->net, dev->mii.phy_id, MII_BMCR);
-		check_warn_return(bmcr, "Error reading MII_BMCR");
+		if (bmcr < 0) {
+			netdev_warn(dev->net, "Error reading MII_BMCR\n");
+			return bmcr;
+		}
 		timeout++;
-	} while ((bmcr & MII_BMCR) && (timeout < 100));
+	} while ((bmcr & BMCR_RESET) && (timeout < 100));
 
 	if (timeout >= 100) {
-		netdev_warn(dev->net, "timeout on PHY Reset");
+		netdev_warn(dev->net, "timeout on PHY Reset\n");
 		return -EIO;
 	}
 
 	smsc75xx_mdio_write(dev->net, dev->mii.phy_id, MII_ADVERTISE,
 		ADVERTISE_ALL | ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP |
 		ADVERTISE_PAUSE_ASYM);
+	smsc75xx_mdio_write(dev->net, dev->mii.phy_id, MII_CTRL1000,
+		ADVERTISE_1000FULL);
 
-	/* read to clear */
-	smsc75xx_mdio_read(dev->net, dev->mii.phy_id, PHY_INT_SRC);
-	check_warn_return(bmcr, "Error reading PHY_INT_SRC");
+	/* read and write to clear phy interrupt status */
+	ret = smsc75xx_mdio_read(dev->net, dev->mii.phy_id, PHY_INT_SRC);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading PHY_INT_SRC\n");
+		return ret;
+	}
+
+	smsc75xx_mdio_write(dev->net, dev->mii.phy_id, PHY_INT_SRC, 0xffff);
 
 	smsc75xx_mdio_write(dev->net, dev->mii.phy_id, PHY_INT_MASK,
 		PHY_INT_MASK_DEFAULT);
 	mii_nway_restart(&dev->mii);
 
-	netif_dbg(dev, ifup, dev->net, "phy initialised successfully");
+	netif_dbg(dev, ifup, dev->net, "phy initialised successfully\n");
 	return 0;
 }
 
@@ -690,14 +940,20 @@ static int smsc75xx_set_rx_max_frame_length(struct usbnet *dev, int size)
 	bool rxenabled;
 
 	ret = smsc75xx_read_reg(dev, MAC_RX, &buf);
-	check_warn_return(ret, "Failed to read MAC_RX: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read MAC_RX: %d\n", ret);
+		return ret;
+	}
 
 	rxenabled = ((buf & MAC_RX_RXEN) != 0);
 
 	if (rxenabled) {
 		buf &= ~MAC_RX_RXEN;
 		ret = smsc75xx_write_reg(dev, MAC_RX, buf);
-		check_warn_return(ret, "Failed to write MAC_RX: %d", ret);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to write MAC_RX: %d\n", ret);
+			return ret;
+		}
 	}
 
 	/* add 4 to size for FCS */
@@ -705,12 +961,18 @@ static int smsc75xx_set_rx_max_frame_length(struct usbnet *dev, int size)
 	buf |= (((size + 4) << MAC_RX_MAX_SIZE_SHIFT) & MAC_RX_MAX_SIZE);
 
 	ret = smsc75xx_write_reg(dev, MAC_RX, buf);
-	check_warn_return(ret, "Failed to write MAC_RX: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write MAC_RX: %d\n", ret);
+		return ret;
+	}
 
 	if (rxenabled) {
 		buf |= MAC_RX_RXEN;
 		ret = smsc75xx_write_reg(dev, MAC_RX, buf);
-		check_warn_return(ret, "Failed to write MAC_RX: %d", ret);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to write MAC_RX: %d\n", ret);
+			return ret;
+		}
 	}
 
 	return 0;
@@ -721,7 +983,10 @@ static int smsc75xx_change_mtu(struct net_device *netdev, int new_mtu)
 	struct usbnet *dev = netdev_priv(netdev);
 
 	int ret = smsc75xx_set_rx_max_frame_length(dev, new_mtu);
-	check_warn_return(ret, "Failed to set mac rx frame length");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to set mac rx frame length\n");
+		return ret;
+	}
 
 	return usbnet_change_mtu(netdev, new_mtu);
 }
@@ -745,9 +1010,36 @@ static int smsc75xx_set_features(struct net_device *netdev, u32 features)
 	/* it's racing here! */
 
 	ret = smsc75xx_write_reg(dev, RFE_CTL, pdata->rfe_ctl);
-	check_warn_return(ret, "Error writing RFE_CTL");
+	if (ret < 0)
+		netdev_warn(dev->net, "Error writing RFE_CTL\n");
 
-	return 0;
+	return ret;
+}
+
+static int smsc75xx_wait_ready(struct usbnet *dev, int in_pm)
+{
+	int timeout = 0;
+
+	do {
+		u32 buf;
+		int ret;
+
+		ret = __smsc75xx_read_reg(dev, PMT_CTL, &buf, in_pm);
+
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to read PMT_CTL: %d\n", ret);
+			return ret;
+		}
+
+		if (buf & PMT_CTL_DEV_RDY)
+			return 0;
+
+		msleep(10);
+		timeout++;
+	} while (timeout < 100);
+
+	netdev_warn(dev->net, "timeout waiting for device ready\n");
+	return -EIO;
 }
 
 static int smsc75xx_reset(struct usbnet *dev)
@@ -756,76 +1048,112 @@ static int smsc75xx_reset(struct usbnet *dev)
 	u32 buf;
 	int ret = 0, timeout;
 
-	netif_dbg(dev, ifup, dev->net, "entering smsc75xx_reset");
+	netif_dbg(dev, ifup, dev->net, "entering smsc75xx_reset\n");
+
+	ret = smsc75xx_wait_ready(dev, 0);
+	if (ret < 0) {
+		netdev_warn(dev->net, "device not ready in smsc75xx_reset\n");
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, HW_CFG, &buf);
-	check_warn_return(ret, "Failed to read HW_CFG: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read HW_CFG: %d\n", ret);
+		return ret;
+	}
 
 	buf |= HW_CFG_LRST;
 
 	ret = smsc75xx_write_reg(dev, HW_CFG, buf);
-	check_warn_return(ret, "Failed to write HW_CFG: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write HW_CFG: %d\n", ret);
+		return ret;
+	}
 
 	timeout = 0;
 	do {
 		msleep(10);
 		ret = smsc75xx_read_reg(dev, HW_CFG, &buf);
-		check_warn_return(ret, "Failed to read HW_CFG: %d", ret);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to read HW_CFG: %d\n", ret);
+			return ret;
+		}
 		timeout++;
 	} while ((buf & HW_CFG_LRST) && (timeout < 100));
 
 	if (timeout >= 100) {
-		netdev_warn(dev->net, "timeout on completion of Lite Reset");
+		netdev_warn(dev->net, "timeout on completion of Lite Reset\n");
 		return -EIO;
 	}
 
-	netif_dbg(dev, ifup, dev->net, "Lite reset complete, resetting PHY");
+	netif_dbg(dev, ifup, dev->net, "Lite reset complete, resetting PHY\n");
 
 	ret = smsc75xx_read_reg(dev, PMT_CTL, &buf);
-	check_warn_return(ret, "Failed to read PMT_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read PMT_CTL: %d\n", ret);
+		return ret;
+	}
 
 	buf |= PMT_CTL_PHY_RST;
 
 	ret = smsc75xx_write_reg(dev, PMT_CTL, buf);
-	check_warn_return(ret, "Failed to write PMT_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write PMT_CTL: %d\n", ret);
+		return ret;
+	}
 
 	timeout = 0;
 	do {
 		msleep(10);
 		ret = smsc75xx_read_reg(dev, PMT_CTL, &buf);
-		check_warn_return(ret, "Failed to read PMT_CTL: %d", ret);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to read PMT_CTL: %d\n", ret);
+			return ret;
+		}
 		timeout++;
 	} while ((buf & PMT_CTL_PHY_RST) && (timeout < 100));
 
 	if (timeout >= 100) {
-		netdev_warn(dev->net, "timeout waiting for PHY Reset");
+		netdev_warn(dev->net, "timeout waiting for PHY Reset\n");
 		return -EIO;
 	}
 
-	netif_dbg(dev, ifup, dev->net, "PHY reset complete");
-
-	smsc75xx_init_mac_address(dev);
+	netif_dbg(dev, ifup, dev->net, "PHY reset complete\n");
 
 	ret = smsc75xx_set_mac_address(dev);
-	check_warn_return(ret, "Failed to set mac address");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to set mac address\n");
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "MAC Address: %pM", dev->net->dev_addr);
+	netif_dbg(dev, ifup, dev->net, "MAC Address: %pM\n",
+		  dev->net->dev_addr);
 
 	ret = smsc75xx_read_reg(dev, HW_CFG, &buf);
-	check_warn_return(ret, "Failed to read HW_CFG: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read HW_CFG: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "Read Value from HW_CFG : 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "Read Value from HW_CFG : 0x%08x\n",
+		  buf);
 
 	buf |= HW_CFG_BIR;
 
 	ret = smsc75xx_write_reg(dev, HW_CFG, buf);
-	check_warn_return(ret, "Failed to write HW_CFG: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net,  "Failed to write HW_CFG: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, HW_CFG, &buf);
-	check_warn_return(ret, "Failed to read HW_CFG: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read HW_CFG: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "Read Value from HW_CFG after "
-			"writing HW_CFG_BIR: 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "Read Value from HW_CFG after writing HW_CFG_BIR: 0x%08x\n",
+		  buf);
 
 	if (!turbo_mode) {
 		buf = 0;
@@ -838,94 +1166,157 @@ static int smsc75xx_reset(struct usbnet *dev)
 		dev->rx_urb_size = DEFAULT_FS_BURST_CAP_SIZE;
 	}
 
-	netif_dbg(dev, ifup, dev->net, "rx_urb_size=%ld",
-		(ulong)dev->rx_urb_size);
+	netif_dbg(dev, ifup, dev->net, "rx_urb_size=%ld\n",
+		  (ulong)dev->rx_urb_size);
 
 	ret = smsc75xx_write_reg(dev, BURST_CAP, buf);
-	check_warn_return(ret, "Failed to write BURST_CAP: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write BURST_CAP: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, BURST_CAP, &buf);
-	check_warn_return(ret, "Failed to read BURST_CAP: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read BURST_CAP: %d\n", ret);
+		return ret;
+	}
 
 	netif_dbg(dev, ifup, dev->net,
-		"Read Value from BURST_CAP after writing: 0x%08x", buf);
+		  "Read Value from BURST_CAP after writing: 0x%08x\n", buf);
 
 	ret = smsc75xx_write_reg(dev, BULK_IN_DLY, DEFAULT_BULK_IN_DELAY);
-	check_warn_return(ret, "Failed to write BULK_IN_DLY: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write BULK_IN_DLY: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, BULK_IN_DLY, &buf);
-	check_warn_return(ret, "Failed to read BULK_IN_DLY: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read BULK_IN_DLY: %d\n", ret);
+		return ret;
+	}
 
 	netif_dbg(dev, ifup, dev->net,
-		"Read Value from BULK_IN_DLY after writing: 0x%08x", buf);
+		  "Read Value from BULK_IN_DLY after writing: 0x%08x\n", buf);
 
 	if (turbo_mode) {
 		ret = smsc75xx_read_reg(dev, HW_CFG, &buf);
-		check_warn_return(ret, "Failed to read HW_CFG: %d", ret);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to read HW_CFG: %d\n", ret);
+			return ret;
+		}
 
-		netif_dbg(dev, ifup, dev->net, "HW_CFG: 0x%08x", buf);
+		netif_dbg(dev, ifup, dev->net, "HW_CFG: 0x%08x\n", buf);
 
 		buf |= (HW_CFG_MEF | HW_CFG_BCE);
 
 		ret = smsc75xx_write_reg(dev, HW_CFG, buf);
-		check_warn_return(ret, "Failed to write HW_CFG: %d", ret);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to write HW_CFG: %d\n", ret);
+			return ret;
+		}
 
 		ret = smsc75xx_read_reg(dev, HW_CFG, &buf);
-		check_warn_return(ret, "Failed to read HW_CFG: %d", ret);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to read HW_CFG: %d\n", ret);
+			return ret;
+		}
 
-		netif_dbg(dev, ifup, dev->net, "HW_CFG: 0x%08x", buf);
+		netif_dbg(dev, ifup, dev->net, "HW_CFG: 0x%08x\n", buf);
 	}
 
 	/* set FIFO sizes */
 	buf = (MAX_RX_FIFO_SIZE - 512) / 512;
 	ret = smsc75xx_write_reg(dev, FCT_RX_FIFO_END, buf);
-	check_warn_return(ret, "Failed to write FCT_RX_FIFO_END: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write FCT_RX_FIFO_END: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "FCT_RX_FIFO_END set to 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "FCT_RX_FIFO_END set to 0x%08x\n", buf);
 
 	buf = (MAX_TX_FIFO_SIZE - 512) / 512;
 	ret = smsc75xx_write_reg(dev, FCT_TX_FIFO_END, buf);
-	check_warn_return(ret, "Failed to write FCT_TX_FIFO_END: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write FCT_TX_FIFO_END: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "FCT_TX_FIFO_END set to 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "FCT_TX_FIFO_END set to 0x%08x\n", buf);
 
 	ret = smsc75xx_write_reg(dev, INT_STS, INT_STS_CLEAR_ALL);
-	check_warn_return(ret, "Failed to write INT_STS: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write INT_STS: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, ID_REV, &buf);
-	check_warn_return(ret, "Failed to read ID_REV: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read ID_REV: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "ID_REV = 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "ID_REV = 0x%08x\n", buf);
 
-	/* Configure GPIO pins as LED outputs */
-	ret = smsc75xx_read_reg(dev, LED_GPIO_CFG, &buf);
-	check_warn_return(ret, "Failed to read LED_GPIO_CFG: %d", ret);
+	ret = smsc75xx_read_reg(dev, E2P_CMD, &buf);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read E2P_CMD: %d\n", ret);
+		return ret;
+	}
 
-	buf &= ~(LED_GPIO_CFG_LED2_FUN_SEL | LED_GPIO_CFG_LED10_FUN_SEL);
-	buf |= LED_GPIO_CFG_LEDGPIO_EN | LED_GPIO_CFG_LED2_FUN_SEL;
+	/* only set default GPIO/LED settings if no EEPROM is detected */
+	if (!(buf & E2P_CMD_LOADED)) {
+		ret = smsc75xx_read_reg(dev, LED_GPIO_CFG, &buf);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to read LED_GPIO_CFG: %d\n", ret);
+			return ret;
+		}
 
-	ret = smsc75xx_write_reg(dev, LED_GPIO_CFG, buf);
-	check_warn_return(ret, "Failed to write LED_GPIO_CFG: %d", ret);
+		buf &= ~(LED_GPIO_CFG_LED2_FUN_SEL | LED_GPIO_CFG_LED10_FUN_SEL);
+		buf |= LED_GPIO_CFG_LEDGPIO_EN | LED_GPIO_CFG_LED2_FUN_SEL | LED_GPIO_CFG_LED10_FUN_SEL;
+
+		ret = smsc75xx_write_reg(dev, LED_GPIO_CFG, buf);
+		if (ret < 0) {
+			netdev_warn(dev->net, "Failed to write LED_GPIO_CFG: %d\n", ret);
+			return ret;
+		}
+	}
 
 	ret = smsc75xx_write_reg(dev, FLOW, 0);
-	check_warn_return(ret, "Failed to write FLOW: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write FLOW: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_write_reg(dev, FCT_FLOW, 0);
-	check_warn_return(ret, "Failed to write FCT_FLOW: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write FCT_FLOW: %d\n", ret);
+		return ret;
+	}
 
 	/* Don't need rfe_ctl_lock during initialisation */
 	ret = smsc75xx_read_reg(dev, RFE_CTL, &pdata->rfe_ctl);
-	check_warn_return(ret, "Failed to read RFE_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read RFE_CTL: %d\n", ret);
+		return ret;
+	}
 
 	pdata->rfe_ctl |= RFE_CTL_AB | RFE_CTL_DPF;
 
 	ret = smsc75xx_write_reg(dev, RFE_CTL, pdata->rfe_ctl);
-	check_warn_return(ret, "Failed to write RFE_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write RFE_CTL: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, RFE_CTL, &pdata->rfe_ctl);
-	check_warn_return(ret, "Failed to read RFE_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read RFE_CTL: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "RFE_CTL set to 0x%08x", pdata->rfe_ctl);
+	netif_dbg(dev, ifup, dev->net, "RFE_CTL set to 0x%08x\n",
+		  pdata->rfe_ctl);
 
 	/* Enable or disable checksum offload engines */
 	smsc75xx_set_features(dev->net, dev->net->features);
@@ -933,61 +1324,111 @@ static int smsc75xx_reset(struct usbnet *dev)
 	smsc75xx_set_multicast(dev->net);
 
 	ret = smsc75xx_phy_initialize(dev);
-	check_warn_return(ret, "Failed to initialize PHY: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to initialize PHY: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, INT_EP_CTL, &buf);
-	check_warn_return(ret, "Failed to read INT_EP_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read INT_EP_CTL: %d\n", ret);
+		return ret;
+	}
 
 	/* enable PHY interrupts */
 	buf |= INT_ENP_PHY_INT;
 
 	ret = smsc75xx_write_reg(dev, INT_EP_CTL, buf);
-	check_warn_return(ret, "Failed to write INT_EP_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write INT_EP_CTL: %d\n", ret);
+		return ret;
+	}
+
+	/* allow mac to detect speed and duplex from phy */
+	ret = smsc75xx_read_reg(dev, MAC_CR, &buf);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read MAC_CR: %d\n", ret);
+		return ret;
+	}
+
+	buf |= (MAC_CR_ADD | MAC_CR_ASD);
+	ret = smsc75xx_write_reg(dev, MAC_CR, buf);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write MAC_CR: %d\n", ret);
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, MAC_TX, &buf);
-	check_warn_return(ret, "Failed to read MAC_TX: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read MAC_TX: %d\n", ret);
+		return ret;
+	}
 
 	buf |= MAC_TX_TXEN;
 
 	ret = smsc75xx_write_reg(dev, MAC_TX, buf);
-	check_warn_return(ret, "Failed to write MAC_TX: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write MAC_TX: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "MAC_TX set to 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "MAC_TX set to 0x%08x\n", buf);
 
 	ret = smsc75xx_read_reg(dev, FCT_TX_CTL, &buf);
-	check_warn_return(ret, "Failed to read FCT_TX_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read FCT_TX_CTL: %d\n", ret);
+		return ret;
+	}
 
 	buf |= FCT_TX_CTL_EN;
 
 	ret = smsc75xx_write_reg(dev, FCT_TX_CTL, buf);
-	check_warn_return(ret, "Failed to write FCT_TX_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write FCT_TX_CTL: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "FCT_TX_CTL set to 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "FCT_TX_CTL set to 0x%08x\n", buf);
 
 	ret = smsc75xx_set_rx_max_frame_length(dev, 1514);
-	check_warn_return(ret, "Failed to set max rx frame length");
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to set max rx frame length\n");
+		return ret;
+	}
 
 	ret = smsc75xx_read_reg(dev, MAC_RX, &buf);
-	check_warn_return(ret, "Failed to read MAC_RX: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read MAC_RX: %d\n", ret);
+		return ret;
+	}
 
 	buf |= MAC_RX_RXEN;
 
 	ret = smsc75xx_write_reg(dev, MAC_RX, buf);
-	check_warn_return(ret, "Failed to write MAC_RX: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write MAC_RX: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "MAC_RX set to 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "MAC_RX set to 0x%08x\n", buf);
 
 	ret = smsc75xx_read_reg(dev, FCT_RX_CTL, &buf);
-	check_warn_return(ret, "Failed to read FCT_RX_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to read FCT_RX_CTL: %d\n", ret);
+		return ret;
+	}
 
 	buf |= FCT_RX_CTL_EN;
 
 	ret = smsc75xx_write_reg(dev, FCT_RX_CTL, buf);
-	check_warn_return(ret, "Failed to write FCT_RX_CTL: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Failed to write FCT_RX_CTL: %d\n", ret);
+		return ret;
+	}
 
-	netif_dbg(dev, ifup, dev->net, "FCT_RX_CTL set to 0x%08x", buf);
+	netif_dbg(dev, ifup, dev->net, "FCT_RX_CTL set to 0x%08x\n", buf);
 
-	netif_dbg(dev, ifup, dev->net, "smsc75xx_reset, return 0");
+	netif_dbg(dev, ifup, dev->net, "smsc75xx_reset, return 0\n");
 	return 0;
 }
 
@@ -1000,7 +1441,7 @@ static const struct net_device_ops smsc75xx_netdev_ops = {
 	.ndo_set_mac_address 	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_do_ioctl 		= smsc75xx_ioctl,
-	.ndo_set_multicast_list = smsc75xx_set_multicast,
+	.ndo_set_rx_mode	= smsc75xx_set_multicast,
 	.ndo_set_features	= smsc75xx_set_features,
 };
 
@@ -1012,14 +1453,17 @@ static int smsc75xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	printk(KERN_INFO SMSC_CHIPNAME " v" SMSC_DRIVER_VERSION "\n");
 
 	ret = usbnet_get_endpoints(dev, intf);
-	check_warn_return(ret, "usbnet_get_endpoints failed: %d", ret);
+	if (ret < 0) {
+		netdev_warn(dev->net, "usbnet_get_endpoints failed: %d\n", ret);
+		return ret;
+	}
 
 	dev->data[0] = (unsigned long)kzalloc(sizeof(struct smsc75xx_priv),
 		GFP_KERNEL);
 
 	pdata = (struct smsc75xx_priv *)(dev->data[0]);
 	if (!pdata) {
-		netdev_warn(dev->net, "Unable to allocate smsc75xx_priv");
+		netdev_warn(dev->net, "Unable to allocate smsc75xx_priv\n");
 		return -ENOMEM;
 	}
 
@@ -1042,13 +1486,26 @@ static int smsc75xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->net->hw_features = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 		NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_RXCSUM;
 
+	ret = smsc75xx_wait_ready(dev, 0);
+	if (ret < 0) {
+		netdev_warn(dev->net, "device not ready in smsc75xx_bind\n");
+		return ret;
+	}
+
+	smsc75xx_init_mac_address(dev);
+
 	/* Init all registers */
 	ret = smsc75xx_reset(dev);
+	if (ret < 0) {
+		netdev_warn(dev->net, "smsc75xx_reset error %d\n", ret);
+		return ret;
+	}
 
 	dev->net->netdev_ops = &smsc75xx_netdev_ops;
 	dev->net->ethtool_ops = &smsc75xx_ethtool_ops;
 	dev->net->flags |= IFF_MULTICAST;
 	dev->net->hard_header_len += SMSC75XX_TX_OVERHEAD;
+	dev->hard_mtu = dev->net->mtu + dev->net->hard_header_len;
 	return 0;
 }
 
@@ -1056,13 +1513,279 @@ static void smsc75xx_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct smsc75xx_priv *pdata = (struct smsc75xx_priv *)(dev->data[0]);
 	if (pdata) {
-		netif_dbg(dev, ifdown, dev->net, "free pdata");
+		netif_dbg(dev, ifdown, dev->net, "free pdata\n");
 		kfree(pdata);
 		pdata = NULL;
 		dev->data[0] = 0;
 	}
 }
 
+static u16 smsc_crc(const u8 *buffer, size_t len)
+{
+	return bitrev16(crc16(0xFFFF, buffer, len));
+}
+
+static int smsc75xx_write_wuff(struct usbnet *dev, int filter, u32 wuf_cfg,
+			       u32 wuf_mask1)
+{
+	int cfg_base = WUF_CFGX + filter * 4;
+	int mask_base = WUF_MASKX + filter * 16;
+	int ret;
+
+	ret = smsc75xx_write_reg(dev, cfg_base, wuf_cfg);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing WUF_CFGX\n");
+		return ret;
+	}
+
+	ret = smsc75xx_write_reg(dev, mask_base, wuf_mask1);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing WUF_MASKX\n");
+		return ret;
+	}
+
+	ret = smsc75xx_write_reg(dev, mask_base + 4, 0);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing WUF_MASKX\n");
+		return ret;
+	}
+
+	ret = smsc75xx_write_reg(dev, mask_base + 8, 0);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing WUF_MASKX\n");
+		return ret;
+	}
+
+	ret = smsc75xx_write_reg(dev, mask_base + 12, 0);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing WUF_MASKX\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static int smsc75xx_enter_suspend0(struct usbnet *dev)
+{
+	struct smsc75xx_priv *pdata = (struct smsc75xx_priv *)(dev->data[0]);
+	u32 val;
+	int ret;
+
+	ret = smsc75xx_read_reg_nopm(dev, PMT_CTL, &val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading PMT_CTL\n");
+		return ret;
+	}
+
+	val &= (~(PMT_CTL_SUS_MODE | PMT_CTL_PHY_RST));
+	val |= PMT_CTL_SUS_MODE_0 | PMT_CTL_WOL_EN | PMT_CTL_WUPS;
+
+	ret = smsc75xx_write_reg_nopm(dev, PMT_CTL, val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing PMT_CTL\n");
+		return ret;
+	}
+
+	pdata->suspend_flags |= SUSPEND_SUSPEND0;
+
+	return 0;
+}
+
+static int smsc75xx_enter_suspend1(struct usbnet *dev)
+{
+	struct smsc75xx_priv *pdata = (struct smsc75xx_priv *)(dev->data[0]);
+	u32 val;
+	int ret;
+
+	ret = smsc75xx_read_reg_nopm(dev, PMT_CTL, &val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading PMT_CTL\n");
+		return ret;
+	}
+
+	val &= ~(PMT_CTL_SUS_MODE | PMT_CTL_WUPS | PMT_CTL_PHY_RST);
+	val |= PMT_CTL_SUS_MODE_1;
+
+	ret = smsc75xx_write_reg_nopm(dev, PMT_CTL, val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing PMT_CTL\n");
+		return ret;
+	}
+
+	/* clear wol status, enable energy detection */
+	val &= ~PMT_CTL_WUPS;
+	val |= (PMT_CTL_WUPS_ED | PMT_CTL_ED_EN);
+
+	ret = smsc75xx_write_reg_nopm(dev, PMT_CTL, val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing PMT_CTL\n");
+		return ret;
+	}
+
+	pdata->suspend_flags |= SUSPEND_SUSPEND1;
+
+	return 0;
+}
+
+static int smsc75xx_enter_suspend2(struct usbnet *dev)
+{
+	struct smsc75xx_priv *pdata = (struct smsc75xx_priv *)(dev->data[0]);
+	u32 val;
+	int ret;
+
+	ret = smsc75xx_read_reg_nopm(dev, PMT_CTL, &val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading PMT_CTL\n");
+		return ret;
+	}
+
+	val &= ~(PMT_CTL_SUS_MODE | PMT_CTL_WUPS | PMT_CTL_PHY_RST);
+	val |= PMT_CTL_SUS_MODE_2;
+
+	ret = smsc75xx_write_reg_nopm(dev, PMT_CTL, val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing PMT_CTL\n");
+		return ret;
+	}
+
+	pdata->suspend_flags |= SUSPEND_SUSPEND2;
+
+	return 0;
+}
+
+static int smsc75xx_enter_suspend3(struct usbnet *dev)
+{
+	struct smsc75xx_priv *pdata = (struct smsc75xx_priv *)(dev->data[0]);
+	u32 val;
+	int ret;
+
+	ret = smsc75xx_read_reg_nopm(dev, FCT_RX_CTL, &val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading FCT_RX_CTL\n");
+		return ret;
+	}
+
+	if (val & FCT_RX_CTL_RXUSED) {
+		netdev_dbg(dev->net, "rx fifo not empty in autosuspend\n");
+		return -EBUSY;
+	}
+
+	ret = smsc75xx_read_reg_nopm(dev, PMT_CTL, &val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading PMT_CTL\n");
+		return ret;
+	}
+
+	val &= ~(PMT_CTL_SUS_MODE | PMT_CTL_WUPS | PMT_CTL_PHY_RST);
+	val |= PMT_CTL_SUS_MODE_3 | PMT_CTL_RES_CLR_WKP_EN;
+
+	ret = smsc75xx_write_reg_nopm(dev, PMT_CTL, val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing PMT_CTL\n");
+		return ret;
+	}
+
+	/* clear wol status */
+	val &= ~PMT_CTL_WUPS;
+	val |= PMT_CTL_WUPS_WOL;
+
+	ret = smsc75xx_write_reg_nopm(dev, PMT_CTL, val);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error writing PMT_CTL\n");
+		return ret;
+	}
+
+	pdata->suspend_flags |= SUSPEND_SUSPEND3;
+
+	return 0;
+}
+
+static int smsc75xx_enable_phy_wakeup_interrupts(struct usbnet *dev, u16 mask)
+{
+	struct mii_if_info *mii = &dev->mii;
+	int ret;
+
+	netdev_dbg(dev->net, "enabling PHY wakeup interrupts\n");
+
+	/* read to clear */
+	ret = smsc75xx_mdio_read_nopm(dev->net, mii->phy_id, PHY_INT_SRC);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading PHY_INT_SRC\n");
+		return ret;
+	}
+
+	/* enable interrupt source */
+	ret = smsc75xx_mdio_read_nopm(dev->net, mii->phy_id, PHY_INT_MASK);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading PHY_INT_MASK\n");
+		return ret;
+	}
+
+	ret |= mask;
+
+	smsc75xx_mdio_write_nopm(dev->net, mii->phy_id, PHY_INT_MASK, ret);
+
+	return 0;
+}
+
+static int smsc75xx_link_ok_nopm(struct usbnet *dev)
+{
+	struct mii_if_info *mii = &dev->mii;
+	int ret;
+
+	/* first, a dummy read, needed to latch some MII phys */
+	ret = smsc75xx_mdio_read_nopm(dev->net, mii->phy_id, MII_BMSR);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading MII_BMSR\n");
+		return ret;
+	}
+
+	ret = smsc75xx_mdio_read_nopm(dev->net, mii->phy_id, MII_BMSR);
+	if (ret < 0) {
+		netdev_warn(dev->net, "Error reading MII_BMSR\n");
+		return ret;
+	}
+
+	return !!(ret & BMSR_LSTATUS);
+}
+
+static int smsc75xx_autosuspend(struct usbnet *dev, u32 link_up)
+{
+	int ret;
+
+	if (!netif_running(dev->net)) {
+		/* interface is ifconfig down so fully power down hw */
+		netdev_dbg(dev->net, "autosuspend entering SUSPEND2\n");
+		return smsc75xx_enter_suspend2(dev);
+	}
+
+	if (!link_up) {
+		/* link is down so enter EDPD mode */
+		netdev_dbg(dev->net, "autosuspend entering SUSPEND1\n");
+
+		/* enable PHY wakeup events for if cable is attached */
+		ret = smsc75xx_enable_phy_wakeup_interrupts(dev,
+			PHY_INT_MASK_ANEG_COMP);
+		if (ret < 0) {
+			netdev_warn(dev->net, "error enabling PHY wakeup ints\n");
+			return ret;
+		}
+
+		netdev_info(dev->net, "entering SUSPEND1 mode\n");
+		return smsc75xx_enter_suspend1(dev);
+	}
+
+	/* enable PHY wakeup events so we remote wakeup if cable is pulled */
+	ret = smsc75xx_enable_phy_wakeup_interrupts(dev,
+		PHY_INT_MASK_LINK_DOWN);
+	if (ret < 0) {
+		netdev_warn(dev->net, "error enabling PHY wakeup ints\n");
+		return ret;
+	}
+
+	netdev_dbg(dev->net, "autosuspend entering SUSPEND3\n");
+	return smsc75xx_enter_suspend3(dev);
+}
 static void smsc75xx_rx_csum_offload(struct usbnet *dev, struct sk_buff *skb,
 				     u32 rx_cmd_a, u32 rx_cmd_b)
 {
@@ -1088,17 +1811,17 @@ static int smsc75xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 
 		memcpy(&rx_cmd_b, skb->data, sizeof(rx_cmd_b));
 		le32_to_cpus(&rx_cmd_b);
-		skb_pull(skb, 4 + NET_IP_ALIGN);
+		skb_pull(skb, 4 + RXW_PADDING);
 
 		packet = skb->data;
 
 		/* get the packet length */
-		size = (rx_cmd_a & RX_CMD_A_LEN) - NET_IP_ALIGN;
-		align_count = (4 - ((size + NET_IP_ALIGN) % 4)) % 4;
+		size = (rx_cmd_a & RX_CMD_A_LEN) - RXW_PADDING;
+		align_count = (4 - ((size + RXW_PADDING) % 4)) % 4;
 
 		if (unlikely(rx_cmd_a & RX_CMD_A_RED)) {
 			netif_dbg(dev, rx_err, dev->net,
-				"Error rx_cmd_a=0x%08x", rx_cmd_a);
+				  "Error rx_cmd_a=0x%08x\n", rx_cmd_a);
 			dev->net->stats.rx_errors++;
 			dev->net->stats.rx_dropped++;
 
@@ -1110,7 +1833,8 @@ static int smsc75xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 			/* ETH_FRAME_LEN + 4(CRC) + 2(COE) + 4(Vlan) */
 			if (unlikely(size > (ETH_FRAME_LEN + 12))) {
 				netif_dbg(dev, rx_err, dev->net,
-					"size err rx_cmd_a=0x%08x", rx_cmd_a);
+					  "size err rx_cmd_a=0x%08x\n",
+					  rx_cmd_a);
 				return 0;
 			}
 
@@ -1127,7 +1851,7 @@ static int smsc75xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 
 			ax_skb = skb_clone(skb, GFP_ATOMIC);
 			if (unlikely(!ax_skb)) {
-				netdev_warn(dev->net, "Error allocating skb");
+				netdev_warn(dev->net, "Error allocating skb\n");
 				return 0;
 			}
 
@@ -1152,7 +1876,7 @@ static int smsc75xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 	}
 
 	if (unlikely(skb->len < 0)) {
-		netdev_warn(dev->net, "invalid rx length<0 %d", skb->len);
+		netdev_warn(dev->net, "invalid rx length<0 %d\n", skb->len);
 		return 0;
 	}
 
@@ -1200,6 +1924,12 @@ static struct sk_buff *smsc75xx_tx_fixup(struct usbnet *dev,
 	return skb;
 }
 
+static int smsc75xx_manage_power(struct usbnet *dev, int on)
+{
+	dev->intf->needs_remote_wakeup = on;
+	return 0;
+}
+
 static const struct driver_info smsc75xx_info = {
 	.description	= "smsc75xx USB 2.0 Gigabit Ethernet",
 	.bind		= smsc75xx_bind,
@@ -1209,7 +1939,8 @@ static const struct driver_info smsc75xx_info = {
 	.rx_fixup	= smsc75xx_rx_fixup,
 	.tx_fixup	= smsc75xx_tx_fixup,
 	.status		= smsc75xx_status,
-	.flags		= FLAG_ETHER | FLAG_SEND_ZLP,
+	.manage_power	= smsc75xx_manage_power,
+	.flags		= FLAG_ETHER | FLAG_SEND_ZLP | FLAG_LINK_INTR,
 };
 
 static const struct usb_device_id products[] = {
@@ -1233,7 +1964,9 @@ static struct usb_driver smsc75xx_driver = {
 	.probe		= usbnet_probe,
 	.suspend	= usbnet_suspend,
 	.resume		= usbnet_resume,
+	.reset_resume	= usbnet_resume,
 	.disconnect	= usbnet_disconnect,
+	.supports_autosuspend = 1,
 };
 
 static int __init smsc75xx_init(void)
@@ -1247,8 +1980,8 @@ static void __exit smsc75xx_exit(void)
 	usb_deregister(&smsc75xx_driver);
 }
 module_exit(smsc75xx_exit);
-
 MODULE_AUTHOR("Nancy Lin");
-MODULE_AUTHOR("Steve Glendinning <steve.glendinning@smsc.com>");
+MODULE_AUTHOR("Steve Glendinning <steve.glendinning@shawell.net>");
+MODULE_AUTHOR("Rikard Olander hostmobility");
 MODULE_DESCRIPTION("SMSC75XX USB 2.0 Gigabit Ethernet Devices");
 MODULE_LICENSE("GPL");

@@ -1200,6 +1200,10 @@ made_compressed_probe:
 				NULL, acm->writesize, acm_write_bulk, snd);
 		snd->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		snd->instance = acm;
+#if 1 //Added by Quectel for zero packet
+        	if (usb_dev->descriptor.idVendor == 0x1519 && usb_dev->descriptor.idProduct == 0x0020)
+            		snd->urb->transfer_flags |= URB_ZERO_PACKET;
+#endif
 	}
 
 	usb_set_intfdata(intf, acm);

@@ -163,6 +163,9 @@ config HM_WIFI_NETDEV_LED
 	depends on ARCH_TEGRA_2x_SOC && MACH_HM_MX4
 	default n
 	select LEDS_GPIO
+	select NEW_LEDS
+	select LEDS_CLASS
+	select NET
 	select LEDS_TRIGGERS
 	select LEDS_TRIGGER_NETDEV
 	help

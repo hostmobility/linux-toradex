@@ -1,11 +1,14 @@
 /*
  * An I2C driver for the PCF85063 RTC
  * Copyright 2014 Rose Technology
+ * Copyright 2016 Host Mobility AB
  *
  * Author: Søren Andersen <san@rosetechnology.dk>
+ * Author: Mirza Krak <mirza.krak@hostmobility.org>
  * Maintainers: http://www.nslu2-linux.org/
  *
  * based on the other drivers in this same directory.
+ * Mirza Krak back-ported this driver to 3.1.10 kernel
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -77,6 +80,17 @@ static int pcf85063_start_clock(struct i2c_client *client, u8 ctrl1)
 		dev_err(&client->dev, "Failing to start the clock\n");
 		return -EIO;
 	}
+
+	return 0;
+}
+
+static int pcf85063_hw_probe(struct i2c_client *client)
+{
+	int ret;
+
+	ret = i2c_smbus_read_byte_data(client, PCF85063_REG_CTRL1);
+	if (ret < 0)
+		return -EIO;
 
 	return 0;
 }
@@ -191,17 +205,15 @@ static int pcf85063_probe(struct i2c_client *client,
 				const struct i2c_device_id *id)
 {
 	struct rtc_device *rtc;
-	int err;
 
 	dev_dbg(&client->dev, "%s\n", __func__);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C))
 		return -ENODEV;
 
-	err = i2c_smbus_read_byte_data(client, PCF85063_REG_CTRL1);
-	if (err < 0) {
-		dev_err(&client->dev, "RTC chip is not present\n");
-		return err;
+	if (pcf85063_hw_probe(client) < 0) {
+		dev_info(&client->dev, "hardware probe failed\n");
+		return -ENODEV;
 	}
 
 	rtc = rtc_device_register(pcf85063_driver.driver.name,
@@ -231,18 +243,9 @@ static const struct i2c_device_id pcf85063_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, pcf85063_id);
 
-#ifdef CONFIG_OF
-static const struct of_device_id pcf85063_of_match[] = {
-	{ .compatible = "nxp,pcf85063" },
-	{}
-};
-MODULE_DEVICE_TABLE(of, pcf85063_of_match);
-#endif
-
 static struct i2c_driver pcf85063_driver = {
 	.driver		= {
 		.name	= "rtc-pcf85063",
-		.of_match_table = of_match_ptr(pcf85063_of_match),
 	},
 	.probe		= pcf85063_probe,
 	.remove		= pcf85063_remove,
@@ -252,5 +255,6 @@ static struct i2c_driver pcf85063_driver = {
 module_i2c_driver(pcf85063_driver);
 
 MODULE_AUTHOR("Søren Andersen <san@rosetechnology.dk>");
+MODULE_AUTHOR("Mirza Krak <mirza.krak@hostmobility.com>");
 MODULE_DESCRIPTION("PCF85063 RTC driver");
 MODULE_LICENSE("GPL");

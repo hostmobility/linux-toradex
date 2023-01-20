@@ -448,7 +448,107 @@ static struct platform_device colibri_can_device = {
 		.platform_data = &colibri_can_platdata,
 	}
 };
-#endif /* CONFIG_CAN_SJA1000 | CONFIG_CAN_SJA1000_MODULE */
+
+#endif /* CONFIG_HM_GTT_CAN */
+
+static uint8_t mx4_quirk_sja1000_can3_interrupt = 0;
+
+static int __init mx4_quirk_sja1000_can3_int(char *__unused)
+{
+	mx4_quirk_sja1000_can3_interrupt = 1;
+	return 0;
+}
+__setup("mx4_quirk_sja1000_can3_interrupt", mx4_quirk_sja1000_can3_int);
+
+
+static uint8_t mx4_quirk_sja1000_no_clock_out = 0;
+
+static int __init mx4_quirk_sja1000_no_clk(char *__unused)
+{
+	mx4_quirk_sja1000_no_clock_out = 1;
+	return 0;
+}
+__setup("mx4_quirk_sja1000_no_clock_out", mx4_quirk_sja1000_no_clk);
+
+static void colibri_can_init(void)
+{
+	struct sja1000_platform_data * pdata =
+		(struct sja1000_platform_data*)colibri_can_device.dev.platform_data;
+
+
+	if (mx4_quirk_sja1000_no_clock_out) {
+		pdata->cdr = CDR_CLK_OFF | CDR_CBP;
+	}
+
+#ifdef CONFIG_HM_GMI_MUX
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX | SNOR_CONFIG_ADV_POL
+		| SNOR_CONFIG_32BIT,
+		SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN) | SNOR_CONFIG_MUX |
+		SNOR_CONFIG_ADV_POL | SNOR_CONFIG_32BIT, SNOR_CONFIG_REG);
+#else
+	writel(SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+	writel(SNOR_CONFIG_GO | SNOR_CONFIG_SNOR_CS(SNOR_CS_PIN), SNOR_CONFIG_REG);
+#endif /* CONFIG_HM_GMI_MUX */
+
+	tegra_gpio_enable(TEGRA_CAN_INT);
+	tegra_gpio_enable(TEGRA_CAN2_INT);
+	gpio_request_one(TEGRA_CAN_INT, GPIOF_DIR_IN, "CAN1-INT");
+	gpio_request_one(TEGRA_CAN2_INT, GPIOF_DIR_IN, "CAN2-INT");
+
+	colibri_can_resource[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+	colibri_can_resource[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN_INT);
+
+	colibri_can_resource2[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+	colibri_can_resource2[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN2_INT);
+
+	platform_device_register(&colibri_can_device);
+	platform_device_register(&colibri_can_device2);
+
+#if defined CONFIG_HM_GTT_CAN
+	tegra_gpio_enable(TEGRA_CAN3_INT);
+	tegra_gpio_enable(TEGRA_CAN4_INT);
+	tegra_gpio_enable(TEGRA_CAN5_INT);
+	tegra_gpio_enable(TEGRA_CAN6_INT);
+
+	gpio_request_one(TEGRA_CAN5_INT, GPIOF_DIR_IN, "CAN5-INT");
+	gpio_request_one(TEGRA_CAN6_INT, GPIOF_DIR_IN, "CAN6-INT");
+
+	if (mx4_quirk_sja1000_can3_interrupt) {
+		gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN4-INT");
+		gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN3-INT");
+
+		colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+		colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+
+		colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+		colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+	} else {
+		gpio_request_one(TEGRA_CAN3_INT, GPIOF_DIR_IN, "CAN3-INT");
+		gpio_request_one(TEGRA_CAN4_INT, GPIOF_DIR_IN, "CAN4-INT");
+
+		colibri_can_resource3[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+		colibri_can_resource3[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN3_INT);
+
+		colibri_can_resource4[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+		colibri_can_resource4[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN4_INT);
+	}
+
+	colibri_can_resource5[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
+	colibri_can_resource5[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN5_INT);
+
+	colibri_can_resource6[1].start	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
+	colibri_can_resource6[1].end	= TEGRA_GPIO_TO_IRQ(TEGRA_CAN6_INT);
+
+	platform_device_register(&colibri_can_device3);
+	platform_device_register(&colibri_can_device4);
+	platform_device_register(&colibri_can_device5);
+	platform_device_register(&colibri_can_device6);
+#endif /* CONFIG_HM_GTT_CAN */
+}
+
+#endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
+
 
 /* Clocks */
 static struct tegra_clk_init_table colibri_t20_clk_init_table[] __initdata = {
@@ -510,37 +610,80 @@ static struct gpio colibri_t20_gpios[] = {
 //conflicts with MECS Tellurium xPOD2 SSPFRM2
 	{TEGRA_GPIO_PB7,	GPIOF_IN,	"SODIMM pin 63"},
 #endif
-#ifndef COLIBRI_T20_VI
-	{TEGRA_GPIO_PD5,	GPIOF_IN,	"SODI-98, Iris X16-13"},
-	{TEGRA_GPIO_PD6,	GPIOF_IN,	"SODIMM pin 81"},
-	{TEGRA_GPIO_PD7,	GPIOF_IN,	"SODIMM pin 94"},
-#endif
-	{TEGRA_GPIO_PI3,	GPIOF_IN,	"SODIMM pin 130"},
-	{TEGRA_GPIO_PI6,	GPIOF_IN,	"SODIMM pin 132"},
-//conflicts with GMI_ADV_N used for multiplexed address/data bus
-	{TEGRA_GPIO_PK0,	GPIOF_IN,	"SODIMM pin 150"},
-//multiplexed OWR
-	{TEGRA_GPIO_PK1,	GPIOF_IN,	"SODIMM pin 152"},
-#if (!defined(MECS_TELLURIUM) || (!defined(CONFIG_CAN_MCP251X) && \
-                                 !defined(CONFIG_CAN_MCP251X_MODULE))) && \
-	(!defined(CONFIG_TOUCHSCREEN_ATMEL_MXT) && \
-	!defined(CONFIG_TOUCHSCREEN_ATMEL_MXT_MODULE))
-//conflicts with CAN reset on MECS Tellurium xPOD1 CAN
-	{TEGRA_GPIO_PK4,	GPIOF_IN,	"SODIMM pin 106"},
-#endif
-//	{TEGRA_GPIO_PK5,	GPIOF_IN,	"USBC_DET"},
-#ifndef CONFIG_KEYBOARD_GPIO
-//conflicts with menu key
-	{TEGRA_GPIO_PK6,	GPIOF_IN,	"SODIMM pin 135"},
-#endif
-#ifndef COLIBRI_T20_VI
-	{TEGRA_GPIO_PL0,	GPIOF_IN,	"SOD-101, Iris X16-16"},
-	{TEGRA_GPIO_PL1,	GPIOF_IN,	"SOD-103, Iris X16-15"},
-//conflicts with Ethernet interrupt on Protea
-	{TEGRA_GPIO_PL2,	GPIOF_IN,	"SODI-79, Iris X16-19"},
-	{TEGRA_GPIO_PL3,	GPIOF_IN,	"SODI-97, Iris X16-17"},
-	{TEGRA_GPIO_PL6,	GPIOF_IN,	"SODI-85, Iris X16-18"},
-	{TEGRA_GPIO_PL7,	GPIOF_IN,	"SODIMM pin 65"},
+	/* Digital inputs */
+	// P45 is used for CF in PXA. Consider change.
+
+#ifdef CONFIG_HM_DIGITAL_INPUTS
+	#ifndef CONFIG_HM_GMI_MUX
+		{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P29 - DIGITAL-IN-1"},
+		{TEGRA_GPIO_PC7,	(GPIOF_IN | GPIOF_ACT_LOW),		"P43 - DIGITAL-IN-2"},
+		{TEGRA_GPIO_PB6,	(GPIOF_IN | GPIOF_ACT_LOW),		"P55 - DIGITAL-IN-3"},
+		{TEGRA_GPIO_PB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P59 - DIGITAL-IN-4"},
+		{TEGRA_GPIO_PZ0,	(GPIOF_IN | GPIOF_ACT_LOW),		"P23 - DIGITAL-IN-5"},
+		{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
+	#else
+		{TEGRA_GPIO_PU2,	(GPIOF_IN | GPIOF_ACT_LOW),		"P110 - DIGITAL-IN-1"},
+		{TEGRA_GPIO_PC7,	(GPIOF_IN | GPIOF_ACT_LOW),		"P43 - DIGITAL-IN-2"},
+		{TEGRA_GPIO_PV3,	(GPIOF_IN | GPIOF_ACT_LOW),		"P45 - DIGITAL-IN-3"},
+		{TEGRA_GPIO_PBB5,	(GPIOF_IN | GPIOF_ACT_LOW),		"P24 - DIGITAL-IN-4"},
+		{TEGRA_GPIO_PBB4,	(GPIOF_IN | GPIOF_ACT_LOW),		"P22 - DIGITAL-IN-5"},
+		{TEGRA_GPIO_PZ1,	(GPIOF_IN | GPIOF_ACT_LOW),		"P25 - DIGITAL-IN-6"},
+	#endif
+#endif /* CONFIG_HM_DIGITAL_INPUTS */
+
+#ifdef CONFIG_MACH_HM_MX4_GTT
+	{TEGRA_GPIO_PK6,	(GPIOF_IN ),                	"P135 - MODEM-WAKEUP"},
+#else
+	{TEGRA_GPIO_PW2,	(GPIOF_IN ),                	"P129 - MODEM-WAKEUP"},
+#endif /* CONFIG_MACH_HM_MX4_GTT */
+
+	{TEGRA_GPIO_PC6,	(GPIOF_IN ),                	"P31 - XANTSHORT"},
+
+#ifndef CONFIG_HM_GMI_MUX
+	{TEGRA_GPIO_PK0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P150 - MM_PXA300_CMD"},
+#endif /* !CONFIG_HM_GMI_MUX */
+
+	/* Compact flash - These pins are not connected on T20*/
+	{TEGRA_GPIO_PC1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P29 - CF-READY"},
+	{TEGRA_GPIO_PT1,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P75 - CF-RESET"},
+	{TEGRA_GPIO_PT3,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW ),	"MODEM_AUDIO_SWITCH"},
+/*
+	{TEGRA_GPIO_PD6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P81 - CF-nCD1+2"},
+*/
+	{TEGRA_GPIO_PL6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P85 - CF-nPPEN"},
+	{TEGRA_GPIO_PD7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P94 - CF-nPCE1"},
+	{TEGRA_GPIO_PX5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P100 - CF-nPSKTSEL"},
+
+	{TEGRA_GPIO_PX6,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P102 - CF-nPWAIT/MM_PXA300_DAT3"},
+
+	{TEGRA_GPIO_PX7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P104 - CF-nIOIS16/MM_PXA300_DAT2"},
+
+	/* Extern UART Interrupts*/
+#ifdef CONFIG_HM_EXT_8250_UART
+	{TEGRA_GPIO_PT2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P69 - UART-INTA"},
+	{TEGRA_GPIO_PBB2,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P133 - UART-INTB"},
+#ifdef CONFIG_MACH_HM_MX4_VCC
+	{TEGRA_GPIO_PU3,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P112 - UART-INTC"},
+#else
+	{TEGRA_GPIO_PK5,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P137 - UART-INTC"},
+	{TEGRA_GPIO_PX4,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P134 - NC"},
+#endif /* CONFIG_MACH_HM_MX4_VCC */
+#endif /* CONFIG_HM_EXT_8250_UART */
+
+/* Wakeup of external ethernet interface */
+#ifdef CONFIG_HM_EXT_AX88772B
+	{TEGRA_GPIO_PAA2,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW | GPIOF_ACT_LOW),		"P51 - OPT1-WAKE"},
+	{TEGRA_GPIO_PAA3,	(GPIOF_DIR_OUT | GPIOF_INIT_LOW | GPIOF_ACT_LOW),		"P53 - OPT2-WAKE"},
+#endif /* CONFIG_HM_EXT_AX88772B */
+
+	/* Gyro Interrupts */
+	/* Our gyro driver does not support interrupts though */
+#ifndef CONFIG_HM_GMI_MUX
+ 	{TEGRA_GPIO_PA0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P73 - GYRO-INT1"},
+ 	{TEGRA_GPIO_PA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P67 - GYRO-INT2"},
+#else
+ 	{TEGRA_GPIO_PA0,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P73 - GYRO-INT1"},
+ 	{TEGRA_GPIO_PAA7,	(GPIOF_IN | GPIOF_NO_EXPORT),		"P172 - GYRO-INT2"},
 #endif
 
 //multiplexed SPI2_CS0_N, SPI2_MISO, SPI2_MOSI and SPI2_SCK
@@ -659,6 +802,17 @@ static struct mxt_platform_data colibri_atmel_pdata = {
 
 /* GEN1_I2C: I2C_SDA/SCL on SODIMM pin 194/196 (e.g. RTC on carrier board) */
 static struct i2c_board_info colibri_t20_i2c_bus1_board_info[] __initdata = {
+#ifdef CONFIG_RTC_DRV_PCF85063
+    	{
+		I2C_BOARD_INFO("pcf85063", 0x51),
+	},
+#endif
+#ifdef CONFIG_AD525X_DPOT
+    	{
+		I2C_BOARD_INFO("ad5246", 0x2E),
+	},
+#endif
+#ifdef CONFIG_MXC_MMA845X
 	{
 		/* M41T0M6 real time clock on Iris carrier board */
 		I2C_BOARD_INFO("rtc-ds1307", 0x68),
@@ -808,23 +962,37 @@ static struct platform_device colibri_t20_keys_device = {
 #ifndef GMI_32BIT
 /* MMC/SD */
 
-static struct tegra_sdhci_platform_data colibri_t20_sdhci_platform_data = {
-	.cd_gpio	= MMC_CD,
-#ifndef SDHCI_8BIT
-	.is_8bit	= 0,
-#else
-	.is_8bit	= 1,
-#endif
-	.power_gpio	= -1,
-	.wp_gpio	= -1,
+#ifdef CONFIG_MACH_HM_MX4_GTT_SUPPORT_P1C_CIRCUIT
+static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_P1C_platform_data = {
+	.cd_gpio		= MMC_CD_P1C_CIRCUIT,
+	.cd_gpio_wake   = 0,
+	.is_8bit		= 0,
+	.power_gpio		= -1,
+	.wp_gpio		= -1,
+};
+#endif /* CONFIG_MACH_HM_MX4_GTT_SUPPORT_P1C_CIRCUIT */
+
+static struct tegra_sdhci_platform_data colibri_t20_sdhci_mmc_platform_data = {
+	.cd_gpio		= MMC_CD,
+	.cd_gpio_wake   = 0,
+	.is_8bit		= 0,
+	.power_gpio		= -1,
+	.wp_gpio		= -1,
 };
 
 int __init colibri_t20_sdhci_init(void)
 {
 	tegra_sdhci_device4.dev.platform_data =
-			&colibri_t20_sdhci_platform_data;
+			&colibri_t20_sdhci_mmc_platform_data;
+
 	platform_device_register(&tegra_sdhci_device4);
 
+#if defined(CONFIG_MACH_HM_MX4_GTT_SUPPORT_P1C_CIRCUIT)
+	tegra_sdhci_device2.dev.platform_data =
+			&colibri_t20_sdhci_mmc_P1C_platform_data;
+
+	platform_device_register(&tegra_sdhci_device2);
+#endif /* CONFIG_MACH_HM_MX4_GTT_SUPPORT_P1C_CIRCUIT */
 	return 0;
 }
 #endif /* !GMI_32BIT */
@@ -1036,35 +1204,24 @@ static struct platform_device tegra_nand_device = {
 	},
 };
 
-/* PWM LEDs */
-static struct led_pwm tegra_leds_pwm[] = {
-#ifdef MECS_TELLURIUM
-	{
-		.name		= "PWM<A>",
-		.pwm_id		= 0,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 19600,
+
+#ifdef CONFIG_HM_WIFI_NETDEV_LED
+static struct gpio_led status_leds[] = {
+	[0] =  {
+		/* Global on switch for LEDs */
+		.name = "mx4-wifi",
+		.default_trigger = "netdev",
+		.gpio = (MX4_WIFI_LED),
+		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
-#endif /* MECS_TELLURIUM */
-	{
-		.name		= "PWM<B>",
-		.pwm_id		= 1,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 19600,
-	},
-#ifndef MECS_TELLURIUM
-	{
-		.name		= "PWM<C>",
-		.pwm_id		= 2,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 19600,
-	},
-#endif /* !MECS_TELLURIUM */
-	{
-		.name		= "PWM<D>",
-		.pwm_id		= 3,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 19600,
+	[1] =  {
+		/* WIFI-RED on MX-4 T20 */
+		.name = "mx4-wifi-red",
+		.default_trigger = "none",
+		.gpio = (MX4_WIFI_RED),
+		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 	},
 };
 
@@ -1750,6 +1907,17 @@ static struct platform_device *colibri_t20_devices[] __initdata = {
 
 static void __init colibri_t20_init(void)
 {
+
+#if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)
+
+	colibri_can_init();
+
+#endif /* CONFIG_CAN_SJA1000 || CONFIG_CAN_SJA1000_MODULE */
+
+	colibri_l3g4200d_init();
+
+	colibri_t20_wakeup_source_init();
+
 	tegra_clk_init_from_table(colibri_t20_clk_init_table);
 	colibri_t20_pinmux_init();
 #if defined(CONFIG_CAN_SJA1000) || defined(CONFIG_CAN_SJA1000_MODULE)

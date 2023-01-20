@@ -468,22 +468,22 @@ static char do_decode_rx_error(struct tegra_uart_port *t, u8 lsr)
 			/* Overrrun error  */
 			flag = TTY_OVERRUN;
 			t->uport.icount.overrun++;
-			trace_printk("uart overrun\n");
+			dev_err(t->uport.dev,"uart overrun\n");
 		} else if (lsr & UART_LSR_PE) {
 			/* Parity error */
 			flag = TTY_PARITY;
 			t->uport.icount.parity++;
-			trace_printk("uart parity error\n");
+			dev_err(t->uport.dev,"uart parity error\n");
 		} else if (lsr & UART_LSR_FE) {
 			flag = TTY_FRAME;
 			t->uport.icount.frame++;
-			trace_printk("uart frame error\n");
+			dev_err(t->uport.dev,"uart frame error\n");
 		} else if (lsr & UART_LSR_BI) {
-			trace_printk("uart break\n");
 			t->uport.icount.brk++;
 			/* If FIFO read error without any data, reset Rx FIFO */
 			if (!(lsr & UART_LSR_DR) && (lsr & UART_LSR_FIFOE))
 				tegra_fifo_reset(t, UART_FCR_CLEAR_RCVR);
+			dev_err(t->uport.dev,"uart break\n");
 		}
 	}
 	return flag;
@@ -858,7 +858,7 @@ static int tegra_uart_hw_init(struct tegra_uart_port *t)
 			t->fcr_shadow &= ~UART_FCR_DMA_SELECT;
 			uart_writeb(t, t->fcr_shadow, UART_FCR);
 		} else {
-			dev_info(t->uport.dev, "Rx DMA enabled\n");
+			dev_err(t->uport.dev, "Rx DMA enabled!!\n");
 		}
 	} else {
 		uart_writeb(t, t->fcr_shadow, UART_FCR);
@@ -953,6 +953,7 @@ static int tegra_uart_init_rx_dma(struct tegra_uart_port *t)
 
 static int tegra_startup(struct uart_port *u)
 {
+	bool disable_dma_hack = false;
 	struct tegra_uart_port *t = container_of(u,
 		struct tegra_uart_port, uport);
 	int ret = 0;
@@ -961,8 +962,23 @@ static int tegra_startup(struct uart_port *u)
 	t = container_of(u, struct tegra_uart_port, uport);
 	sprintf(t->port_name, "tegra_uart_%d", u->line);
 
+	switch (u->line)
+	{
+		case 0: //t20=j1708=UartA=ttyHS0=uart0
+		case 1: //t20=RS485=UartC=ttyHS1=uart2
+			disable_dma_hack = false;
+			break;
+		case 2: //t20=rs232-1=UartB=ttyHS2=uart4
+		case 3: //t20=rs232-2=UartD=ttyHS3=uart3
+			disable_dma_hack = true;
+			break;
+		default:
+			disable_dma_hack = false;
+			break;
+	}
+
 	t->use_tx_dma = false;
-	if (!TX_FORCE_PIO) {
+	if (!TX_FORCE_PIO && !disable_dma_hack) {
 		t->tx_dma = tegra_dma_allocate_channel(TEGRA_DMA_MODE_ONESHOT,
 					"uart_tx_%d", u->line);
 		if (t->tx_dma)
@@ -990,7 +1006,7 @@ static int tegra_startup(struct uart_port *u)
 	t->tx_in_progress = 0;
 
 	t->use_rx_dma = false;
-	if (!RX_FORCE_PIO && t->rx_dma_req.virt_addr) {
+	if (!RX_FORCE_PIO && t->rx_dma_req.virt_addr && !disable_dma_hack) {
 		if (!tegra_uart_init_rx_dma(t))
 			t->use_rx_dma = true;
 	}

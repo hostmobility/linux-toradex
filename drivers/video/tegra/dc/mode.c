@@ -44,6 +44,23 @@ const struct fb_videomode tegra_modes[] = {
 		.flag = FB_FLAG_RATIO_16_9,
 		.vmode = FB_VMODE_NONINTERLACED
 	},
+        /* 800x480@60 (VDM 65) 31500 60 60 14 28 80 3 */
+        {
+                .name =         "800x480VDM",
+                .refresh =      60,
+                .xres =         800,
+                .yres =         480,
+                .pixclock = 31500,
+                .left_margin =  60,
+                .right_margin = 60,
+                .upper_margin = 14,
+                .lower_margin = 28,
+                .hsync_len =    80,
+                .vsync_len =    3,
+                .sync = 0,
+                .flag = FB_FLAG_RATIO_16_9,
+                .vmode = FB_VMODE_NONINTERLACED
+        },
 	/* 800x480@60 (NEXCOM VMD 1001) */
 	{
 		.name =		"800x480CT",
@@ -78,9 +95,55 @@ const struct fb_videomode tegra_modes[] = {
 		.flag = FB_FLAG_RATIO_16_9,
 		.vmode = FB_VMODE_NONINTERLACED
 	},
-	/* TouchRevolution Fusion 10" aka Chunghwa Picture Tubes
-	 * CLAA100NC05 10.1 inch 1024x600 single channel LVDS panel
-	 */
+	/* 1440x900@60 (Bosch screen) */
+	{
+		.name =		"1440x900CT",
+		.refresh =	60,
+		.xres = 	1440,
+		.yres = 	900,
+		.pixclock = 9392,
+		.left_margin = 	232,
+		.right_margin = 80,
+		.upper_margin = 28,
+		.lower_margin = 1,
+		.hsync_len =	152,
+		.vsync_len = 	3,
+		.sync = FB_SYNC_VERT_HIGH_ACT,
+		//.flag = FB_FLAG_RATIO_16_9,
+		.vmode = FB_VMODE_NONINTERLACED
+	},
+
+	/* Portrait modes */
+	{
+		.name = 	"480x640",
+		.refresh = 	60,
+		.xres = 	480,
+		.yres = 	640,
+		.pixclock = 	55555,
+		.left_margin = 	20,
+		.right_margin = 8,
+		.upper_margin = 7,
+		.lower_margin = 8,
+		.hsync_len = 	4,
+		.vsync_len = 	1,
+		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.vmode = FB_VMODE_NONINTERLACED
+	},
+	{
+		.name = 	"540x960",
+		.refresh = 	60,
+		.xres = 	540,
+		.yres = 	960,
+		.pixclock = 	100000,
+		.left_margin = 	32,
+		.right_margin = 32,
+		.upper_margin = 1,
+		.lower_margin = 2,
+		.hsync_len = 	16,
+		.vsync_len = 	1,
+		.sync = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.vmode = FB_VMODE_NONINTERLACED
+	},
 	{
 		.name = 	"1024x600",
 		.refresh = 	60,
