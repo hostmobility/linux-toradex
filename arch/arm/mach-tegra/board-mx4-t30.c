@@ -1627,7 +1627,7 @@ static const char *colibri_t30_dt_board_compat[] = {
 #ifdef CONFIG_ANDROID
 MACHINE_START(COLIBRI_T30, "cardhu")
 #else
-MACHINE_START(COLIBRI_T30, "Toradex Colibri T30 on MX-4 T20/T30 board")
+MACHINE_START(COLIBRI_T30, "Toradex Colibri T30 on MX-4 T20/T30 board. New memory timing from default windows ce.")
 #endif
 	.boot_params	= 0x80000100,
 	.dt_compat	= colibri_t30_dt_board_compat,
