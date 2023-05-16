@@ -1951,7 +1951,7 @@ static const char *colibri_t20_dt_board_compat[] = {
 #ifdef CONFIG_ANDROID
 MACHINE_START(COLIBRI_T20, "ventana")
 #else
-MACHINE_START(COLIBRI_T20, "Toradex Colibri T20")
+MACHINE_START(COLIBRI_T20, "Toradex Colibri T20, new windows ce dram timing")
 #endif
 	.boot_params	= 0x00000100,
 	.dt_compat	= colibri_t20_dt_board_compat,
